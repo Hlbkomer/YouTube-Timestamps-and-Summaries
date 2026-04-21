@@ -1,0 +1,769 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		3193E6E22F98073700B0CF19 /* YouTube Timestamps and Summaries Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3193E6E12F98073700B0CF19 /* YouTube Timestamps and Summaries Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		3193E6CC2F98073700B0CF19 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3193E6A92F98073600B0CF19 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3193E6B02F98073600B0CF19;
+			remoteInfo = "YouTube Timestamps and Summaries";
+		};
+		3193E6D62F98073700B0CF19 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3193E6A92F98073600B0CF19 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3193E6B02F98073600B0CF19;
+			remoteInfo = "YouTube Timestamps and Summaries";
+		};
+		3193E6E32F98073700B0CF19 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3193E6A92F98073600B0CF19 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3193E6E02F98073700B0CF19;
+			remoteInfo = "YouTube Timestamps and Summaries Extension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		3193E7002F98073700B0CF19 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				3193E6E22F98073700B0CF19 /* YouTube Timestamps and Summaries Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		3193E6B12F98073600B0CF19 /* YouTube Timestamps and Summaries.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "YouTube Timestamps and Summaries.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3193E6CB2F98073700B0CF19 /* YouTube Timestamps and SummariesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "YouTube Timestamps and SummariesTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3193E6D52F98073700B0CF19 /* YouTube Timestamps and SummariesUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "YouTube Timestamps and SummariesUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3193E6E12F98073700B0CF19 /* YouTube Timestamps and Summaries Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "YouTube Timestamps and Summaries Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3193E6FA2F98073700B0CF19 /* Exceptions for "YouTube Timestamps and Summaries Extension" folder in "YouTube Timestamps and Summaries Extension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3193E6E02F98073700B0CF19 /* YouTube Timestamps and Summaries Extension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		3193E6B32F98073600B0CF19 /* YouTube Timestamps and Summaries */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "YouTube Timestamps and Summaries";
+			sourceTree = "<group>";
+		};
+		3193E6CE2F98073700B0CF19 /* YouTube Timestamps and SummariesTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "YouTube Timestamps and SummariesTests";
+			sourceTree = "<group>";
+		};
+		3193E6D82F98073700B0CF19 /* YouTube Timestamps and SummariesUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "YouTube Timestamps and SummariesUITests";
+			sourceTree = "<group>";
+		};
+		3193E6E52F98073700B0CF19 /* YouTube Timestamps and Summaries Extension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3193E6FA2F98073700B0CF19 /* Exceptions for "YouTube Timestamps and Summaries Extension" folder in "YouTube Timestamps and Summaries Extension" target */,
+			);
+			explicitFolders = (
+				Resources/_locales,
+				Resources/images,
+			);
+			path = "YouTube Timestamps and Summaries Extension";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3193E6AE2F98073600B0CF19 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3193E6C82F98073700B0CF19 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3193E6D22F98073700B0CF19 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3193E6DE2F98073700B0CF19 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3193E6A82F98073600B0CF19 = {
+			isa = PBXGroup;
+			children = (
+				3193E6B32F98073600B0CF19 /* YouTube Timestamps and Summaries */,
+				3193E6CE2F98073700B0CF19 /* YouTube Timestamps and SummariesTests */,
+				3193E6D82F98073700B0CF19 /* YouTube Timestamps and SummariesUITests */,
+				3193E6E52F98073700B0CF19 /* YouTube Timestamps and Summaries Extension */,
+				3193E6B22F98073600B0CF19 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3193E6B22F98073600B0CF19 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3193E6B12F98073600B0CF19 /* YouTube Timestamps and Summaries.app */,
+				3193E6CB2F98073700B0CF19 /* YouTube Timestamps and SummariesTests.xctest */,
+				3193E6D52F98073700B0CF19 /* YouTube Timestamps and SummariesUITests.xctest */,
+				3193E6E12F98073700B0CF19 /* YouTube Timestamps and Summaries Extension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3193E6B02F98073600B0CF19 /* YouTube Timestamps and Summaries */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3193E7012F98073700B0CF19 /* Build configuration list for PBXNativeTarget "YouTube Timestamps and Summaries" */;
+			buildPhases = (
+				3193E6AD2F98073600B0CF19 /* Sources */,
+				3193E6AE2F98073600B0CF19 /* Frameworks */,
+				3193E6AF2F98073600B0CF19 /* Resources */,
+				3193E7002F98073700B0CF19 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3193E6E42F98073700B0CF19 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3193E6B32F98073600B0CF19 /* YouTube Timestamps and Summaries */,
+			);
+			name = "YouTube Timestamps and Summaries";
+			packageProductDependencies = (
+			);
+			productName = "YouTube Timestamps and Summaries";
+			productReference = 3193E6B12F98073600B0CF19 /* YouTube Timestamps and Summaries.app */;
+			productType = "com.apple.product-type.application";
+		};
+		3193E6CA2F98073700B0CF19 /* YouTube Timestamps and SummariesTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3193E7042F98073700B0CF19 /* Build configuration list for PBXNativeTarget "YouTube Timestamps and SummariesTests" */;
+			buildPhases = (
+				3193E6C72F98073700B0CF19 /* Sources */,
+				3193E6C82F98073700B0CF19 /* Frameworks */,
+				3193E6C92F98073700B0CF19 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3193E6CD2F98073700B0CF19 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3193E6CE2F98073700B0CF19 /* YouTube Timestamps and SummariesTests */,
+			);
+			name = "YouTube Timestamps and SummariesTests";
+			packageProductDependencies = (
+			);
+			productName = "YouTube Timestamps and SummariesTests";
+			productReference = 3193E6CB2F98073700B0CF19 /* YouTube Timestamps and SummariesTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		3193E6D42F98073700B0CF19 /* YouTube Timestamps and SummariesUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3193E7072F98073700B0CF19 /* Build configuration list for PBXNativeTarget "YouTube Timestamps and SummariesUITests" */;
+			buildPhases = (
+				3193E6D12F98073700B0CF19 /* Sources */,
+				3193E6D22F98073700B0CF19 /* Frameworks */,
+				3193E6D32F98073700B0CF19 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3193E6D72F98073700B0CF19 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				3193E6D82F98073700B0CF19 /* YouTube Timestamps and SummariesUITests */,
+			);
+			name = "YouTube Timestamps and SummariesUITests";
+			packageProductDependencies = (
+			);
+			productName = "YouTube Timestamps and SummariesUITests";
+			productReference = 3193E6D52F98073700B0CF19 /* YouTube Timestamps and SummariesUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		3193E6E02F98073700B0CF19 /* YouTube Timestamps and Summaries Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3193E6FB2F98073700B0CF19 /* Build configuration list for PBXNativeTarget "YouTube Timestamps and Summaries Extension" */;
+			buildPhases = (
+				3193E6DD2F98073700B0CF19 /* Sources */,
+				3193E6DE2F98073700B0CF19 /* Frameworks */,
+				3193E6DF2F98073700B0CF19 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3193E6E52F98073700B0CF19 /* YouTube Timestamps and Summaries Extension */,
+			);
+			name = "YouTube Timestamps and Summaries Extension";
+			packageProductDependencies = (
+			);
+			productName = "YouTube Timestamps and Summaries Extension";
+			productReference = 3193E6E12F98073700B0CF19 /* YouTube Timestamps and Summaries Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3193E6A92F98073600B0CF19 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					3193E6B02F98073600B0CF19 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+					3193E6CA2F98073700B0CF19 = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = 3193E6B02F98073600B0CF19;
+					};
+					3193E6D42F98073700B0CF19 = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = 3193E6B02F98073600B0CF19;
+					};
+					3193E6E02F98073700B0CF19 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+				};
+			};
+			buildConfigurationList = 3193E6AC2F98073600B0CF19 /* Build configuration list for PBXProject "YouTube Timestamps and Summaries" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 3193E6A82F98073600B0CF19;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 3193E6B22F98073600B0CF19 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3193E6B02F98073600B0CF19 /* YouTube Timestamps and Summaries */,
+				3193E6CA2F98073700B0CF19 /* YouTube Timestamps and SummariesTests */,
+				3193E6D42F98073700B0CF19 /* YouTube Timestamps and SummariesUITests */,
+				3193E6E02F98073700B0CF19 /* YouTube Timestamps and Summaries Extension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3193E6AF2F98073600B0CF19 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3193E6C92F98073700B0CF19 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3193E6D32F98073700B0CF19 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3193E6DF2F98073700B0CF19 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3193E6AD2F98073600B0CF19 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3193E6C72F98073700B0CF19 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3193E6D12F98073700B0CF19 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3193E6DD2F98073700B0CF19 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3193E6CD2F98073700B0CF19 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3193E6B02F98073600B0CF19 /* YouTube Timestamps and Summaries */;
+			targetProxy = 3193E6CC2F98073700B0CF19 /* PBXContainerItemProxy */;
+		};
+		3193E6D72F98073700B0CF19 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3193E6B02F98073600B0CF19 /* YouTube Timestamps and Summaries */;
+			targetProxy = 3193E6D62F98073700B0CF19 /* PBXContainerItemProxy */;
+		};
+		3193E6E42F98073700B0CF19 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3193E6E02F98073700B0CF19 /* YouTube Timestamps and Summaries Extension */;
+			targetProxy = 3193E6E32F98073700B0CF19 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3193E6FC2F98073700B0CF19 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "YouTube Timestamps and Summaries Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "YouTube Timestamps and Summaries Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "Matuko.YouTube-Timestamps-and-Summaries.Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		3193E6FD2F98073700B0CF19 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "YouTube Timestamps and Summaries Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "YouTube Timestamps and Summaries Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "Matuko.YouTube-Timestamps-and-Summaries.Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		3193E6FE2F98073700B0CF19 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		3193E6FF2F98073700B0CF19 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		3193E7022F98073700B0CF19 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "YouTube Timestamps and Summaries";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "Matuko.YouTube-Timestamps-and-Summaries";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		3193E7032F98073700B0CF19 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "YouTube Timestamps and Summaries";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "Matuko.YouTube-Timestamps-and-Summaries";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		3193E7052F98073700B0CF19 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Matuko.YouTube-Timestamps-and-SummariesTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YouTube Timestamps and Summaries.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/YouTube Timestamps and Summaries";
+			};
+			name = Debug;
+		};
+		3193E7062F98073700B0CF19 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Matuko.YouTube-Timestamps-and-SummariesTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YouTube Timestamps and Summaries.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/YouTube Timestamps and Summaries";
+			};
+			name = Release;
+		};
+		3193E7082F98073700B0CF19 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Matuko.YouTube-Timestamps-and-SummariesUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "YouTube Timestamps and Summaries";
+			};
+			name = Debug;
+		};
+		3193E7092F98073700B0CF19 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Matuko.YouTube-Timestamps-and-SummariesUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "YouTube Timestamps and Summaries";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3193E6AC2F98073600B0CF19 /* Build configuration list for PBXProject "YouTube Timestamps and Summaries" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3193E6FE2F98073700B0CF19 /* Debug */,
+				3193E6FF2F98073700B0CF19 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3193E6FB2F98073700B0CF19 /* Build configuration list for PBXNativeTarget "YouTube Timestamps and Summaries Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3193E6FC2F98073700B0CF19 /* Debug */,
+				3193E6FD2F98073700B0CF19 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3193E7012F98073700B0CF19 /* Build configuration list for PBXNativeTarget "YouTube Timestamps and Summaries" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3193E7022F98073700B0CF19 /* Debug */,
+				3193E7032F98073700B0CF19 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3193E7042F98073700B0CF19 /* Build configuration list for PBXNativeTarget "YouTube Timestamps and SummariesTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3193E7052F98073700B0CF19 /* Debug */,
+				3193E7062F98073700B0CF19 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3193E7072F98073700B0CF19 /* Build configuration list for PBXNativeTarget "YouTube Timestamps and SummariesUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3193E7082F98073700B0CF19 /* Debug */,
+				3193E7092F98073700B0CF19 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 3193E6A92F98073600B0CF19 /* Project object */;
+}
