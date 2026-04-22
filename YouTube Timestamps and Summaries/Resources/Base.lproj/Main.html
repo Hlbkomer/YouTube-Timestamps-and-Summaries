@@ -2,18 +2,107 @@
 <html>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
-
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:;">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-
     <link rel="stylesheet" href="../Style.css">
     <script src="../Script.js" defer></script>
 </head>
 <body>
-    <img src="../Icon.png" width="128" height="128" alt="YouTube Timestamps and Summaries Icon">
-    <p class="state-unknown">You can turn on YouTube Timestamps and Summaries’s extension in Safari Extensions preferences.</p>
-    <p class="state-on">YouTube Timestamps and Summaries’s extension is currently on. You can turn it off in Safari Extensions preferences.</p>
-    <p class="state-off">YouTube Timestamps and Summaries’s extension is currently off. You can turn it on in Safari Extensions preferences.</p>
-    <button class="open-preferences">Quit and Open Safari Extensions Preferences…</button>
+    <main class="app-shell">
+        <section class="hero">
+            <p class="eyebrow">Safari Companion App</p>
+            <h1>YouTube Timestamps and Summaries</h1>
+        </section>
+
+        <section class="panel checklist-panel">
+            <p class="section-label">Checklist</p>
+            <ol id="checklist" class="checklist">
+                <li>Loading setup steps…</li>
+            </ol>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <p class="section-label">Gemini OAuth Setup</p>
+                    <h2 id="setup-title">Google Cloud values</h2>
+                </div>
+            </div>
+
+            <div id="config-fields">
+                <label class="field">
+                    <span>OAuth Client ID</span>
+                    <input id="client-id" type="text" placeholder="1234567890-abcdef.apps.googleusercontent.com" autocomplete="off">
+                </label>
+
+                <label class="field">
+                    <span>OAuth Client Secret</span>
+                    <input id="client-secret" type="password" placeholder="GOCSPX-..." autocomplete="off">
+                </label>
+
+                <label class="field">
+                    <span>Google Cloud Project ID</span>
+                    <input id="project-id" type="text" placeholder="your-project-id" autocomplete="off">
+                </label>
+            </div>
+
+            <div class="button-row">
+                <button id="save-config" class="primary">Save Setup</button>
+                <button id="sign-in" class="secondary">Sign In With Google</button>
+                <button id="sign-out" class="ghost">Sign Out</button>
+            </div>
+
+            <p id="connection-status" class="connection-status">Waiting for configuration…</p>
+
+            <p id="setup-hint" class="hint">
+                Use a <strong>Desktop app</strong> OAuth client in Google Cloud, enable the
+                <strong>Google Generative Language API</strong>, and keep your test users added while you are developing.
+            </p>
+        </section>
+
+        <section class="panel status-panel">
+            <div>
+                <p class="section-label">Extension Status</p>
+                <p id="extension-status" class="status-line">Checking Safari extension status…</p>
+            </div>
+            <button id="open-preferences" class="secondary">Open Safari Extension Settings</button>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <p class="section-label">Generation Setup</p>
+                    <h2>Model and prompts</h2>
+                </div>
+            </div>
+
+            <label class="field">
+                <span>Gemini model</span>
+                <select id="model">
+                    <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                    <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                </select>
+            </label>
+
+            <label class="field">
+                <span>Timestamps prompt</span>
+                <textarea id="timestamps-prompt" rows="5" placeholder="Create chronological YouTube timestamps..."></textarea>
+            </label>
+
+            <label class="field">
+                <span>Summary prompt</span>
+                <textarea id="summary-prompt" rows="5" placeholder="Summarize this YouTube video..."></textarea>
+            </label>
+
+            <div class="button-row">
+                <button id="save-prompts" class="primary">Save Settings</button>
+                <button id="reset-prompts" class="ghost">Reset Defaults</button>
+            </div>
+        </section>
+
+        <p id="message" class="flash-message" hidden></p>
+    </main>
 </body>
 </html>

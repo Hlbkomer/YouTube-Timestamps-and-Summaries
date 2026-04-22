@@ -8,7 +8,10 @@
 import SafariServices
 import os.log
 
-class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
+final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
+
+    private let service = GeminiNativeService()
+    private let logger = Logger(subsystem: "Matuko.YouTube-Timestamps-and-Summaries", category: "NativeBridge")
 
     func beginRequest(with context: NSExtensionContext) {
         let request = context.inputItems.first as? NSExtensionItem
@@ -27,16 +30,53 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             message = request?.userInfo?["message"]
         }
 
-        os_log(.default, "Received message from browser.runtime.sendNativeMessage: %@ (profile: %@)", String(describing: message), profile?.uuidString ?? "none")
+        let receivedLine = "[NativeBridge] Received native message. profile=\(profile?.uuidString ?? "none")"
+        print(receivedLine)
+        logger.log(
+            "Received native message. profile=\(profile?.uuidString ?? "none", privacy: .public) payload=\(String(describing: message), privacy: .private(mask: .hash))"
+        )
 
-        let response = NSExtensionItem()
-        if #available(iOS 15.0, macOS 11.0, *) {
-            response.userInfo = [ SFExtensionMessageKey: [ "echo": message ] ]
-        } else {
-            response.userInfo = [ "message": [ "echo": message ] ]
+        Task {
+            let payload = await handleMessage(message)
+            print("[NativeBridge] Completed native message with ok=\((payload["ok"] as? Bool) == true)")
+            logger.log("Completed native message with ok=\((payload["ok"] as? Bool) == true, privacy: .public)")
+            let response = NSExtensionItem()
+
+            if #available(iOS 15.0, macOS 11.0, *) {
+                response.userInfo = [SFExtensionMessageKey: payload]
+            } else {
+                response.userInfo = ["message": payload]
+            }
+
+            context.completeRequest(returningItems: [response], completionHandler: nil)
         }
-
-        context.completeRequest(returningItems: [ response ], completionHandler: nil)
     }
 
+    private func handleMessage(_ message: Any?) async -> [String: Any] {
+        guard let payload = message as? [String: Any], let action = payload["action"] as? String else {
+            return [
+                "ok": false,
+                "error": "The extension received an invalid request."
+            ]
+        }
+
+        switch action {
+        case "getStatus":
+            return service.statusPayload()
+
+        case "openContainerApp":
+            return service.openContainerApp()
+
+        case "generateContent":
+            let videoURL = payload["videoURL"] as? String ?? ""
+            let kind = payload["kind"] as? String ?? "timestamps"
+            return await service.generate(videoURL: videoURL, kind: kind)
+
+        default:
+            return [
+                "ok": false,
+                "error": "Unsupported native action: \(action)"
+            ]
+        }
+    }
 }

@@ -1,10 +1,10 @@
 {
     "extension_name": {
-        "message": "YouTube Timestamps and Summaries Extension",
+        "message": "YouTube Timestamps and Summaries",
         "description": "The display name for the extension."
     },
     "extension_description": {
-        "message": "This is YouTube Timestamps and Summaries Extension. You should tell us what your extension does here.",
+        "message": "Adds a Gemini-powered sidebar to YouTube for timestamp generation and video summaries.",
         "description": "Description of what the extension does."
     }
 }
