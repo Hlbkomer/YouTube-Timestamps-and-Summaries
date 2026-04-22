@@ -134,6 +134,26 @@ function getVideoURL() {
     return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
+function unavailableMessage(kind) {
+    return kind === "timestamps"
+        ? "Timestamps could not be generated. If the video is still live, wait for it to finish and then try again."
+        : "Summary could not be generated. If the video is still live, wait for it to finish and then try again.";
+}
+
+function looksLikeInputRequest(text) {
+    const normalized = String(text ?? "").trim().toLowerCase();
+    if (!normalized) {
+        return true;
+    }
+
+    const actionWords = ["provide", "paste", "upload", "send", "share"];
+    const subjectWords = ["link", "url", "transcript", "file", "video", "content"];
+    const hasActionWord = actionWords.some((word) => normalized.includes(word));
+    const hasSubjectWord = subjectWords.some((word) => normalized.includes(word));
+
+    return hasActionWord && hasSubjectWord;
+}
+
 function getSidebarTarget() {
     return document.querySelector("#secondary-inner") || document.querySelector("#secondary");
 }
@@ -216,6 +236,14 @@ function renderEmptyState(kind) {
 }
 
 function renderErrorState(kind, message) {
+    if (message === unavailableMessage(kind)) {
+        return `
+            <div class="surface state-surface">
+                <div class="state-copy">${escapeHTML(message)}</div>
+            </div>
+        `;
+    }
+
     const debug = debugSummary(kind);
     return `
         <div class="surface state-surface">
@@ -957,9 +985,25 @@ async function generate(kind) {
 
     logDebug(kind, "step: Gemini response received");
     if (kind === "timestamps") {
-        state.timestampsText = response.text || "";
+        const timestampText = String(response.text ?? "").trim();
+        if (parseTimestamps(timestampText).length === 0) {
+            state.timestampsText = "";
+            state.errors[kind] = unavailableMessage(kind);
+            render();
+            await maybeRunQueuedGeneration();
+            return;
+        }
+        state.timestampsText = timestampText;
     } else {
-        state.summaryText = response.text || "";
+        const summaryText = String(response.text ?? "").trim();
+        if (looksLikeInputRequest(summaryText)) {
+            state.summaryText = "";
+            state.errors[kind] = unavailableMessage(kind);
+            render();
+            await maybeRunQueuedGeneration();
+            return;
+        }
+        state.summaryText = summaryText;
     }
 
     state.errors[kind] = "";
@@ -1016,20 +1060,55 @@ function timeToSeconds(time) {
 function jumpToTime(seconds) {
     const safeSeconds = Math.max(0, Math.floor(seconds));
     const moviePlayer = document.querySelector("#movie_player");
+    const video = document.querySelector("video");
+
+    const applyNativeSeek = () => {
+        if (!video) {
+            return;
+        }
+
+        const seekVideo = () => {
+            try {
+                video.currentTime = safeSeconds;
+            } catch (_) {
+                // Ignore transient media seek errors and fall back to the URL jump below if needed.
+            }
+        };
+
+        if (video.readyState >= 1) {
+            seekVideo();
+        } else {
+            video.addEventListener("loadedmetadata", seekVideo, { once: true });
+        }
+    };
+
     if (moviePlayer && typeof moviePlayer.seekTo === "function") {
         moviePlayer.seekTo(safeSeconds, true);
+        applyNativeSeek();
         if (typeof moviePlayer.playVideo === "function") {
             moviePlayer.playVideo();
+        }
+        if (video) {
+            window.setTimeout(() => {
+                if (Math.abs(video.currentTime - safeSeconds) > 1) {
+                    applyNativeSeek();
+                }
+                video.play().catch(() => {});
+            }, 80);
         }
         updateVideoURL(safeSeconds);
         return;
     }
 
-    const video = document.querySelector("video");
     if (video) {
-        video.currentTime = safeSeconds;
+        applyNativeSeek();
         updateVideoURL(safeSeconds);
-        video.play().catch(() => {});
+        window.setTimeout(() => {
+            if (Math.abs(video.currentTime - safeSeconds) > 1) {
+                applyNativeSeek();
+            }
+            video.play().catch(() => {});
+        }, 80);
         return;
     }
 
