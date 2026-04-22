@@ -1,6 +1,8 @@
 # YouTube Timestamps and Summaries
 
-A macOS companion app plus Safari Web Extension that adds a YouTube sidebar for:
+Safari extension and macOS companion app that generates YouTube timestamps and summaries with Gemini.
+
+It adds a right-side sidebar to YouTube with:
 
 - automatic video timestamps
 - on-demand video summaries
@@ -34,6 +36,39 @@ The extension uses Google OAuth and Gemini. The user signs in once in the compan
    - `projectID`
 6. In Xcode, set your Apple development team for both the app target and the extension target.
 7. Run the macOS app, sign in with Google, enable the Safari extension, and open a YouTube watch page.
+
+## Limitations
+
+- Active livestreams may not generate usable timestamps or summaries until the broadcast finishes.
+- This project currently targets Safari on macOS and depends on the companion app for Google OAuth.
+- Gemini output quality and speed can vary by model, video type, and video availability.
+- Public YouTube URLs work best. Some videos may still fail if Gemini cannot read the video content reliably.
+
+## Troubleshooting
+
+### Sign in with Google does nothing
+
+- Make sure the companion app is running from Xcode.
+- Confirm your Google Cloud OAuth client is a `Desktop app` client.
+- Check that your `clientID`, `clientSecret`, and `projectID` are present in `LocalSecrets.plist`.
+
+### The Safari sidebar does not appear on YouTube
+
+- Open the companion app and make sure the Safari extension is enabled.
+- In Safari, verify the extension has access to YouTube.
+- Refresh the YouTube watch page after enabling the extension.
+
+### Timestamps or summary could not be generated
+
+- Try the request again after refreshing the page.
+- If the video is still live, wait until the stream finishes.
+- Try a different Gemini model in the companion app if generation is slow or unreliable.
+
+### Xcode says the extension needs a development team
+
+- In Xcode, open the project settings.
+- Set the same Apple development team for both the app target and the extension target.
+- Leave automatic signing enabled unless you have a custom signing setup.
 
 ## Security Notes
 
