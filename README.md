@@ -9,6 +9,20 @@ It adds a right-side sidebar to YouTube with:
 
 The extension uses Google OAuth and Gemini. The user signs in once in the companion app, and the extension uses that signed-in state while browsing YouTube.
 
+## Preview
+
+### Demo
+
+![Animated demo](docs/readme-assets/demo.gif)
+
+### Companion App
+
+![Companion app screenshot](docs/readme-assets/companion-app.png)
+
+### YouTube Sidebar
+
+![YouTube sidebar screenshot](docs/readme-assets/youtube-sidebar.png)
+
 ## Features
 
 - right-side YouTube sidebar with `Timestamps` and `Summary`
