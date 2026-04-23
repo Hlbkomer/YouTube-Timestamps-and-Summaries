@@ -6,11 +6,11 @@ title: Privacy Policy
 
 Last updated: April 23, 2026
 
-This Privacy Policy explains how YouTube Timestamps and Summaries handles data when a user signs in with Google and uses the app's Gemini-powered features.
+This Privacy Policy explains how Video Timestamps and Summaries for YouTube handles data when a user signs in with Google and uses the app's Gemini-powered features.
 
 ## Overview
 
-YouTube Timestamps and Summaries is a Safari extension and macOS companion app that generates timestamps and summaries for YouTube videos.
+Video Timestamps and Summaries for YouTube is a Safari extension and macOS companion app that generates timestamps and summaries for YouTube videos.
 
 The app uses Google OAuth so the signed-in user can call Google's Gemini service from the app.
 

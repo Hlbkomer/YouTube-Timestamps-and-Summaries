@@ -1,10 +1,10 @@
 ---
-title: YouTube Timestamps and Summaries
+title: Video Timestamps and Summaries for YouTube
 ---
 
-# YouTube Timestamps and Summaries
+# Video Timestamps and Summaries for YouTube
 
-YouTube Timestamps and Summaries is a Safari extension and macOS companion app that helps people generate:
+Video Timestamps and Summaries for YouTube is a Safari extension and macOS companion app that helps people generate:
 
 - chronological timestamps for YouTube videos
 - short summaries for YouTube videos
