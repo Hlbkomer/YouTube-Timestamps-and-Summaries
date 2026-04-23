@@ -51,6 +51,10 @@ The extension uses Google OAuth and Gemini. The user signs in once in the compan
 6. In Xcode, set your Apple development team for both the app target and the extension target.
 7. Run the macOS app, sign in with Google, enable the Safari extension, and open a YouTube watch page.
 
+## Releasing
+
+For Developer ID signing, notarization, and release packaging, see [RELEASING.md](RELEASING.md).
+
 ## Limitations
 
 - Active livestreams may not generate usable timestamps or summaries until the broadcast finishes.
