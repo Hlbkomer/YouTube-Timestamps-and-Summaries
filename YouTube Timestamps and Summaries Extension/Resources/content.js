@@ -803,6 +803,7 @@ async function maybeGenerateSummary() {
 async function maybeAutogenerateTimestamps() {
     if (
         !isWatchPage()
+        || document.hidden
         || !state.isConfigured
         || !state.isSignedIn
         || state.didAutogenerateTimestamps
