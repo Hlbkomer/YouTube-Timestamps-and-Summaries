@@ -78,12 +78,6 @@ The extension uses Google OAuth and Gemini. The user signs in once in the compan
 - If the video is still live, wait until the stream finishes.
 - Try a different Gemini model in the companion app if generation is slow or unreliable.
 
-### Xcode says the extension needs a development team
-
-- In Xcode, open the project settings.
-- Set the same Apple development team for both the app target and the extension target.
-- Leave automatic signing enabled unless you have a custom signing setup.
-
 ## Security Notes
 
 - `LocalSecrets.plist` is gitignored and should never be committed.

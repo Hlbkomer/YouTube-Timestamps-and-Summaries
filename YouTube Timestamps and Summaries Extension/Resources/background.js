@@ -122,18 +122,18 @@ function startGenerateJob(videoURL, kind) {
         messages: [],
         nativeDebug: null,
     };
-    appendJobMessage(job, `created for ${kind}`);
+    appendJobMessage(job, `${kind} request queued`);
     jobs.set(job.id, job);
 
     void (async () => {
-        appendJobMessage(job, "sending native request");
+        appendJobMessage(job, "asking the app to contact Gemini");
         const response = await sendNative("generateContent", { videoURL, kind });
         job.nativeDebug = response?.debug || null;
 
         if (response?.ok) {
             job.status = "completed";
             job.text = response.text || "";
-            appendJobMessage(job, `completed with ${job.text.length} chars`);
+            appendJobMessage(job, `Gemini replied with ${job.text.length} chars`);
         } else {
             job.status = "failed";
             job.error = response?.error || "The native app returned no usable response.";

@@ -82,20 +82,28 @@ window.renderAppState = function renderAppState(state) {
     if (isSignedIn) {
         connectionStatus.textContent = "Google is connected.";
         connectionStatus.dataset.state = "connected";
+        connectionStatus.hidden = false;
     } else if (isSigningIn) {
         connectionStatus.textContent = "Finish the Google sign-in flow in your browser, then return here.";
         connectionStatus.dataset.state = "configured";
+        connectionStatus.hidden = false;
     } else if (state.isConfigured) {
-        connectionStatus.textContent = usesBundledConfig
-            ? "This build already includes the Gemini setup. Finish by signing in with Google."
-            : "Setup is saved. Finish by signing in with Google.";
-        connectionStatus.dataset.state = "configured";
+        if (usesBundledConfig) {
+            connectionStatus.textContent = "";
+            connectionStatus.dataset.state = "";
+            connectionStatus.hidden = true;
+        } else {
+            connectionStatus.textContent = "Setup is saved. Finish by signing in with Google.";
+            connectionStatus.dataset.state = "configured";
+            connectionStatus.hidden = false;
+        }
     } else {
         connectionStatus.textContent = "Add your OAuth Client ID and Project ID to finish Gemini setup.";
         if (!usesBundledConfig) {
             connectionStatus.textContent = "Add your OAuth Client ID, Client Secret, and Project ID to finish Gemini setup.";
         }
         connectionStatus.dataset.state = "missing";
+        connectionStatus.hidden = false;
     }
 
     if (state.message) {

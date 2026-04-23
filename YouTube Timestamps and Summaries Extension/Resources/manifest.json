@@ -5,7 +5,10 @@
     "description": "__MSG_extension_description__",
     "version": "1.0",
     "icons": {
+        "16": "images/icon-16.png",
+        "32": "images/icon-32.png",
         "48": "images/icon-48.png",
+        "64": "images/icon-64.png",
         "96": "images/icon-96.png",
         "128": "images/icon-128.png",
         "256": "images/icon-256.png",
@@ -16,7 +19,11 @@
         "type": "module"
     },
     "action": {
-        "default_icon": "images/toolbar-icon.svg"
+        "default_icon": {
+            "16": "images/icon-16.png",
+            "32": "images/icon-32.png",
+            "48": "images/icon-48.png"
+        }
     },
     "permissions": [
         "nativeMessaging",
@@ -27,13 +34,35 @@
         "*://youtube.com/*",
         "*://m.youtube.com/*"
     ],
-    "content_scripts": [{
-        "js": [ "content.js" ],
-        "matches": [
-            "*://www.youtube.com/*",
-            "*://youtube.com/*",
-            "*://m.youtube.com/*"
-        ],
-        "run_at": "document_idle"
-    }]
+    "content_scripts": [
+        {
+            "js": [ "youtube-helpers.js", "route-guard.js" ],
+            "matches": [
+                "*://www.youtube.com/*",
+                "*://youtube.com/*",
+                "*://m.youtube.com/*"
+            ],
+            "exclude_matches": [
+                "*://www.youtube.com/watch*",
+                "*://youtube.com/watch*",
+                "*://m.youtube.com/watch*",
+                "*://www.youtube.com/live/*",
+                "*://youtube.com/live/*",
+                "*://m.youtube.com/live/*"
+            ],
+            "run_at": "document_start"
+        },
+        {
+            "js": [ "youtube-helpers.js", "content.js" ],
+            "matches": [
+                "*://www.youtube.com/watch*",
+                "*://youtube.com/watch*",
+                "*://m.youtube.com/watch*",
+                "*://www.youtube.com/live/*",
+                "*://youtube.com/live/*",
+                "*://m.youtube.com/live/*"
+            ],
+            "run_at": "document_idle"
+        }
+    ]
 }

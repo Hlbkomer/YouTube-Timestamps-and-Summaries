@@ -10,10 +10,35 @@ import Testing
 
 struct YouTube_Timestamps_and_SummariesTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-        // Swift Testing Documentation
-        // https://developer.apple.com/documentation/testing
+    @Test func modelResolutionFallsBackToDefault() {
+        #expect(GeminiModelOption.resolved(from: nil) == .defaultOption)
+        #expect(GeminiModelOption.resolved(from: "unknown-model") == .defaultOption)
+        #expect(GeminiModelOption.resolved(from: GeminiModelOption.gemini3ProPreview.rawValue) == .gemini3ProPreview)
     }
 
+    @Test func oauthConfigRequiresTrimmedValues() {
+        let incomplete = GeminiOAuthConfig(
+            clientID: " client-id ",
+            clientSecret: "   ",
+            projectID: " project-id "
+        )
+        let complete = GeminiOAuthConfig(
+            clientID: " client-id ",
+            clientSecret: " client-secret ",
+            projectID: " project-id "
+        )
+
+        #expect(incomplete.isComplete == false)
+        #expect(complete.isComplete == true)
+        #expect(complete.trimmedClientID == "client-id")
+        #expect(complete.trimmedClientSecret == "client-secret")
+        #expect(complete.trimmedProjectID == "project-id")
+    }
+
+    @Test func defaultPromptsMatchCurrentProductDefaults() {
+        let prompts = GeminiPromptConfig.default
+
+        #expect(prompts.timestamps == "Please create chronological timestamps for this video. No bullet points, one timestamp per line in the format MM:SS Title.")
+        #expect(prompts.summary == "Please summarize this video.")
+    }
 }

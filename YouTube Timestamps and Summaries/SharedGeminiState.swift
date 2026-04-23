@@ -157,6 +157,7 @@ final class SharedGeminiStore {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let tokenKeychain = SharedGeminiTokenKeychain()
+    private let clientSecretKeychain = SharedGeminiClientSecretKeychain()
 
     private init() {
         defaults = UserDefaults(suiteName: SharedGeminiState.appGroupIdentifier) ?? .standard
@@ -171,9 +172,59 @@ final class SharedGeminiStore {
 
     var config: GeminiOAuthConfig? {
         get {
-            decode(GeminiOAuthConfig.self, forKey: SharedGeminiState.configKey)
+            guard let storedConfig = decode(GeminiOAuthConfig.self, forKey: SharedGeminiState.configKey) else {
+                return nil
+            }
+
+            if let clientSecret = clientSecretKeychain.readSecret(), !clientSecret.isEmpty {
+                return GeminiOAuthConfig(
+                    clientID: storedConfig.clientID,
+                    clientSecret: clientSecret,
+                    projectID: storedConfig.projectID
+                )
+            }
+
+            let legacySecret = storedConfig.trimmedClientSecret
+            guard !legacySecret.isEmpty else {
+                return storedConfig
+            }
+
+            if clientSecretKeychain.writeSecret(legacySecret) {
+                let sanitizedConfig = GeminiOAuthConfig(
+                    clientID: storedConfig.clientID,
+                    clientSecret: "",
+                    projectID: storedConfig.projectID
+                )
+                encode(sanitizedConfig, forKey: SharedGeminiState.configKey)
+            }
+
+            return storedConfig
         }
         set {
+            guard let newValue else {
+                clientSecretKeychain.deleteItem()
+                encode(nil as GeminiOAuthConfig?, forKey: SharedGeminiState.configKey)
+                return
+            }
+
+            let clientSecret = newValue.trimmedClientSecret
+            let sanitizedConfig = GeminiOAuthConfig(
+                clientID: newValue.clientID,
+                clientSecret: "",
+                projectID: newValue.projectID
+            )
+
+            if clientSecret.isEmpty {
+                clientSecretKeychain.deleteItem()
+                encode(sanitizedConfig, forKey: SharedGeminiState.configKey)
+                return
+            }
+
+            if clientSecretKeychain.writeSecret(clientSecret) {
+                encode(sanitizedConfig, forKey: SharedGeminiState.configKey)
+                return
+            }
+
             encode(newValue, forKey: SharedGeminiState.configKey)
         }
     }
@@ -257,6 +308,22 @@ final class SharedGeminiStore {
         return try? decoder.decode(type, from: data)
     }
 
+    private func resolvedStoredConfig() -> GeminiOAuthConfig? {
+        guard let storedConfig = decode(GeminiOAuthConfig.self, forKey: SharedGeminiState.configKey) else {
+            return nil
+        }
+
+        if let clientSecret = clientSecretKeychain.readSecret(), !clientSecret.isEmpty {
+            return GeminiOAuthConfig(
+                clientID: storedConfig.clientID,
+                clientSecret: clientSecret,
+                projectID: storedConfig.projectID
+            )
+        }
+
+        return storedConfig
+    }
+
     private func legacyTokenData() -> Data? {
         defaults.data(forKey: SharedGeminiState.tokenKey)
     }
@@ -284,12 +351,12 @@ final class SharedGeminiStore {
             return
         }
 
-        let previousConfig = decode(GeminiOAuthConfig.self, forKey: SharedGeminiState.configKey)
+        let previousConfig = resolvedStoredConfig()
         guard previousConfig != bundledConfig else {
             return
         }
 
-        encode(bundledConfig, forKey: SharedGeminiState.configKey)
+        config = bundledConfig
         if previousConfig != nil || hasStoredToken() {
             clearToken()
         }
@@ -379,6 +446,92 @@ private final class SharedGeminiTokenKeychain {
         if status != errSecSuccess && status != errSecItemNotFound {
             print("[GeminiStore] Keychain delete failed. status=\(status)")
         }
+    }
+
+    private func baseQuery() -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecAttrAccessGroup as String: SharedGeminiState.appGroupIdentifier,
+            kSecUseDataProtectionKeychain as String: true,
+        ]
+    }
+}
+
+private final class SharedGeminiClientSecretKeychain {
+    private let service = "Matuko.YouTube-Timestamps-and-Summaries.GeminiOAuthClientSecret"
+    private let account = "shared-oauth-client-secret"
+
+    func readSecret() -> String? {
+        guard let data = readData() else {
+            return nil
+        }
+
+        return String(data: data, encoding: .utf8)
+    }
+
+    @discardableResult
+    func writeSecret(_ secret: String) -> Bool {
+        writeData(Data(secret.utf8))
+    }
+
+    func deleteItem() {
+        let status = SecItemDelete(baseQuery() as CFDictionary)
+        if status != errSecSuccess && status != errSecItemNotFound {
+            print("[GeminiStore] Client secret Keychain delete failed. status=\(status)")
+        }
+    }
+
+    private func readData() -> Data? {
+        var query = baseQuery()
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        switch status {
+        case errSecSuccess:
+            return result as? Data
+        case errSecItemNotFound:
+            return nil
+        default:
+            print("[GeminiStore] Client secret Keychain read failed. status=\(status)")
+            return nil
+        }
+    }
+
+    @discardableResult
+    private func writeData(_ data: Data) -> Bool {
+        var addQuery = baseQuery()
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        addQuery[kSecValueData as String] = data
+
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        if addStatus == errSecSuccess {
+            return true
+        }
+
+        guard addStatus == errSecDuplicateItem else {
+            print("[GeminiStore] Client secret Keychain write failed. status=\(addStatus)")
+            return false
+        }
+
+        let updateStatus = SecItemUpdate(
+            baseQuery() as CFDictionary,
+            [
+                kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+                kSecValueData as String: data,
+            ] as CFDictionary
+        )
+
+        if updateStatus == errSecSuccess {
+            return true
+        }
+
+        print("[GeminiStore] Client secret Keychain update failed. status=\(updateStatus)")
+        return false
     }
 
     private func baseQuery() -> [String: Any] {

@@ -1,5 +1,27 @@
+(() => {
+const {
+    buildCanonicalVideoURL,
+    extractVideoKey,
+    getNavigationURL,
+    isShortsURL,
+    isWatchURL,
+    looksLikeInputRequest,
+    parseTimestamps: parseTimestampLines,
+} = globalThis.GeminiYouTubeHelpers;
+
+const supportedPath = window.location.pathname === "/watch"
+    || window.location.pathname.startsWith("/live/");
+
+if (!supportedPath) {
+    for (const host of document.querySelectorAll("#gemini-youtube-sidebar-root")) {
+        host.remove();
+    }
+    return;
+}
+
 let panelHost = null;
 let currentVideoKey = null;
+let lastObservedURL = window.location.href;
 const DEBUG_LINE_LIMIT = 80;
 const GENERATION_TIMEOUT_MS = 360000;
 let state = {
@@ -118,11 +140,25 @@ async function sendMessageWithTimeout(message, timeoutMs = GENERATION_TIMEOUT_MS
 }
 
 function isWatchPage() {
-    return window.location.pathname === "/watch" && Boolean(new URLSearchParams(window.location.search).get("v"));
+    return Boolean(getVideoKey()) && (
+        window.location.pathname === "/watch"
+        || window.location.pathname.startsWith("/live/")
+    );
 }
 
 function getVideoKey() {
-    return new URLSearchParams(window.location.search).get("v");
+    const moviePlayer = document.querySelector("#movie_player");
+    const playerResponse = typeof moviePlayer?.getPlayerResponse === "function"
+        ? moviePlayer.getPlayerResponse()
+        : null;
+
+    return extractVideoKey({
+        currentUrl: window.location.href,
+        canonicalHref: document.querySelector('link[rel="canonical"]')?.href || "",
+        ogUrl: document.querySelector('meta[property="og:url"]')?.getAttribute("content") || "",
+        playerVideoId: playerResponse?.videoDetails?.videoId || "",
+        pathname: window.location.pathname,
+    });
 }
 
 function getVideoURL() {
@@ -131,7 +167,7 @@ function getVideoURL() {
         return "";
     }
 
-    return `https://www.youtube.com/watch?v=${videoId}`;
+    return buildCanonicalVideoURL(videoId);
 }
 
 function unavailableMessage(kind) {
@@ -140,27 +176,57 @@ function unavailableMessage(kind) {
         : "Summary could not be generated. If the video is still live, wait for it to finish and then try again.";
 }
 
-function looksLikeInputRequest(text) {
-    const normalized = String(text ?? "").trim().toLowerCase();
-    if (!normalized) {
-        return true;
-    }
-
-    const actionWords = ["provide", "paste", "upload", "send", "share"];
-    const subjectWords = ["link", "url", "transcript", "file", "video", "content"];
-    const hasActionWord = actionWords.some((word) => normalized.includes(word));
-    const hasSubjectWord = subjectWords.some((word) => normalized.includes(word));
-
-    return hasActionWord && hasSubjectWord;
-}
-
 function getSidebarTarget() {
-    return document.querySelector("#secondary-inner") || document.querySelector("#secondary");
+    return document.querySelector("ytd-watch-flexy #secondary-inner")
+        || document.querySelector("ytd-watch-flexy #secondary");
 }
 
 function removePanel() {
     panelHost?.remove();
+    for (const host of document.querySelectorAll("#gemini-youtube-sidebar-root")) {
+        host.remove();
+    }
     panelHost = null;
+}
+
+function resetPanelState() {
+    state.activeTab = "timestamps";
+    state.timestampsText = "";
+    state.summaryText = "";
+    state.errors = {
+        timestamps: "",
+        summary: "",
+    };
+    state.debug = {
+        timestamps: "",
+        summary: "",
+    };
+    state.isLoading = {
+        timestamps: false,
+        summary: false,
+    };
+    state.activeGenerationKind = "";
+    state.queuedKind = "";
+    state.queuedVideoKey = "";
+    state.generationIDs = {
+        timestamps: 0,
+        summary: 0,
+    };
+    state.didAutogenerateTimestamps = false;
+}
+
+function cleanupNonWatchPage() {
+    currentVideoKey = null;
+    resetPanelState();
+    removePanel();
+
+    for (const delay of [0, 150, 600]) {
+        window.setTimeout(() => {
+            if (!isWatchPage()) {
+                removePanel();
+            }
+        }, delay);
+    }
 }
 
 function escapeHTML(value) {
@@ -805,12 +871,9 @@ async function generate(kind) {
     state.generationIDs[kind] += 1;
     const generationID = state.generationIDs[kind];
     logDebug(kind, `started: ${new Date().toLocaleTimeString()}`);
-    if (state.model) {
-        logDebug(kind, `model: ${state.model}`);
-    }
     logDebug(kind, `videoKey: ${videoKey}`);
     logDebug(kind, `videoURL: ${videoURL}`);
-    logDebug(kind, "step: requesting background job");
+    logDebug(kind, "step: asking the extension to start the request");
     render();
 
     const startResponse = await sendMessageWithTimeout({
@@ -867,8 +930,8 @@ async function generate(kind) {
     }
 
     const jobID = startResponse.jobId;
-    logDebug(kind, `job: ${jobID}`);
-    logDebug(kind, "step: polling background job");
+    logDebug(kind, `requestId: ${jobID}`);
+    logDebug(kind, "step: waiting for Gemini to reply");
     render();
 
     const deadline = Date.now() + GENERATION_TIMEOUT_MS;
@@ -925,7 +988,7 @@ async function generate(kind) {
 
         if (Date.now() - lastWaitNoticeAt >= 5000) {
             lastWaitNoticeAt = Date.now();
-            logDebug(kind, `waiting: ${Math.round((Date.now() - startedAt) / 1000)}s`);
+            logDebug(kind, `waiting for Gemini: ${Math.round((Date.now() - startedAt) / 1000)}s`);
             render();
         }
 
@@ -1013,23 +1076,7 @@ async function generate(kind) {
 }
 
 function parseTimestamps(text) {
-    return text
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-            const match = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*[-|\u2013\u2014]\s*|\s+)(.+)$/);
-            if (!match) {
-                return null;
-            }
-
-            return {
-                time: match[1],
-                label: match[2],
-                seconds: timeToSeconds(match[1]),
-            };
-        })
-        .filter(Boolean);
+    return parseTimestampLines(text);
 }
 
 function buildTimestampHref(seconds) {
@@ -1042,19 +1089,6 @@ function updateVideoURL(seconds) {
     const url = new URL(window.location.href);
     url.searchParams.set("t", `${Math.max(0, Math.floor(seconds))}s`);
     window.history.replaceState(window.history.state, "", url);
-}
-
-function timeToSeconds(time) {
-    const parts = time.split(":").map(Number);
-    if (parts.some(Number.isNaN)) {
-        return 0;
-    }
-
-    if (parts.length === 2) {
-        return parts[0] * 60 + parts[1];
-    }
-
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
 }
 
 function jumpToTime(seconds) {
@@ -1130,31 +1164,7 @@ async function buildPanel() {
 
 async function ensurePanel() {
     if (!isWatchPage()) {
-        currentVideoKey = null;
-        state.activeTab = "timestamps";
-        state.timestampsText = "";
-        state.summaryText = "";
-        state.errors = {
-            timestamps: "",
-            summary: "",
-        };
-        state.debug = {
-            timestamps: "",
-            summary: "",
-        };
-        state.isLoading = {
-            timestamps: false,
-            summary: false,
-        };
-        state.activeGenerationKind = "";
-        state.queuedKind = "";
-        state.queuedVideoKey = "";
-        state.generationIDs = {
-            timestamps: 0,
-            summary: 0,
-        };
-        state.didAutogenerateTimestamps = false;
-        removePanel();
+        cleanupNonWatchPage();
         return;
     }
 
@@ -1167,29 +1177,7 @@ async function ensurePanel() {
     let needsRender = false;
     if (currentVideoKey !== nextVideoKey) {
         currentVideoKey = nextVideoKey;
-        state.activeTab = "timestamps";
-        state.timestampsText = "";
-        state.summaryText = "";
-        state.errors = {
-            timestamps: "",
-            summary: "",
-        };
-        state.debug = {
-            timestamps: "",
-            summary: "",
-        };
-        state.isLoading = {
-            timestamps: false,
-            summary: false,
-        };
-        state.activeGenerationKind = "";
-        state.queuedKind = "";
-        state.queuedVideoKey = "";
-        state.generationIDs = {
-            timestamps: 0,
-            summary: 0,
-        };
-        state.didAutogenerateTimestamps = false;
+        resetPanelState();
         needsRender = true;
     }
 
@@ -1213,8 +1201,62 @@ async function ensurePanel() {
 }
 
 async function handleForegroundRefresh() {
-    await refreshStatus();
+    if (isWatchPage()) {
+        await refreshStatus();
+        await ensurePanel();
+        return;
+    }
+
+    if (panelHost || currentVideoKey !== null) {
+        await ensurePanel();
+    }
+}
+
+async function handleNavigationChange() {
+    lastObservedURL = window.location.href;
+
+    if (isWatchPage()) {
+        await refreshStatus();
+    }
+
     await ensurePanel();
+}
+
+function handleNavigationStart(event) {
+    const nextURL = getNavigationURL(event);
+    if (nextURL && isShortsURL(nextURL)) {
+        cleanupNonWatchPage();
+        window.location.assign(new URL(nextURL, window.location.origin).toString());
+        return;
+    }
+
+    if (nextURL) {
+        lastObservedURL = new URL(nextURL, window.location.origin).toString();
+    } else {
+        lastObservedURL = window.location.href;
+    }
+
+    if (!nextURL || !isWatchURL(nextURL)) {
+        cleanupNonWatchPage();
+    }
+}
+
+async function heartbeat() {
+    const currentURL = window.location.href;
+    const urlChanged = currentURL !== lastObservedURL;
+    if (urlChanged) {
+        lastObservedURL = currentURL;
+    }
+
+    if (urlChanged && isWatchPage()) {
+        await refreshStatus();
+        await ensurePanel();
+        return;
+    }
+
+    if (isWatchPage() || panelHost || currentVideoKey !== null) {
+        await ensurePanel();
+    }
 }
 
 async function init() {
@@ -1223,17 +1265,24 @@ async function init() {
     }
 
     state.ready = true;
-    await refreshStatus();
+    lastObservedURL = window.location.href;
+    if (isWatchPage()) {
+        await refreshStatus();
+    }
     await ensurePanel();
 
     window.addEventListener("focus", handleForegroundRefresh);
+    window.addEventListener("popstate", handleNavigationChange);
     document.addEventListener("visibilitychange", () => {
         if (!document.hidden) {
             handleForegroundRefresh();
         }
     });
+    document.addEventListener("yt-navigate-start", handleNavigationStart);
+    document.addEventListener("yt-navigate-finish", handleNavigationChange);
 
-    setInterval(ensurePanel, 1000);
+    setInterval(heartbeat, 1000);
 }
 
 init();
+})();
