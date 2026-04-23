@@ -165,9 +165,13 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
     }
 
     private func openPreferences() {
-        SFSafariApplication.showPreferencesForExtension(withIdentifier: extensionBundleIdentifier) { _ in
-            DispatchQueue.main.async {
-                NSApplication.shared.terminate(nil)
+        SFSafariApplication.showPreferencesForExtension(withIdentifier: extensionBundleIdentifier) { [weak self] error in
+            Task { @MainActor [weak self] in
+                if let error {
+                    await self?.pushState(message: "Safari could not open the extension settings: \(error.localizedDescription)")
+                } else {
+                    await self?.pushState(message: "Safari extension settings opened.")
+                }
             }
         }
     }
