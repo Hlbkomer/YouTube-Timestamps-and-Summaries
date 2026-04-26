@@ -68,7 +68,7 @@ For the transcript-analysis design, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 - Requires macOS 26 or later.
 - Timestamp generation requires the user to sign in with ChatGPT.
-- Apple Intelligence summaries require Apple Intelligence to be available on the Mac. ChatGPT summaries do not.
+- Apple Intelligence summaries require Apple Intelligence to be available on the Mac.
 - Videos without an available transcript cannot be summarized or timestamped.
 - Active livestreams may not expose a stable transcript until the broadcast finishes.
 - Generated timestamps and summaries can be incomplete or inaccurate.
