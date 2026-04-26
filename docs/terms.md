@@ -6,7 +6,7 @@ title: Terms of Service
 
 Last updated: April 26, 2026
 
-These Terms of Service govern the use of Video Timestamps and Summaries for YouTube.
+These Terms of Service govern the use of Timestamps & Summaries for YT.
 
 ## Use Of The App
 

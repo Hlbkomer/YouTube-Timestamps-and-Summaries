@@ -29,7 +29,7 @@ For paste-ready App Store Connect fields and privacy answers, see:
 
 ### 1. App name and trademark sensitivity
 
-The original project and repo still use `YouTube Timestamps and Summaries` in internal target names and file paths, but the user-facing display name can be aligned separately for App Store review.
+The Xcode target names and bundle identifiers can remain internal implementation details, but the user-facing display name should match the App Store listing.
 
 That may be risky for App Review because Apple can reject app metadata that uses third-party trademarks in a misleading or over-claiming way.
 

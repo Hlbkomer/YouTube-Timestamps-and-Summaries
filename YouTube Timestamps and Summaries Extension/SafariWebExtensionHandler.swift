@@ -1,6 +1,6 @@
 //
 //  SafariWebExtensionHandler.swift
-//  YouTube Timestamps and Summaries Extension
+//  Timestamps & Summaries for YT Extension
 //
 //  Created by Matus Vojtek on 21/04/2026.
 //

@@ -1,6 +1,6 @@
 //
 //  AppleIntelligenceService.swift
-//  YouTube Timestamps and Summaries Extension
+//  Timestamps & Summaries for YT Extension
 //
 //  Created by Codex on 21/04/2026.
 //

@@ -1,6 +1,6 @@
 //
 //  CodexAuthService.swift
-//  YouTube Timestamps and Summaries
+//  Timestamps & Summaries for YT
 //
 //  Created by Codex on 26/04/2026.
 //

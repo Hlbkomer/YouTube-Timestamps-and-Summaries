@@ -1,6 +1,6 @@
 //
 //  AppDelegate.swift
-//  YouTube Timestamps and Summaries
+//  Timestamps & Summaries for YT
 //
 //  Created by Matus Vojtek on 21/04/2026.
 //

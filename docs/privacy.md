@@ -6,11 +6,11 @@ title: Privacy Policy
 
 Last updated: April 26, 2026
 
-This Privacy Policy explains how Video Timestamps and Summaries for YouTube handles data when generating timestamps and summaries.
+This Privacy Policy explains how Timestamps & Summaries for YT handles data when generating timestamps and summaries.
 
 ## Overview
 
-Video Timestamps and Summaries for YouTube is a Safari extension and macOS companion app that generates timestamps and summaries for YouTube videos.
+Timestamps & Summaries for YT is a Safari extension and macOS companion app that generates timestamps and summaries for YouTube videos.
 
 The app uses the user's signed-in ChatGPT account for timestamp generation. Summaries can be generated either with ChatGPT or with Apple Intelligence on the user's Mac. It does not require API keys or a developer-operated backend.
 

@@ -1,6 +1,6 @@
 //
 //  ViewController.swift
-//  YouTube Timestamps and Summaries
+//  Timestamps & Summaries for YT
 //
 //  Created by Matus Vojtek on 21/04/2026.
 //
@@ -309,7 +309,7 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         <!doctype html>
         <html>
         <body style="margin:0;padding:28px;font:15px -apple-system,BlinkMacSystemFont,sans-serif;color:#111;background:#f7f6f2">
-            <h1 style="margin:0 0 12px">YouTube Timestamps and Summaries</h1>
+            <h1 style="margin:0 0 12px">Timestamps &amp; Summaries for YT</h1>
             <p>\(escapedMessage)</p>
         </body>
         </html>

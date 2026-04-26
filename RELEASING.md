@@ -87,7 +87,7 @@ For a simple first public release, upload the notarized zip artifact to GitHub R
 
 Recommended artifact:
 
-- `build/release/artifacts/YouTube Timestamps and Summaries.zip`
+- `build/release/artifacts/Timestamps & Summaries for YT.zip`
 
 ## Final Checks
 

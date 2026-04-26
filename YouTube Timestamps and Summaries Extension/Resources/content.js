@@ -8,8 +8,7 @@ const {
 } = globalThis.YouTubeTimestampsHelpers;
 
 const SIDEBAR_HOST_ID = "youtube-timestamps-sidebar-root";
-const LEGACY_SIDEBAR_HOST_IDS = ["gemini-youtube-sidebar-root"];
-const SIDEBAR_HOST_IDS = [SIDEBAR_HOST_ID, ...LEGACY_SIDEBAR_HOST_IDS];
+const SIDEBAR_HOST_IDS = [SIDEBAR_HOST_ID];
 const COMPANION_APP_URL = "youtube-timestamps-summaries://open";
 
 // Keep this script scoped to watch/live pages in manifest.json. Running the

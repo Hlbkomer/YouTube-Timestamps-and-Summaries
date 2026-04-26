@@ -1,4 +1,4 @@
-# YouTube Timestamps and Summaries
+# Timestamps & Summaries for YT
 
 Safari extension and macOS companion app that generates YouTube timestamps from transcripts with ChatGPT and summaries with either ChatGPT or Apple Intelligence.
 
@@ -35,10 +35,8 @@ Under the hood, the extension keeps transcript timing deterministic, validates g
 
 ## Project Structure
 
-- `YouTube Timestamps and Summaries/`
-  macOS companion app
-- `YouTube Timestamps and Summaries Extension/`
-  Safari Web Extension and native bridge
+- macOS companion app target
+- Safari Web Extension target and native bridge
 
 ## Extension Routing Notes
 

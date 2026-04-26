@@ -1,6 +1,6 @@
 //
 //  CodexGenerationService.swift
-//  YouTube Timestamps and Summaries Extension
+//  Timestamps & Summaries for YT Extension
 //
 //  Created by Codex on 26/04/2026.
 //
@@ -185,7 +185,7 @@ final class CodexGenerationService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("codex_cli_rs/0.0.0 (YouTube Timestamps and Summaries)", forHTTPHeaderField: "User-Agent")
+        request.setValue("codex_cli_rs/0.0.0 (Timestamps & Summaries for YT)", forHTTPHeaderField: "User-Agent")
         request.setValue("codex_cli_rs", forHTTPHeaderField: "originator")
 
         if let accountID = chatGPTAccountID(from: accessToken) {
