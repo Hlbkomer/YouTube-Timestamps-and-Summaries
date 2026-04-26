@@ -4,81 +4,69 @@ title: Privacy Policy
 
 # Privacy Policy
 
-Last updated: April 23, 2026
+Last updated: April 26, 2026
 
-This Privacy Policy explains how Video Timestamps and Summaries for YouTube handles data when a user signs in with Google and uses the app's Gemini-powered features.
+This Privacy Policy explains how Video Timestamps and Summaries for YouTube handles data when generating timestamps and summaries.
 
 ## Overview
 
 Video Timestamps and Summaries for YouTube is a Safari extension and macOS companion app that generates timestamps and summaries for YouTube videos.
 
-The app uses Google OAuth so the signed-in user can call Google's Gemini service from the app.
+The app uses the user's signed-in ChatGPT account for timestamp generation. Summaries can be generated either with ChatGPT or with Apple Intelligence on the user's Mac. It does not require Google sign-in, API keys, or a developer-operated backend.
 
 ## Information Processed By The App
 
 When a user uses the app, the following information may be processed:
 
 - the current YouTube video URL
-- the selected prompt text used to request timestamps or summaries
-- Google OAuth access and refresh tokens needed to call Gemini
-- local settings such as selected Gemini model and saved prompts
+- the available transcript or captions for the current YouTube video
+- ChatGPT sign-in tokens after the user signs in
+- local app settings
 
 ## How Information Is Used
 
 This information is used only to:
 
-- authenticate the user with Google
-- send Gemini requests requested by the user
-- return timestamps or summaries inside the Safari extension
+- return timestamps and summaries inside the Safari extension
+- keep the user's ChatGPT sign-in active for generation
 - remember local app preferences
 
 ## Local Storage
 
 The app stores its settings locally on the user's Mac.
 
-OAuth tokens are stored locally in the macOS Keychain.
+The app does not use Google sign-in, so it does not store Google OAuth tokens.
 
-Prompt settings and related app preferences are stored locally on the user's Mac.
-
-## Data Shared With Google
-
-When a user requests timestamps or a summary, the app sends the YouTube video URL and the selected prompt to Google's Gemini service.
-
-Google OAuth is used only so the user can authorize the app to make those Gemini requests on the user's behalf.
-
-The app is not intended to access Gmail, Drive, Calendar, Contacts, or similar Google account data.
+ChatGPT sign-in tokens are stored locally in the shared app group container. Users can remove them by signing out in the companion app or removing the app's local data.
 
 ## No Separate Developer Backend
 
-The app does not use a separate developer-operated backend server for Gemini requests.
-
-Gemini requests are sent from the user's local app directly to Google.
+The app does not use a separate developer-operated backend server for generation requests.
 
 ## Data Sharing
 
 The app does not sell personal data.
 
-The app does not intentionally share user data with third parties other than Google services required for authentication and Gemini generation.
+The app does not intentionally share user data with a developer-operated server.
+
+For timestamp generation, transcript text is sent through the user's signed-in ChatGPT account. For summary generation, transcript text is sent to ChatGPT or processed locally with Apple Intelligence on the user's Mac, depending on the user's app setting.
 
 ## Data Retention
 
 Local settings remain on the user's Mac until the user changes or removes them.
 
-OAuth tokens remain stored locally until the user signs out, revokes access, or the token becomes invalid.
-
 ## Security
 
-The app uses local system storage and the macOS Keychain to protect saved OAuth tokens.
+The app uses local system storage for saved app settings and ChatGPT sign-in tokens.
 
-No method of storage or transmission is completely secure, but reasonable steps are taken to keep tokens and local settings protected on the user's device.
+No method of storage is completely secure, but reasonable steps are taken to keep local settings protected on the user's device.
 
 ## User Choices
 
 Users can:
 
-- sign out of the app
-- revoke Google access from their Google account
 - remove the app and its locally stored settings
+- sign out in the companion app to clear ChatGPT sign-in tokens
 
 ## Contact
 

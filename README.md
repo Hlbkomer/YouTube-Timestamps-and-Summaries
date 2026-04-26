@@ -1,13 +1,15 @@
 # YouTube Timestamps and Summaries
 
-Safari extension and macOS companion app that generates YouTube timestamps and summaries with Gemini.
+Safari extension and macOS companion app that generates YouTube timestamps from transcripts with ChatGPT and summaries with either ChatGPT or Apple Intelligence.
 
 It adds a right-side sidebar to YouTube with:
 
 - automatic video timestamps
-- on-demand video summaries
+- automatic video summaries
 
-The extension uses Google OAuth and Gemini. The user signs in once in the companion app, and the extension uses that signed-in state while browsing YouTube.
+The extension reads the available YouTube transcript, sends it to the user's selected signed-in ChatGPT model for timestamps, and creates the summary with either that model or Apple Intelligence on the Mac. A ChatGPT account is required. No Google sign-in, API key, or developer backend is required.
+
+Under the hood, the extension keeps transcript timing deterministic, validates generated timestamps against real transcript cue times, and keeps Apple Intelligence available as an optional local summary engine. See [ARCHITECTURE.md](ARCHITECTURE.md) for the current generation pipeline and guardrails.
 
 ## Preview
 
@@ -26,10 +28,10 @@ The extension uses Google OAuth and Gemini. The user signs in once in the compan
 ## Features
 
 - right-side YouTube sidebar with `Timestamps` and `Summary`
-- customizable default prompts in the macOS companion app
-- selectable Gemini models
-- Google OAuth sign-in instead of pasted API keys
-- local-only secrets file for Google Cloud configuration
+- transcript-based generation for better timestamp accuracy
+- configurable generation model, backed by the user's ChatGPT session
+- summaries can use either the selected ChatGPT model or Apple Intelligence
+- no Google OAuth setup, API keys, or developer backend
 
 ## Project Structure
 
@@ -38,37 +40,48 @@ The extension uses Google OAuth and Gemini. The user signs in once in the compan
 - `YouTube Timestamps and Summaries Extension/`
   Safari Web Extension and native bridge
 
+## Extension Routing Notes
+
+The Safari extension intentionally keeps the sidebar script scoped to supported YouTube video pages only:
+
+- `content.js` should run on YouTube watch/live pages, where the timestamps and summary sidebar is mounted.
+- `route-guard.js` can run on broader YouTube pages, but only to turn watch/live single-page navigations into full navigations so Safari injects `content.js`.
+- Do not broaden `content.js` to all YouTube pages. Running the sidebar script on Shorts, feeds, subscriptions, or the homepage can disturb YouTube's own layout.
+
+The `tests/js/manifest-routing.test.cjs` test protects this split.
+
 ## Setup
 
-1. Create a Google Cloud project.
-2. Enable `Google Generative Language API`.
-3. Create a `Desktop app` OAuth client.
-4. Copy `YouTube Timestamps and Summaries/LocalSecrets.template.plist` to `YouTube Timestamps and Summaries/LocalSecrets.plist`.
-5. Fill in:
-   - `clientID`
-   - `clientSecret`
-   - `projectID`
-6. In Xcode, set your Apple development team for both the app target and the extension target.
-7. Run the macOS app, sign in with Google, enable the Safari extension, and open a YouTube watch page.
+1. Use a Mac with macOS 26 or later.
+2. In Xcode, set your Apple development team for both the app target and the extension target.
+3. Run the macOS app.
+4. Choose the generation model and summary engine in the app.
+5. Sign in with ChatGPT from the app.
+6. Click `Open Safari Extension Settings` and enable the Safari extension.
+7. Open a YouTube watch page that has captions or a transcript.
 
 ## Releasing
 
 For Developer ID signing, notarization, and release packaging, see [RELEASING.md](RELEASING.md).
 
+For the transcript-analysis design, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Limitations
 
-- Active livestreams may not generate usable timestamps or summaries until the broadcast finishes.
-- This project currently targets Safari on macOS and depends on the companion app for Google OAuth.
-- Gemini output quality and speed can vary by model, video type, and video availability.
-- Public YouTube URLs work best. Some videos may still fail if Gemini cannot read the video content reliably.
+- Requires macOS 26 or later.
+- Timestamp generation requires the user to sign in with ChatGPT.
+- Apple Intelligence summaries require Apple Intelligence to be available on the Mac. ChatGPT summaries do not.
+- Videos without an available transcript cannot be summarized or timestamped.
+- Active livestreams may not expose a stable transcript until the broadcast finishes.
+- Generated timestamps and summaries can be incomplete or inaccurate.
 
 ## Troubleshooting
 
-### Sign in with Google does nothing
+### Apple Intelligence is not available
 
-- Make sure the companion app is running from Xcode.
-- Confirm your Google Cloud OAuth client is a `Desktop app` client.
-- Check that your `clientID`, `clientSecret`, and `projectID` are present in `LocalSecrets.plist`.
+- Confirm the Mac supports Apple Intelligence.
+- Enable Apple Intelligence in macOS Settings.
+- Wait for the on-device model to finish downloading if macOS says it is not ready yet.
 
 ### The Safari sidebar does not appear on YouTube
 
@@ -79,21 +92,21 @@ For Developer ID signing, notarization, and release packaging, see [RELEASING.md
 ### Timestamps or summary could not be generated
 
 - Try the request again after refreshing the page.
-- If the video is still live, wait until the stream finishes.
-- Try a different Gemini model in the companion app if generation is slow or unreliable.
+- Confirm the video has captions or an available transcript.
+- Confirm ChatGPT sign-in completed in the companion app.
+- If the video is still live, wait until the stream finishes and YouTube exposes the transcript.
 
 ## Security Notes
 
-- `LocalSecrets.plist` is gitignored and should never be committed.
-- Google OAuth tokens are stored locally on the machine and shared between the app and extension using the macOS Keychain.
-- Prompt text and the current YouTube URL are sent to Gemini.
-- The extension only requests host access for YouTube domains.
+- No Google OAuth client secret, Google API key, or developer-operated backend is required.
+- ChatGPT sign-in tokens are stored locally in the app group container so the app and extension can use the user's own signed-in account.
+- Transcript text is sent to ChatGPT for timestamp generation and, if selected, summary generation.
+- When Apple Intelligence is selected for summaries, transcript text is processed locally by the app extension on the user's Mac.
+- The WebExtension requests host access only for YouTube pages.
 
 ## GitHub Checklist
 
 Before publishing:
 
-- confirm `YouTube Timestamps and Summaries/LocalSecrets.plist` is not tracked
-- do not commit downloaded Google OAuth JSON files
-- do not commit logs containing live access tokens or refresh tokens
-- rotate any token that was accidentally pasted into chat, terminal, or logs
+- do not commit local build artifacts, logs, or screenshots that reveal private browsing context
+- confirm no credentials or API keys are added before publishing

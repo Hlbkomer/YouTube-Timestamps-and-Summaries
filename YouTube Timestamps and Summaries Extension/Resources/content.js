@@ -1,20 +1,28 @@
 (() => {
 const {
-    buildCanonicalVideoURL,
     extractVideoKey,
     getNavigationURL,
     isShortsURL,
     isWatchURL,
-    looksLikeInputRequest,
     parseTimestamps: parseTimestampLines,
-} = globalThis.GeminiYouTubeHelpers;
+} = globalThis.YouTubeTimestampsHelpers;
 
+const SIDEBAR_HOST_ID = "youtube-timestamps-sidebar-root";
+const LEGACY_SIDEBAR_HOST_IDS = ["gemini-youtube-sidebar-root"];
+const SIDEBAR_HOST_IDS = [SIDEBAR_HOST_ID, ...LEGACY_SIDEBAR_HOST_IDS];
+const COMPANION_APP_URL = "youtube-timestamps-summaries://open";
+
+// Keep this script scoped to watch/live pages in manifest.json. Running the
+// sidebar script on Shorts or other YouTube surfaces can disturb YouTube's own
+// layout during SPA navigation.
 const supportedPath = window.location.pathname === "/watch"
     || window.location.pathname.startsWith("/live/");
 
 if (!supportedPath) {
-    for (const host of document.querySelectorAll("#gemini-youtube-sidebar-root")) {
-        host.remove();
+    for (const hostID of SIDEBAR_HOST_IDS) {
+        for (const host of document.querySelectorAll(`#${hostID}`)) {
+            host.remove();
+        }
     }
     return;
 }
@@ -23,12 +31,39 @@ let panelHost = null;
 let currentVideoKey = null;
 let lastObservedURL = window.location.href;
 const DEBUG_LINE_LIMIT = 80;
-const GENERATION_TIMEOUT_MS = 360000;
+const MIN_GENERATION_TIMEOUT_MS = 6 * 60 * 1000;
+const MAX_GENERATION_TIMEOUT_MS = 20 * 60 * 1000;
+const GENERATION_TIMEOUT_FREE_CHARACTERS = 30000;
+const GENERATION_TIMEOUT_CHARACTER_BLOCK = 10000;
+const GENERATION_TIMEOUT_EXTRA_MS_PER_BLOCK = 45 * 1000;
+const TRANSCRIPT_CACHE_LIMIT = 5;
+const TRANSCRIPT_TRACK_WAIT_ATTEMPTS = 16;
+const transcriptCache = new Map();
+const timedTextTrackCache = new Map();
+const innertubePlayerTrackCache = new Map();
+const generationRequestKeys = new Set();
+let initialPlayerResponseCache = {
+    videoKey: "",
+    response: null,
+};
+let initialDataCache = {
+    videoKey: "",
+    response: null,
+};
+let ytcfgCache = null;
 let state = {
     ready: false,
     isConfigured: false,
-    isSignedIn: false,
-    model: "",
+    generationMode: "selectedProvider",
+    engine: "",
+    appleIntelligenceAvailable: false,
+    codexConnected: false,
+    codexLoginError: "",
+    settings: {
+        providerID: "openaiCodex",
+        modelID: "gpt-5.5",
+        summaryEngine: "selectedModel",
+    },
     activeTab: "timestamps",
     timestampsText: "",
     summaryText: "",
@@ -44,18 +79,15 @@ let state = {
         timestamps: false,
         summary: false,
     },
-    activeGenerationKind: "",
-    queuedKind: "",
-    queuedVideoKey: "",
     generationIDs: {
         timestamps: 0,
         summary: 0,
     },
-    didAutogenerateTimestamps: false,
+    didAutogenerateAnalysis: false,
 };
 
 function logDebug(kind, message, extra) {
-    const prefix = `[Gemini content:${kind}]`;
+    const prefix = `[Apple Intelligence content:${kind}]`;
     if (typeof extra === "undefined") {
         console.debug(prefix, message);
     } else {
@@ -101,9 +133,7 @@ function mergeDebugLines(kind, messageBlock) {
 function debugSummary(kind) {
     const lines = [];
 
-    if (state.model) {
-        lines.push(`model: ${state.model}`);
-    }
+    lines.push(`engine: ${kind === "summary" ? summaryEngineLabel() : modelLabel()}`);
 
     if (state.debug[kind]) {
         lines.push(state.debug[kind]);
@@ -112,15 +142,92 @@ function debugSummary(kind) {
     return lines.join("\n");
 }
 
-function isQueued(kind) {
-    return state.queuedKind === kind && state.queuedVideoKey === currentVideoKey;
-}
-
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function sendMessageWithTimeout(message, timeoutMs = GENERATION_TIMEOUT_MS) {
+function generationTimeoutForTranscript(transcriptText) {
+    const characterCount = typeof transcriptText === "string" ? transcriptText.length : 0;
+    const extraCharacters = Math.max(0, characterCount - GENERATION_TIMEOUT_FREE_CHARACTERS);
+    const extraBlocks = Math.ceil(extraCharacters / GENERATION_TIMEOUT_CHARACTER_BLOCK);
+    const timeoutMs = MIN_GENERATION_TIMEOUT_MS + (extraBlocks * GENERATION_TIMEOUT_EXTRA_MS_PER_BLOCK);
+
+    return Math.min(MAX_GENERATION_TIMEOUT_MS, Math.max(MIN_GENERATION_TIMEOUT_MS, timeoutMs));
+}
+
+function modelLabel() {
+    return state.settings.modelLabel || state.settings.modelID || "selected model";
+}
+
+function summaryEngineLabel() {
+    return state.settings.summaryEngineLabel
+        || (state.settings.summaryEngine === "selectedModel" ? modelLabel() : "Apple Intelligence");
+}
+
+function generationKindForTab(kind, usesSelectedProvider) {
+    if (!usesSelectedProvider) {
+        return kind === "summary" ? "summaryFull" : "timestamps";
+    }
+
+    return kind === "summary" ? "codexSummary" : "codexTimestamps";
+}
+
+function generationStepDescription(kind, usesSelectedProvider) {
+    if (!usesSelectedProvider) {
+        return kind === "summary"
+            ? "step: asking Apple Intelligence to create summary"
+            : "step: asking Apple Intelligence to create timestamps";
+    }
+
+    return kind === "summary"
+        ? `step: asking ${summaryEngineLabel()} to create summary`
+        : `step: asking ${modelLabel()} to create timestamps`;
+}
+
+function generationWaitDescription(kind, usesSelectedProvider) {
+    if (!usesSelectedProvider) {
+        return kind === "summary"
+            ? "step: waiting for Apple Intelligence summary"
+            : "step: waiting for Apple Intelligence timestamps";
+    }
+
+    return kind === "summary"
+        ? `step: waiting for ${summaryEngineLabel()} summary`
+        : `step: waiting for ${modelLabel()} timestamps`;
+}
+
+function stripTranscriptTimestamps(transcriptText) {
+    return String(transcriptText || "")
+        .split(/\r?\n/)
+        .map((line) => line.replace(/^\s*\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/, "").trim())
+        .filter(Boolean)
+        .join("\n");
+}
+
+function transcriptForGeneration(kind, transcriptText) {
+    if (kind !== "summary") {
+        return transcriptText || "";
+    }
+
+    return stripTranscriptTimestamps(transcriptText);
+}
+
+function isCurrentGeneration(videoKey, kind, generationID) {
+    return currentVideoKey === videoKey && state.generationIDs[kind] === generationID;
+}
+
+function stopLoadingForStaleGeneration(videoKey, kind, generationID) {
+    if (state.generationIDs[kind] !== generationID) {
+        return;
+    }
+
+    state.isLoading[kind] = false;
+    if (currentVideoKey === videoKey) {
+        render();
+    }
+}
+
+async function sendMessageWithTimeout(message, timeoutMs = MIN_GENERATION_TIMEOUT_MS) {
     let timeoutID = null;
 
     try {
@@ -161,29 +268,920 @@ function getVideoKey() {
     });
 }
 
-function getVideoURL() {
-    const videoId = getVideoKey();
-    if (!videoId) {
-        return "";
+function getPlayerResponse() {
+    const moviePlayer = document.querySelector("#movie_player");
+    try {
+        return typeof moviePlayer?.getPlayerResponse === "function"
+            ? moviePlayer.getPlayerResponse()
+            : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function parseBalancedJSONObject(source, openBraceIndex) {
+    let depth = 0;
+    let inString = false;
+    let isEscaped = false;
+
+    for (let index = openBraceIndex; index < source.length; index += 1) {
+        const character = source[index];
+
+        if (inString) {
+            if (isEscaped) {
+                isEscaped = false;
+            } else if (character === "\\") {
+                isEscaped = true;
+            } else if (character === "\"") {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (character === "\"") {
+            inString = true;
+            continue;
+        }
+
+        if (character === "{") {
+            depth += 1;
+        } else if (character === "}") {
+            depth -= 1;
+            if (depth === 0) {
+                return source.slice(openBraceIndex, index + 1);
+            }
+        }
     }
 
-    return buildCanonicalVideoURL(videoId);
+    return "";
+}
+
+function parseScriptAssignmentObject(assignmentName) {
+    for (const script of document.scripts) {
+        const source = script.textContent || "";
+        const assignmentIndex = source.indexOf(assignmentName);
+        if (assignmentIndex === -1) {
+            continue;
+        }
+
+        const openBraceIndex = source.indexOf("{", assignmentIndex);
+        if (openBraceIndex === -1) {
+            continue;
+        }
+
+        const json = parseBalancedJSONObject(source, openBraceIndex);
+        if (!json) {
+            continue;
+        }
+
+        try {
+            return JSON.parse(json);
+        } catch (_) {
+            continue;
+        }
+    }
+
+    return null;
+}
+
+function getInitialPlayerResponse(videoKey) {
+    if (initialPlayerResponseCache.videoKey === videoKey) {
+        return initialPlayerResponseCache.response;
+    }
+
+    const response = parseScriptAssignmentObject("ytInitialPlayerResponse");
+    const responseVideoKey = response?.videoDetails?.videoId || "";
+    initialPlayerResponseCache = {
+        videoKey,
+        response: !responseVideoKey || responseVideoKey === videoKey ? response : null,
+    };
+
+    return initialPlayerResponseCache.response;
+}
+
+function getInitialData(videoKey) {
+    if (initialDataCache.videoKey === videoKey) {
+        return initialDataCache.response;
+    }
+
+    const response = parseScriptAssignmentObject("ytInitialData");
+    const responseVideoKey = extractVideoKey({
+        currentUrl: window.location.href,
+        canonicalHref: document.querySelector("link[rel='canonical']")?.href || "",
+        ogUrl: document.querySelector("meta[property='og:url']")?.content || "",
+        pathname: window.location.pathname,
+    });
+    initialDataCache = {
+        videoKey,
+        response: !responseVideoKey || responseVideoKey === videoKey ? response : null,
+    };
+
+    return initialDataCache.response;
+}
+
+function getYTCfg() {
+    if (ytcfgCache) {
+        return ytcfgCache;
+    }
+
+    ytcfgCache = parseScriptAssignmentObject("ytcfg.set") || {};
+    return ytcfgCache;
+}
+
+function captionTracksFromPlayerResponse(playerResponse) {
+    const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    return Array.isArray(tracks) ? tracks.filter((track) => track?.baseUrl) : [];
+}
+
+function uniqueCaptionTracks(tracks) {
+    const seen = new Set();
+    const result = [];
+
+    for (const track of tracks) {
+        const key = track?.baseUrl || `${track?.languageCode || ""}:${track?.kind || ""}:${trackLabel(track)}`;
+        if (!key || seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push(track);
+    }
+
+    return result;
+}
+
+function getPageCaptionTracks(videoKey) {
+    return uniqueCaptionTracks([
+        ...captionTracksFromPlayerResponse(getPlayerResponse()),
+        ...captionTracksFromPlayerResponse(getInitialPlayerResponse(videoKey)),
+    ]);
+}
+
+async function fetchInnertubePlayerTracks(videoKey) {
+    if (innertubePlayerTrackCache.has(videoKey)) {
+        return innertubePlayerTrackCache.get(videoKey);
+    }
+
+    const apiKey = getYTCfg().INNERTUBE_API_KEY;
+    if (!apiKey) {
+        throw new Error("YouTube player page configuration was not found on this page.");
+    }
+
+    // Mirrors youtube-transcript-api's working path: ask the player endpoint as
+    // an Android client, then fetch captionTracks from that response.
+    const response = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${encodeURIComponent(apiKey)}&prettyPrint=false`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            context: {
+                client: {
+                    clientName: "ANDROID",
+                    clientVersion: "20.10.38",
+                },
+            },
+            videoId: videoKey,
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`YouTube player transcript lookup failed with ${response.status}.`);
+    }
+
+    const data = await response.json();
+    const tracks = uniqueCaptionTracks(captionTracksFromPlayerResponse(data));
+    innertubePlayerTrackCache.set(videoKey, tracks);
+    return tracks;
+}
+
+async function fetchTimedTextTracks(videoKey) {
+    if (timedTextTrackCache.has(videoKey)) {
+        return timedTextTrackCache.get(videoKey);
+    }
+
+    const url = new URL("https://www.youtube.com/api/timedtext");
+    url.searchParams.set("type", "list");
+    url.searchParams.set("v", videoKey);
+
+    const response = await fetch(url.toString(), { credentials: "include" });
+    if (!response.ok) {
+        throw new Error(`Timed-text track list failed with ${response.status}.`);
+    }
+
+    const xml = await response.text();
+    const document = new DOMParser().parseFromString(xml, "text/xml");
+    const tracks = Array.from(document.querySelectorAll("track"))
+        .map((track) => {
+            const languageCode = track.getAttribute("lang_code") || "";
+            if (!languageCode) {
+                return null;
+            }
+
+            const trackURL = new URL("https://www.youtube.com/api/timedtext");
+            trackURL.searchParams.set("v", videoKey);
+            trackURL.searchParams.set("lang", languageCode);
+            trackURL.searchParams.set("fmt", "json3");
+
+            const name = track.getAttribute("name") || "";
+            if (name) {
+                trackURL.searchParams.set("name", name);
+            }
+
+            const kind = track.getAttribute("kind") || "";
+            if (kind) {
+                trackURL.searchParams.set("kind", kind);
+            }
+
+            return {
+                baseUrl: trackURL.toString(),
+                languageCode,
+                kind,
+                name: {
+                    simpleText: track.getAttribute("lang_translated")
+                        || track.getAttribute("lang_original")
+                        || languageCode,
+                },
+            };
+        })
+        .filter(Boolean);
+
+    timedTextTrackCache.set(videoKey, tracks);
+    return tracks;
+}
+
+async function getCaptionTracks(videoKey) {
+    const pageTracks = getPageCaptionTracks(videoKey);
+    if (pageTracks.length > 0) {
+        return {
+            source: "player",
+            tracks: pageTracks,
+        };
+    }
+
+    try {
+        const timedTextTracks = await fetchTimedTextTracks(videoKey);
+        return {
+            source: "timed text",
+            tracks: uniqueCaptionTracks(timedTextTracks),
+        };
+    } catch (error) {
+        return {
+            source: "timed text",
+            tracks: [],
+            error: error?.message || String(error),
+        };
+    }
+}
+
+function trackLabel(track) {
+    return track?.name?.simpleText
+        || track?.name?.runs?.map((run) => run.text).filter(Boolean).join("")
+        || track?.languageCode
+        || "caption track";
+}
+
+function selectCaptionTrack(tracks) {
+    return rankCaptionTracks(tracks)[0] || null;
+}
+
+function rankCaptionTracks(tracks) {
+    const preferredLanguage = (navigator.language || "").split("-")[0].toLowerCase();
+    const usableTracks = tracks.filter((track) => track?.baseUrl);
+    const manualTracks = usableTracks.filter((track) => track.kind !== "asr");
+    const preferredOrder = [
+        ...manualTracks.filter((track) => track.languageCode === preferredLanguage),
+        ...usableTracks.filter((track) => track.languageCode === preferredLanguage),
+        ...manualTracks.filter((track) => track.languageCode === "en"),
+        ...usableTracks.filter((track) => track.languageCode === "en"),
+        ...manualTracks,
+        ...usableTracks,
+    ];
+
+    return uniqueCaptionTracks(preferredOrder);
+}
+
+function formatTranscriptTime(seconds) {
+    const totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const remainingSeconds = totalSeconds % 60;
+    const twoDigits = (value) => String(value).padStart(2, "0");
+
+    if (hours > 0) {
+        return `${hours}:${twoDigits(minutes)}:${twoDigits(remainingSeconds)}`;
+    }
+
+    return `${twoDigits(minutes)}:${twoDigits(remainingSeconds)}`;
+}
+
+function normalizeTranscriptText(text) {
+    return String(text ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function parseJSONTranscript(text) {
+    const data = JSON.parse(text);
+    const events = Array.isArray(data?.events) ? data.events : [];
+    return events
+        .map((event) => {
+            const line = normalizeTranscriptText(
+                Array.isArray(event.segs)
+                    ? event.segs.map((segment) => segment?.utf8 || segment?.text || "").join("")
+                    : "",
+            );
+            if (!line) {
+                return null;
+            }
+
+            return {
+                startSeconds: Number(event.tStartMs || 0) / 1000,
+                text: line,
+            };
+        })
+        .filter(Boolean);
+}
+
+function parseXMLTranscript(text) {
+    const document = new DOMParser().parseFromString(text, "text/xml");
+    const legacyEntries = Array.from(document.querySelectorAll("text"))
+        .map((node) => {
+            const line = normalizeTranscriptText(node.textContent || "");
+            if (!line) {
+                return null;
+            }
+
+            return {
+                startSeconds: Number(node.getAttribute("start") || 0),
+                text: line,
+            };
+        })
+        .filter(Boolean);
+
+    if (legacyEntries.length > 0) {
+        return legacyEntries;
+    }
+
+    return Array.from(document.querySelectorAll("p"))
+        .map((node) => {
+            const segmentText = Array.from(node.querySelectorAll("s"))
+                .map((segment) => segment.textContent || "")
+                .join("");
+            const line = normalizeTranscriptText(segmentText || node.textContent || "");
+            if (!line) {
+                return null;
+            }
+
+            const hasMilliseconds = node.hasAttribute("t");
+            const rawStart = Number(node.getAttribute("t") || node.getAttribute("start") || 0);
+            return {
+                startSeconds: hasMilliseconds ? rawStart / 1000 : rawStart,
+                text: line,
+            };
+        })
+        .filter(Boolean);
+}
+
+function parseTranscriptBody(body) {
+    let entries = [];
+
+    try {
+        entries = parseJSONTranscript(body);
+    } catch (_) {
+        entries = [];
+    }
+
+    if (entries.length > 0) {
+        return entries;
+    }
+
+    return parseXMLTranscript(body);
+}
+
+function textFromRuns(value) {
+    if (typeof value?.simpleText === "string") {
+        return value.simpleText;
+    }
+
+    if (Array.isArray(value?.runs)) {
+        return value.runs.map((run) => run?.text || "").join("");
+    }
+
+    return "";
+}
+
+function parseTranscriptTimeString(value) {
+    const parts = String(value || "").split(":").map(Number);
+    if (parts.length === 2 && parts.every((part) => !Number.isNaN(part))) {
+        return parts[0] * 60 + parts[1];
+    }
+
+    if (parts.length === 3 && parts.every((part) => !Number.isNaN(part))) {
+        return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+
+    return 0;
+}
+
+function findTranscriptParams(value, depth = 0) {
+    if (!value || typeof value !== "object" || depth > 80) {
+        return null;
+    }
+
+    if (typeof value.getTranscriptEndpoint?.params === "string") {
+        return {
+            params: value.getTranscriptEndpoint.params,
+            source: "getTranscriptEndpoint",
+        };
+    }
+
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const result = findTranscriptParams(item, depth + 1);
+            if (result) {
+                return result;
+            }
+        }
+        return null;
+    }
+
+    for (const item of Object.values(value)) {
+        const result = findTranscriptParams(item, depth + 1);
+        if (result) {
+            return result;
+        }
+    }
+
+    return null;
+}
+
+function collectInnertubeTranscriptEntries(value, entries = [], depth = 0) {
+    if (!value || typeof value !== "object" || depth > 100) {
+        return entries;
+    }
+
+    const cue = value.transcriptCueRenderer;
+    if (cue) {
+        const line = normalizeTranscriptText(textFromRuns(cue.cue));
+        if (line) {
+            entries.push({
+                startSeconds: Number(cue.startOffsetMs || 0) / 1000,
+                text: line,
+            });
+        }
+    }
+
+    const segment = value.transcriptSegmentRenderer;
+    if (segment) {
+        const line = normalizeTranscriptText(textFromRuns(segment.snippet));
+        if (line) {
+            entries.push({
+                startSeconds: Number(segment.startMs || 0) / 1000
+                    || parseTranscriptTimeString(textFromRuns(segment.startTimeText)),
+                text: line,
+            });
+        }
+    }
+
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            collectInnertubeTranscriptEntries(item, entries, depth + 1);
+        }
+        return entries;
+    }
+
+    for (const item of Object.values(value)) {
+        collectInnertubeTranscriptEntries(item, entries, depth + 1);
+    }
+
+    return entries;
+}
+
+function innertubeContext() {
+    const config = getYTCfg();
+    if (config.INNERTUBE_CONTEXT) {
+        const context = JSON.parse(JSON.stringify(config.INNERTUBE_CONTEXT));
+        if (config.VISITOR_DATA && context.client && !context.client.visitorData) {
+            context.client.visitorData = config.VISITOR_DATA;
+        }
+        return context;
+    }
+
+    return {
+        client: {
+            clientName: "WEB",
+            clientVersion: config.INNERTUBE_CLIENT_VERSION || "2.20260424.00.00",
+            visitorData: config.VISITOR_DATA || undefined,
+        },
+    };
+}
+
+function innertubeHeaders(context) {
+    const config = getYTCfg();
+    const client = context?.client || {};
+    const clientName = String(config.INNERTUBE_CONTEXT_CLIENT_NAME || config.INNERTUBE_CLIENT_NAME || "1");
+    const clientVersion = String(client.clientVersion || config.INNERTUBE_CLIENT_VERSION || "");
+
+    return {
+        "content-type": "application/json; charset=UTF-8",
+        "x-goog-api-format-version": "2",
+        "x-youtube-client-name": clientName,
+        "x-youtube-client-version": clientVersion,
+    };
+}
+
+async function innertubeTranscriptRequest(apiKey, body, headers) {
+    const urls = [
+        `https://www.youtube.com/youtubei/v1/get_transcript?key=${encodeURIComponent(apiKey)}&prettyPrint=false`,
+        "https://www.youtube.com/youtubei/v1/get_transcript?prettyPrint=false",
+    ];
+
+    let lastResponse = null;
+    for (const url of urls) {
+        const response = await fetch(url, {
+            method: "POST",
+            credentials: "include",
+            headers,
+            body: JSON.stringify(body),
+        });
+
+        if (response.ok) {
+            return response;
+        }
+
+        lastResponse = response;
+    }
+
+    return lastResponse;
+}
+
+async function describeInnertubeFailure(response) {
+    const body = await response.text().catch(() => "");
+    if (!body) {
+        return `YouTube transcript request failed with ${response.status}.`;
+    }
+
+    try {
+        const data = JSON.parse(body);
+        const status = data?.error?.status || data?.error?.code || "unknown";
+        const message = normalizeTranscriptText(data?.error?.message || "");
+        return `YouTube transcript request failed with ${response.status} (${status}${message ? `: ${message}` : ""}).`;
+    } catch (_) {
+        return `YouTube transcript request failed with ${response.status} (${describeTranscriptBody(body, response.headers.get("content-type") || "")}).`;
+    }
+}
+
+async function fetchInnertubeTranscript(videoKey) {
+    const transcriptParams = findTranscriptParams(getInitialData(videoKey));
+    if (!transcriptParams?.params) {
+        throw new Error("YouTube transcript params were not found on this page.");
+    }
+
+    const apiKey = getYTCfg().INNERTUBE_API_KEY;
+    if (!apiKey) {
+        throw new Error("YouTube transcript page configuration was not found on this page.");
+    }
+
+    console.debug("[Apple Intelligence content:transcript]", `Using ${transcriptParams.source} transcript params (${transcriptParams.params.length} chars)`);
+
+    const context = innertubeContext();
+    const response = await innertubeTranscriptRequest(apiKey, {
+        context,
+        params: transcriptParams.params,
+    }, innertubeHeaders(context));
+
+    if (!response.ok) {
+        throw new Error(await describeInnertubeFailure(response));
+    }
+
+    const data = await response.json();
+    const entries = collectInnertubeTranscriptEntries(data)
+        .sort((first, second) => first.startSeconds - second.startSeconds);
+    const lines = entries
+        .map((entry) => `[${formatTranscriptTime(entry.startSeconds)}] ${entry.text}`)
+        .filter(Boolean);
+
+    if (lines.length === 0) {
+        throw new Error("YouTube transcript response returned no transcript lines.");
+    }
+
+    return {
+        text: lines.join("\n"),
+        lineCount: lines.length,
+        label: "YouTube transcript",
+    };
+}
+
+function describeTranscriptBody(body, contentType = "") {
+    const length = body.length;
+    const type = contentType || "unknown content-type";
+
+    try {
+        const data = JSON.parse(body);
+        const events = Array.isArray(data?.events) ? data.events.length : 0;
+        const keys = Object.keys(data || {}).slice(0, 5).join(", ") || "none";
+        return `${type}, ${length} chars, JSON keys: ${keys}, events: ${events}`;
+    } catch (_) {
+        const document = new DOMParser().parseFromString(body, "text/xml");
+        const root = document.documentElement?.nodeName || "none";
+        const textNodes = document.querySelectorAll("text").length;
+        const paragraphNodes = document.querySelectorAll("p").length;
+        const parserErrors = document.querySelectorAll("parsererror").length;
+        return `${type}, ${length} chars, XML root: ${root}, text nodes: ${textNodes}, p nodes: ${paragraphNodes}, parser errors: ${parserErrors}`;
+    }
+}
+
+function transcriptURLCandidates(baseUrl) {
+    const candidates = [];
+    const seen = new Set();
+
+    function add(url) {
+        const value = url.toString();
+        if (!seen.has(value)) {
+            seen.add(value);
+            candidates.push(value);
+        }
+    }
+
+    const jsonURL = new URL(baseUrl);
+    jsonURL.searchParams.set("fmt", "json3");
+    add(jsonURL);
+
+    const originalURL = new URL(baseUrl);
+    add(originalURL);
+
+    for (const format of ["srv3", "srv1"]) {
+        const url = new URL(baseUrl);
+        url.searchParams.set("fmt", format);
+        add(url);
+    }
+
+    return candidates;
+}
+
+async function fetchTranscript(track) {
+    let lastError = "";
+
+    for (const url of transcriptURLCandidates(track.baseUrl)) {
+        const response = await fetch(url, { credentials: "include" });
+        if (!response.ok) {
+            lastError = `Transcript request failed with ${response.status}.`;
+            continue;
+        }
+
+        const body = await response.text();
+        const bodyDescription = describeTranscriptBody(body, response.headers.get("content-type") || "");
+        const entries = parseTranscriptBody(body);
+        const lines = entries
+            .map((entry) => `[${formatTranscriptTime(entry.startSeconds)}] ${entry.text}`)
+            .filter(Boolean);
+
+        if (lines.length > 0) {
+            return {
+                text: lines.join("\n"),
+                lineCount: lines.length,
+                label: trackLabel(track),
+            };
+        }
+
+        lastError = `Caption track returned no transcript lines (${bodyDescription}).`;
+    }
+
+    throw new Error(lastError || "Caption track returned no transcript lines.");
+}
+
+function rememberTranscript(videoKey, transcript) {
+    if (!videoKey || !transcript?.text) {
+        return;
+    }
+
+    transcriptCache.delete(videoKey);
+    transcriptCache.set(videoKey, transcript);
+
+    while (transcriptCache.size > TRANSCRIPT_CACHE_LIMIT) {
+        const oldestKey = transcriptCache.keys().next().value;
+        transcriptCache.delete(oldestKey);
+    }
+}
+
+function applyGenerationText(kind, text) {
+    const generatedText = String(text || "").trim();
+    if (!generatedText) {
+        return false;
+    }
+
+    if (kind === "summary") {
+        state.summaryText = generatedText;
+        state.errors.summary = "";
+        return true;
+    }
+
+    if (parseTimestamps(generatedText).length === 0) {
+        return false;
+    }
+
+    state.timestampsText = generatedText;
+    state.errors.timestamps = "";
+    return true;
+}
+
+async function tryTranscriptTracks(videoKey, kind, source, tracks) {
+    let lastError = "";
+    for (const track of rankCaptionTracks(tracks)) {
+        logDebug(kind, `transcript: fetching ${source} captions (${trackLabel(track)})`);
+        try {
+            const transcript = await fetchTranscript(track);
+            rememberTranscript(videoKey, transcript);
+            logDebug(kind, `transcript: ready (${transcript.lineCount} lines)`);
+            return {
+                transcript,
+                error: "",
+            };
+        } catch (error) {
+            lastError = error?.message || String(error);
+            logDebug(kind, `transcript: track failed (${trackLabel(track)})`);
+        }
+    }
+
+    return {
+        transcript: null,
+        error: lastError,
+    };
+}
+
+async function getTranscript(videoKey, kind) {
+    if (transcriptCache.has(videoKey)) {
+        const cachedTranscript = transcriptCache.get(videoKey);
+        logDebug(kind, `transcript: using cached captions (${cachedTranscript.lineCount} lines)`);
+        return cachedTranscript;
+    }
+
+    for (let attempt = 0; attempt < TRANSCRIPT_TRACK_WAIT_ATTEMPTS; attempt += 1) {
+        const { source, tracks, error } = await getCaptionTracks(videoKey);
+        if (tracks.length > 0) {
+            let lastError = "";
+            const pageResult = await tryTranscriptTracks(videoKey, kind, source, tracks);
+            if (pageResult.transcript) {
+                return pageResult.transcript;
+            }
+            lastError = pageResult.error;
+
+            logDebug(kind, "transcript: trying YouTube player captions");
+            try {
+                const playerTracks = await fetchInnertubePlayerTracks(videoKey);
+                const playerResult = await tryTranscriptTracks(videoKey, kind, "YouTube player", playerTracks);
+                if (playerResult.transcript) {
+                    return playerResult.transcript;
+                }
+                lastError = playerResult.error || lastError;
+            } catch (error) {
+                lastError = error?.message || String(error);
+                logDebug(kind, `transcript: player fallback failed (${lastError})`);
+            }
+
+            logDebug(kind, "transcript: trying YouTube transcript panel");
+            try {
+                const transcript = await fetchInnertubeTranscript(videoKey);
+                rememberTranscript(videoKey, transcript);
+                logDebug(kind, `transcript: ready (${transcript.lineCount} lines)`);
+                return transcript;
+            } catch (error) {
+                lastError = error?.message || String(error);
+                logDebug(kind, `transcript: panel fallback failed (${lastError})`);
+            }
+
+            try {
+                const timedTextTracks = await fetchTimedTextTracks(videoKey);
+                const timedTextResult = await tryTranscriptTracks(videoKey, kind, "timed text", timedTextTracks);
+                if (timedTextResult.transcript) {
+                    return timedTextResult.transcript;
+                }
+                lastError = timedTextResult.error || lastError;
+            } catch (error) {
+                lastError = error?.message || String(error);
+            }
+
+            throw new Error(lastError || "Caption tracks returned no transcript lines.");
+        }
+
+        if (attempt === 0) {
+            logDebug(kind, "transcript: waiting for YouTube captions");
+            if (error) {
+                logDebug(kind, `transcript: timed-text fallback unavailable (${error})`);
+            }
+        }
+        await sleep(750);
+    }
+
+    logDebug(kind, "transcript: trying YouTube player captions");
+    try {
+        const playerTracks = await fetchInnertubePlayerTracks(videoKey);
+        const playerResult = await tryTranscriptTracks(videoKey, kind, "YouTube player", playerTracks);
+        if (playerResult.transcript) {
+            return playerResult.transcript;
+        }
+        if (playerResult.error) {
+            logDebug(kind, `transcript: player fallback failed (${playerResult.error})`);
+        }
+    } catch (error) {
+        logDebug(kind, `transcript: player fallback failed (${error?.message || String(error)})`);
+    }
+
+    logDebug(kind, "transcript: trying YouTube transcript panel");
+    try {
+        const transcript = await fetchInnertubeTranscript(videoKey);
+        rememberTranscript(videoKey, transcript);
+        logDebug(kind, `transcript: ready (${transcript.lineCount} lines)`);
+        return transcript;
+    } catch (error) {
+        logDebug(kind, `transcript: panel fallback failed (${error?.message || String(error)})`);
+    }
+
+    logDebug(kind, "transcript: unavailable");
+    return null;
 }
 
 function unavailableMessage(kind) {
     return kind === "timestamps"
         ? "Timestamps could not be generated. If the video is still live, wait for it to finish and then try again."
-        : "Summary could not be generated. If the video is still live, wait for it to finish and then try again.";
+        : "Summary could not be generated.";
 }
 
 function getSidebarTarget() {
+    if (getLiveChatBlock()) {
+        return document.querySelector("ytd-watch-flexy #secondary")
+            || document.querySelector("ytd-watch-flexy #secondary-inner");
+    }
+
     return document.querySelector("ytd-watch-flexy #secondary-inner")
         || document.querySelector("ytd-watch-flexy #secondary");
 }
 
+function getLiveChatBlock() {
+    return document.querySelector("ytd-watch-flexy #chat")
+        || document.querySelector("ytd-watch-flexy #chat-container")
+        || document.querySelector("ytd-watch-flexy ytd-live-chat-frame");
+}
+
+function getPanelHosts() {
+    return SIDEBAR_HOST_IDS.flatMap((hostID) => Array.from(document.querySelectorAll(`#${hostID}`)));
+}
+
+function dedupePanelHosts(preferredHost = panelHost) {
+    const hosts = getPanelHosts();
+    const keeper = preferredHost && hosts.includes(preferredHost)
+        ? preferredHost
+        : hosts[0] ?? null;
+
+    for (const host of hosts) {
+        if (host !== keeper) {
+            host.remove();
+        }
+    }
+
+    return keeper;
+}
+
+function isPanelBeforeElement(element) {
+    if (!panelHost || !element) {
+        return false;
+    }
+
+    return Boolean(panelHost.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
+
+function isPanelPlaced(target) {
+    if (!panelHost) {
+        return false;
+    }
+
+    const liveChat = getLiveChatBlock();
+    if (liveChat?.parentElement) {
+        return liveChat.parentElement.contains(panelHost)
+            && isPanelBeforeElement(liveChat);
+    }
+
+    return target.contains(panelHost);
+}
+
+function placePanelHost(target) {
+    if (!panelHost) {
+        return;
+    }
+
+    const liveChat = getLiveChatBlock();
+    if (liveChat?.parentElement) {
+        liveChat.parentElement.insertBefore(panelHost, liveChat);
+        return;
+    }
+
+    target.prepend(panelHost);
+}
+
 function removePanel() {
     panelHost?.remove();
-    for (const host of document.querySelectorAll("#gemini-youtube-sidebar-root")) {
+    for (const host of getPanelHosts()) {
         host.remove();
     }
     panelHost = null;
@@ -205,14 +1203,11 @@ function resetPanelState() {
         timestamps: false,
         summary: false,
     };
-    state.activeGenerationKind = "";
-    state.queuedKind = "";
-    state.queuedVideoKey = "";
     state.generationIDs = {
         timestamps: 0,
         summary: 0,
     };
-    state.didAutogenerateTimestamps = false;
+    state.didAutogenerateAnalysis = false;
 }
 
 function cleanupNonWatchPage() {
@@ -242,10 +1237,6 @@ function buttonLabel(kind) {
         return kind === "timestamps" ? "Timestamps..." : "Summary...";
     }
 
-    if (isQueued(kind)) {
-        return kind === "timestamps" ? "Timestamps queued" : "Summary queued";
-    }
-
     return kind === "timestamps" ? "Timestamps" : "Summary";
 }
 
@@ -266,24 +1257,21 @@ function renderConnectionState(message) {
     `;
 }
 
+function renderCodexConnectionState() {
+    return `
+        <div class="surface state-surface">
+            <div class="state-copy">Connect ChatGPT in the companion app to generate timestamps.</div>
+            <button class="soft-button" data-open-app>Open Companion App</button>
+            ${state.codexLoginError ? `<div class="error-copy">${escapeHTML(state.codexLoginError)}</div>` : ""}
+        </div>
+    `;
+}
+
 function renderLoadingState(kind) {
     const debug = debugSummary(kind);
     return `
         <div class="surface state-surface">
             <div class="state-copy">${kind === "timestamps" ? "Generating timestamps..." : "Generating summary..."}</div>
-            ${debug ? `<pre class="debug-copy">${escapeHTML(debug)}</pre>` : ""}
-        </div>
-    `;
-}
-
-function renderQueuedState(kind) {
-    const runningKind = state.activeGenerationKind || "request";
-    const runningLabel = runningKind === "timestamps" ? "timestamps" : "summary";
-    const debug = debugSummary(kind);
-    return `
-        <div class="surface state-surface">
-            <div class="state-copy">${kind === "timestamps" ? "Timestamps are queued." : "Summary is queued."}</div>
-            <div class="caption">Waiting for ${runningLabel} to finish first.</div>
             ${debug ? `<pre class="debug-copy">${escapeHTML(debug)}</pre>` : ""}
         </div>
     `;
@@ -295,7 +1283,7 @@ function renderEmptyState(kind) {
             <div class="state-copy">${
                 kind === "timestamps"
                     ? "Timestamps will appear here automatically."
-                    : "Open Summary to generate a recap for this video."
+                    : "Summary will appear here automatically."
             }</div>
         </div>
     `;
@@ -333,10 +1321,6 @@ function renderTimestampsResult() {
         return renderErrorState("timestamps", state.errors.timestamps);
     }
 
-    if (isQueued("timestamps") && !state.timestampsText) {
-        return renderQueuedState("timestamps");
-    }
-
     if (!state.timestampsText) {
         return renderEmptyState("timestamps");
     }
@@ -371,10 +1355,6 @@ function renderSummaryResult() {
 
     if (state.errors.summary && !state.summaryText) {
         return renderErrorState("summary", state.errors.summary);
-    }
-
-    if (isQueued("summary") && !state.summaryText) {
-        return renderQueuedState("summary");
     }
 
     if (!state.summaryText) {
@@ -420,6 +1400,12 @@ function renderSummaryHTML(text) {
             continue;
         }
 
+        if (/^(?:part|section)\s+\d+(?:\s+of\s+\d+)?[:.]?$/i.test(line)) {
+            flushParagraph();
+            flushBullets();
+            continue;
+        }
+
         const bulletMatch = line.match(/^[-*]\s+(.+)$/);
         if (bulletMatch) {
             flushParagraph();
@@ -454,12 +1440,12 @@ function renderInlineSummary(value) {
 }
 
 function renderActiveContent() {
-    if (!state.isConfigured) {
-        return renderConnectionState("Finish Gemini setup in the companion app.");
+    if (!state.codexConnected) {
+        return renderCodexConnectionState();
     }
 
-    if (!state.isSignedIn) {
-        return renderConnectionState("Sign in with Google in the companion app.");
+    if (state.settings.summaryEngine === "appleIntelligence" && !state.appleIntelligenceAvailable) {
+        return renderConnectionState("Apple Intelligence is not available on this Mac.");
     }
 
     return state.activeTab === "timestamps" ? renderTimestampsResult() : renderSummaryResult();
@@ -486,13 +1472,18 @@ function render() {
                 --surface: #f6f6f7;
                 --surface-strong: #efeff1;
                 --border: rgba(15, 23, 42, 0.09);
-                --text: #111318;
-                --muted: #69707c;
+                --text: var(--yt-spec-text-primary, #0f0f0f);
+                --muted: var(--yt-spec-text-secondary, #606060);
                 --accent: #d93025;
                 --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
                 margin: 0 0 16px;
                 color: var(--text);
-                font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+                font-family: "Roboto", "Arial", sans-serif;
+                font-size: 1.4rem;
+                font-weight: 400;
+                letter-spacing: normal;
+                line-height: 2rem;
+                -webkit-font-smoothing: antialiased;
             }
 
             @media (prefers-color-scheme: dark) {
@@ -501,8 +1492,8 @@ function render() {
                     --surface: #202226;
                     --surface-strong: #2a2d31;
                     --border: rgba(255, 255, 255, 0.08);
-                    --text: #f5f5f6;
-                    --muted: #a7afb9;
+                    --text: var(--yt-spec-text-primary, #f1f1f1);
+                    --muted: var(--yt-spec-text-secondary, #aaa);
                     --accent: #ff5a4f;
                     --shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
                 }
@@ -561,8 +1552,8 @@ function render() {
                 min-height: 34px;
                 flex: 0 0 auto;
                 font: inherit;
-                font-size: 14px;
-                font-weight: 600;
+                font-size: 1.4rem;
+                font-weight: 500;
                 line-height: 34px;
                 white-space: nowrap;
                 cursor: pointer;
@@ -631,7 +1622,8 @@ function render() {
 
             .caption {
                 color: var(--muted);
-                font-size: 12px;
+                font-size: 1.2rem;
+                line-height: 1.8rem;
             }
 
             .debug-copy {
@@ -661,7 +1653,7 @@ function render() {
 
             .timestamp-list {
                 display: grid;
-                gap: 6px;
+                gap: 0;
             }
 
             .timestamp-link {
@@ -673,7 +1665,10 @@ function render() {
                 text-align: left;
                 text-decoration: none;
                 cursor: pointer;
-                line-height: 1.25;
+                font-size: 1.4rem;
+                font-weight: 400;
+                letter-spacing: normal;
+                line-height: 2rem;
             }
 
             .timestamp-time {
@@ -689,7 +1684,11 @@ function render() {
 
             .summary-rich {
                 display: grid;
-                gap: 10px;
+                gap: 6px;
+                font-size: 1.4rem;
+                font-weight: 400;
+                letter-spacing: normal;
+                line-height: 2rem;
             }
 
             .summary-rich p,
@@ -702,7 +1701,7 @@ function render() {
             }
 
             .summary-rich li + li {
-                margin-top: 6px;
+                margin-top: 2px;
             }
 
         </style>
@@ -750,27 +1749,50 @@ function render() {
 }
 
 async function refreshStatus() {
-    const response = await sendMessageWithTimeout({ type: "gemini:getStatus" }, 20000).catch((error) => {
-        console.debug("[Gemini content:status] Status refresh failed", error);
+    const response = await sendMessageWithTimeout({ type: "ai:getStatus" }, 20000).catch((error) => {
+        console.debug("[Apple Intelligence content:status] Status refresh failed", error);
         return null;
     });
+    state.generationMode = response?.generationMode || state.generationMode;
+    state.appleIntelligenceAvailable = Boolean(response?.appleIntelligence?.isConfigured ?? response?.isConfigured);
+    state.codexConnected = Boolean(response?.codex?.connected);
+    state.settings = {
+        ...state.settings,
+        ...(response?.settings || {}),
+    };
     state.isConfigured = Boolean(response?.isConfigured);
-    state.isSignedIn = Boolean(response?.isSignedIn);
-    state.model = response?.model || state.model;
+    state.engine = response?.engine || state.engine;
+    if (state.codexConnected) {
+        state.codexLoginError = "";
+    } else if (response?.codex?.error) {
+        state.codexLoginError = response.codex.error;
+    }
     render();
 }
 
-async function openCompanionApp() {
-    const response = await sendMessageWithTimeout({ type: "gemini:openApp" }, 20000).catch((error) => ({
-        ok: false,
-        error: error?.message || "The companion app could not be opened.",
-    }));
-    if (response?.ok) {
+function refreshStatusInBackground() {
+    void (async () => {
         await refreshStatus();
-        return;
-    }
+        await maybeAutogenerateAnalysis();
+    })().catch((error) => {
+        console.debug("[Apple Intelligence content:status] Background status refresh failed", error);
+    });
+}
 
-    window.alert(response?.error || "The companion app could not be opened.");
+async function openCompanionApp() {
+    // Use the actual user click gesture to open the registered companion app
+    // URL scheme. Safari can reject native-extension attempts to launch the app
+    // even though a user-initiated page link is allowed.
+    const link = document.createElement("a");
+    link.href = COMPANION_APP_URL;
+    link.rel = "noreferrer";
+    link.style.display = "none";
+    document.documentElement.append(link);
+    link.click();
+    link.remove();
+
+    await sleep(1200);
+    await refreshStatus();
 }
 
 async function handleTabSelection(kind) {
@@ -785,7 +1807,7 @@ async function handleTabSelection(kind) {
 }
 
 async function maybeGenerateTimestamps() {
-    if (!state.isConfigured || !state.isSignedIn || state.timestampsText) {
+    if (!state.isConfigured || state.timestampsText) {
         return;
     }
 
@@ -793,94 +1815,101 @@ async function maybeGenerateTimestamps() {
 }
 
 async function maybeGenerateSummary() {
-    if (!state.isConfigured || !state.isSignedIn || state.summaryText) {
+    if (!state.isConfigured || state.summaryText) {
         return;
     }
 
     await requestGeneration("summary");
 }
 
-async function maybeAutogenerateTimestamps() {
+async function maybeAutogenerateAnalysis() {
     if (
         !isWatchPage()
+        || !panelHost
+        || !panelHost.isConnected
         || document.hidden
         || !state.isConfigured
-        || !state.isSignedIn
-        || state.didAutogenerateTimestamps
-        || state.timestampsText
+        || state.didAutogenerateAnalysis
+        || (state.timestampsText && state.summaryText)
     ) {
         return;
     }
 
-    state.didAutogenerateTimestamps = true;
-    await requestGeneration("timestamps");
+    state.didAutogenerateAnalysis = true;
+    await Promise.all([
+        requestGeneration("timestamps"),
+        requestGeneration("summary"),
+    ]);
 }
 
 async function requestGeneration(kind) {
-    if (!state.isConfigured || !state.isSignedIn || state.isLoading[kind] || activeText(kind)) {
+    if (!state.isConfigured || state.isLoading[kind] || activeText(kind)) {
         return;
     }
 
-    if (state.activeGenerationKind && state.activeGenerationKind !== kind) {
-        state.queuedKind = kind;
-        state.queuedVideoKey = currentVideoKey || getVideoKey() || "";
-        logDebug(kind, `step: waiting for ${state.activeGenerationKind} to finish`);
-        render();
+    const videoKey = currentVideoKey || getVideoKey() || "";
+    const requestKey = `${videoKey}:${kind}`;
+    if (generationRequestKeys.has(requestKey)) {
         return;
     }
 
-    if (isQueued(kind)) {
-        state.queuedKind = "";
-        state.queuedVideoKey = "";
+    generationRequestKeys.add(requestKey);
+    try {
+        await generate(kind);
+    } finally {
+        generationRequestKeys.delete(requestKey);
     }
-
-    await generate(kind);
-}
-
-async function maybeRunQueuedGeneration() {
-    if (!state.queuedKind || state.activeGenerationKind) {
-        return;
-    }
-
-    if (state.queuedVideoKey !== currentVideoKey) {
-        state.queuedKind = "";
-        state.queuedVideoKey = "";
-        return;
-    }
-
-    const nextKind = state.queuedKind;
-    state.queuedKind = "";
-    state.queuedVideoKey = "";
-    await requestGeneration(nextKind);
 }
 
 async function generate(kind) {
-    if (!state.isConfigured || !state.isSignedIn || state.isLoading[kind]) {
+    if (!state.isConfigured || state.isLoading[kind]) {
         return;
     }
 
-    const videoURL = getVideoURL();
     const videoKey = getVideoKey();
-    if (!videoURL || !videoKey) {
+    if (!videoKey) {
         return;
     }
 
     state.errors[kind] = "";
     state.debug[kind] = "";
     state.isLoading[kind] = true;
-    state.activeGenerationKind = kind;
     state.generationIDs[kind] += 1;
     const generationID = state.generationIDs[kind];
     logDebug(kind, `started: ${new Date().toLocaleTimeString()}`);
-    logDebug(kind, `videoKey: ${videoKey}`);
-    logDebug(kind, `videoURL: ${videoURL}`);
-    logDebug(kind, "step: asking the extension to start the request");
+    logDebug(kind, "video: supported YouTube video detected");
+    render();
+
+    const transcript = await getTranscript(videoKey, kind).catch((error) => {
+        logDebug(kind, `transcript: failed (${error?.message || String(error)})`);
+        return null;
+    });
+    if (!isCurrentGeneration(videoKey, kind, generationID)) {
+        stopLoadingForStaleGeneration(videoKey, kind, generationID);
+        return;
+    }
+
+    if (!transcript?.text) {
+        state.isLoading[kind] = false;
+        state.errors[kind] = "This video does not have an available transcript.";
+        render();
+        return;
+    }
+
+    const usesSelectedProvider = state.generationMode === "selectedProvider" || state.generationMode === "codexChatGPT";
+    const requestKind = generationKindForTab(kind, usesSelectedProvider);
+    const requestTranscript = transcriptForGeneration(kind, transcript?.text || "");
+    const generationTimeoutMs = generationTimeoutForTranscript(requestTranscript);
+
+    logDebug(kind, generationStepDescription(kind, usesSelectedProvider));
+    logDebug(kind, `timeout budget: ${Math.round(generationTimeoutMs / 1000)}s`);
     render();
 
     const startResponse = await sendMessageWithTimeout({
-        type: "gemini:startGenerate",
-        videoURL,
-        kind,
+        type: "ai:startGenerate",
+        kind: requestKind,
+        transcript: requestTranscript,
+        timeoutMs: generationTimeoutMs,
     }, 20000).catch((error) => {
         logDebug(kind, "step: start request failed", error);
         return {
@@ -894,7 +1923,8 @@ async function generate(kind) {
         };
     });
 
-    if (currentVideoKey !== videoKey || state.generationIDs[kind] !== generationID) {
+    if (!isCurrentGeneration(videoKey, kind, generationID)) {
+        stopLoadingForStaleGeneration(videoKey, kind, generationID);
         return;
     }
 
@@ -920,29 +1950,25 @@ async function generate(kind) {
             logDebug(kind, debugParts.join("\n"));
         }
         state.isLoading[kind] = false;
-        if (state.activeGenerationKind === kind) {
-            state.activeGenerationKind = "";
-        }
-        state.errors[kind] = startResponse?.error || "The extension could not start the Gemini job.";
+        state.errors[kind] = startResponse?.error || "The extension could not start the generation job.";
         render();
-        await maybeRunQueuedGeneration();
         await refreshStatus();
         return;
     }
 
     const jobID = startResponse.jobId;
     logDebug(kind, `requestId: ${jobID}`);
-    logDebug(kind, "step: waiting for Gemini to reply");
+    logDebug(kind, generationWaitDescription(kind, usesSelectedProvider));
     render();
 
-    const deadline = Date.now() + GENERATION_TIMEOUT_MS;
+    const deadline = Date.now() + generationTimeoutMs;
     const startedAt = Date.now();
     let lastWaitNoticeAt = startedAt;
     let response = null;
 
     while (Date.now() < deadline) {
         const pollResponse = await sendMessageWithTimeout({
-            type: "gemini:getGenerateJob",
+            type: "ai:getGenerateJob",
             jobId: jobID,
         }, 20000).catch((error) => ({
             ok: false,
@@ -954,7 +1980,8 @@ async function generate(kind) {
             },
         }));
 
-        if (currentVideoKey !== videoKey || state.generationIDs[kind] !== generationID) {
+        if (!isCurrentGeneration(videoKey, kind, generationID)) {
+            stopLoadingForStaleGeneration(videoKey, kind, generationID);
             return;
         }
 
@@ -989,7 +2016,7 @@ async function generate(kind) {
 
         if (Date.now() - lastWaitNoticeAt >= 5000) {
             lastWaitNoticeAt = Date.now();
-            logDebug(kind, `waiting for Gemini: ${Math.round((Date.now() - startedAt) / 1000)}s`);
+            logDebug(kind, `waiting: ${Math.round((Date.now() - startedAt) / 1000)}s`);
             render();
         }
 
@@ -999,7 +2026,9 @@ async function generate(kind) {
     if (!response) {
         response = {
             ok: false,
-            error: "Timed out waiting for the Gemini background job to finish.",
+            error: kind === "summary"
+                ? `Timed out waiting for ${summaryEngineLabel()} summary.`
+                : `Timed out waiting for ${modelLabel()} timestamps.`,
             debug: {
                 layer: "content",
                 step: "poll-timeout",
@@ -1008,14 +2037,12 @@ async function generate(kind) {
         };
     }
 
-    if (currentVideoKey !== videoKey || state.generationIDs[kind] !== generationID) {
+    if (!isCurrentGeneration(videoKey, kind, generationID)) {
+        stopLoadingForStaleGeneration(videoKey, kind, generationID);
         return;
     }
 
     state.isLoading[kind] = false;
-    if (state.activeGenerationKind === kind) {
-        state.activeGenerationKind = "";
-    }
 
     if (!response?.ok) {
         const debugParts = [];
@@ -1040,39 +2067,20 @@ async function generate(kind) {
         if (debugParts.length > 0) {
             logDebug(kind, debugParts.join("\n"));
         }
-        state.errors[kind] = response?.error || "The extension did not receive a usable response from Gemini.";
+        state.errors[kind] = response?.error || "The extension did not receive a usable generation response.";
         render();
-        await maybeRunQueuedGeneration();
         await refreshStatus();
         return;
     }
 
-    logDebug(kind, "step: Gemini response received");
-    if (kind === "timestamps") {
-        const timestampText = String(response.text ?? "").trim();
-        if (parseTimestamps(timestampText).length === 0) {
-            state.timestampsText = "";
-            state.errors[kind] = unavailableMessage(kind);
-            render();
-            await maybeRunQueuedGeneration();
-            return;
-        }
-        state.timestampsText = timestampText;
-    } else {
-        const summaryText = String(response.text ?? "").trim();
-        if (looksLikeInputRequest(summaryText)) {
-            state.summaryText = "";
-            state.errors[kind] = unavailableMessage(kind);
-            render();
-            await maybeRunQueuedGeneration();
-            return;
-        }
-        state.summaryText = summaryText;
+    logDebug(kind, "step: generation response received");
+    if (!applyGenerationText(kind, response.text)) {
+        state.errors[kind] = unavailableMessage(kind);
+        render();
+        return;
     }
 
-    state.errors[kind] = "";
     render();
-    await maybeRunQueuedGeneration();
     return;
 }
 
@@ -1152,14 +2160,23 @@ function jumpToTime(seconds) {
 
 async function buildPanel() {
     const target = getSidebarTarget();
-    if (!target || panelHost) {
+    if (!target) {
+        return;
+    }
+
+    panelHost = dedupePanelHosts(panelHost);
+    if (panelHost) {
+        if (!isPanelPlaced(target)) {
+            placePanelHost(target);
+        }
+        render();
         return;
     }
 
     panelHost = document.createElement("div");
-    panelHost.id = "gemini-youtube-sidebar-root";
+    panelHost.id = SIDEBAR_HOST_ID;
     panelHost.attachShadow({ mode: "open" });
-    target.prepend(panelHost);
+    placePanelHost(target);
     render();
 }
 
@@ -1174,6 +2191,8 @@ async function ensurePanel() {
         return;
     }
 
+    panelHost = dedupePanelHosts(panelHost);
+
     const nextVideoKey = getVideoKey();
     let needsRender = false;
     if (currentVideoKey !== nextVideoKey) {
@@ -1185,12 +2204,12 @@ async function ensurePanel() {
     if (!panelHost || !panelHost.isConnected) {
         panelHost = null;
         await buildPanel();
-        await maybeAutogenerateTimestamps();
+        await maybeAutogenerateAnalysis();
         return;
     }
 
-    if (!target.contains(panelHost)) {
-        target.prepend(panelHost);
+    if (!isPanelPlaced(target)) {
+        placePanelHost(target);
         needsRender = true;
     }
 
@@ -1198,13 +2217,13 @@ async function ensurePanel() {
         render();
     }
 
-    await maybeAutogenerateTimestamps();
+    await maybeAutogenerateAnalysis();
 }
 
 async function handleForegroundRefresh() {
     if (isWatchPage()) {
-        await refreshStatus();
         await ensurePanel();
+        refreshStatusInBackground();
         return;
     }
 
@@ -1216,11 +2235,11 @@ async function handleForegroundRefresh() {
 async function handleNavigationChange() {
     lastObservedURL = window.location.href;
 
-    if (isWatchPage()) {
-        await refreshStatus();
-    }
-
     await ensurePanel();
+
+    if (isWatchPage()) {
+        refreshStatusInBackground();
+    }
 }
 
 function handleNavigationStart(event) {
@@ -1267,10 +2286,6 @@ async function init() {
 
     state.ready = true;
     lastObservedURL = window.location.href;
-    if (isWatchPage()) {
-        await refreshStatus();
-    }
-    await ensurePanel();
 
     window.addEventListener("focus", handleForegroundRefresh);
     window.addEventListener("popstate", handleNavigationChange);
@@ -1283,6 +2298,11 @@ async function init() {
     document.addEventListener("yt-navigate-finish", handleNavigationChange);
 
     setInterval(heartbeat, 1000);
+
+    await ensurePanel();
+    if (isWatchPage()) {
+        refreshStatusInBackground();
+    }
 }
 
 init();

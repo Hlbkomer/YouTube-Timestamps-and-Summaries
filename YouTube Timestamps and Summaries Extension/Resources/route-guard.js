@@ -1,8 +1,12 @@
 const {
     getNavigationURL,
     isVideoURL,
-} = globalThis.GeminiYouTubeHelpers;
+} = globalThis.YouTubeTimestampsHelpers;
 
+// This lightweight guard is the only script that should run on non-video
+// YouTube pages. It turns watch/live SPA navigations into full navigations so
+// Safari injects content.js only on supported video pages, while Shorts and
+// feeds stay untouched.
 function isLeftClick(event) {
     return event.button === 0 && !event.defaultPrevented;
 }

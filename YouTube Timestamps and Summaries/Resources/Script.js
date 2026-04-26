@@ -1,21 +1,16 @@
-const clientIDInput = document.getElementById("client-id");
-const clientSecretInput = document.getElementById("client-secret");
-const projectIDInput = document.getElementById("project-id");
-const modelSelect = document.getElementById("model");
-const timestampsPromptInput = document.getElementById("timestamps-prompt");
-const summaryPromptInput = document.getElementById("summary-prompt");
 const extensionStatus = document.getElementById("extension-status");
-const connectionStatus = document.getElementById("connection-status");
+const codexStatus = document.getElementById("codex-status");
+const codexPairing = document.getElementById("codex-pairing");
+const codexCode = document.getElementById("codex-code");
 const messageBanner = document.getElementById("message");
-const setupTitle = document.getElementById("setup-title");
-const configFields = document.getElementById("config-fields");
-const saveConfigButton = document.getElementById("save-config");
-const savePromptsButton = document.getElementById("save-prompts");
-const resetPromptsButton = document.getElementById("reset-prompts");
-const setupHint = document.getElementById("setup-hint");
 const checklist = document.getElementById("checklist");
-const signInButton = document.getElementById("sign-in");
-const signOutButton = document.getElementById("sign-out");
+const openPreferencesButton = document.getElementById("open-preferences");
+const providerSelect = document.getElementById("provider-select");
+const modelSelect = document.getElementById("model-select");
+const summarySelect = document.getElementById("summary-select");
+const codexSignInButton = document.getElementById("codex-sign-in");
+const codexSignOutButton = document.getElementById("codex-sign-out");
+const copyCodexCodeButton = document.getElementById("copy-codex-code");
 
 function post(action, extra = {}) {
     webkit.messageHandlers.controller.postMessage({ action, ...extra });
@@ -25,51 +20,81 @@ function settingsLabel(useSettingsLabel) {
     return useSettingsLabel ? "Settings" : "Preferences";
 }
 
-function renderChecklist(usesBundledConfig) {
-    const items = usesBundledConfig
-        ? [
-            "Run this app and click <strong>Sign In With Google</strong>.",
-            "Open Safari Extension Settings and turn the extension on.",
-            "Choose a Gemini model and adjust the prompts below if you want to customize generation.",
-            "Open a YouTube watch page in Safari.",
-            "<strong>Timestamps</strong> generate automatically. Open <strong>Summary</strong> when you want the recap.",
-        ]
-        : [
-            "Create or choose a Google Cloud project.",
-            "Enable the Google Generative Language API.",
-            "Create an OAuth client of type <strong>Desktop app</strong>.",
-            "Paste the OAuth Client ID, Client Secret, and Project ID here, then sign in.",
-            "Choose a Gemini model and review the prompts below so Gemini returns the format you want.",
-            "Open a YouTube watch page in Safari. Timestamps generate automatically, and Summary runs on click.",
-        ];
-
+function renderChecklist() {
+    const items = [
+        "Choose the model used for timestamps and summary.",
+        "Sign in with ChatGPT.",
+        "Enable the Safari extension.",
+        "Open a YouTube video with captions or a transcript.",
+        "<strong>Timestamps</strong> and <strong>Summary</strong> will appear automatically.",
+    ];
     checklist.innerHTML = items.map((item) => `<li>${item}</li>`).join("");
 }
 
-window.renderAppState = function renderAppState(state) {
-    const usesBundledConfig = Boolean(state.usesBundledConfig);
-    const isSignedIn = Boolean(state.isSignedIn);
-    const isSigningIn = Boolean(state.isSigningIn);
+function renderOptions(select, options, selectedID) {
+    const currentValue = select.value || selectedID;
+    select.innerHTML = options
+        .map((option) => `<option value="${option.id}">${option.label}</option>`)
+        .join("");
+    select.value = selectedID || currentValue;
+}
 
-    clientIDInput.value = state.clientID ?? "";
-    clientSecretInput.value = state.clientSecret ?? "";
-    projectIDInput.value = state.projectID ?? "";
-    modelSelect.value = state.selectedModel ?? "gemini-3-flash-preview";
-    timestampsPromptInput.value = state.timestampsPrompt ?? "";
-    summaryPromptInput.value = state.summaryPrompt ?? "";
-    configFields.hidden = usesBundledConfig;
-    saveConfigButton.hidden = usesBundledConfig;
-    setupHint.hidden = usesBundledConfig;
-    setupTitle.textContent = usesBundledConfig ? "Google sign-in" : "Google Cloud values";
-    renderChecklist(usesBundledConfig);
-    signOutButton.hidden = !isSignedIn;
-    signOutButton.disabled = !isSignedIn || isSigningIn;
-    signInButton.disabled = isSigningIn || isSignedIn;
-    signInButton.textContent = isSigningIn
-        ? "Opening Browser..."
-        : (isSignedIn ? "Connected To Google" : "Sign In With Google");
+function selectedModelLabel() {
+    const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+    return selectedOption?.textContent || "Selected model";
+}
+
+function syncSummaryModelLabel() {
+    const option = Array.from(summarySelect.options).find((item) => item.value === "selectedModel");
+    if (option) {
+        option.textContent = selectedModelLabel();
+    }
+}
+
+function saveGenerationSettings() {
+    post("saveGenerationSettings", {
+        providerID: providerSelect.value,
+        modelID: modelSelect.value,
+        summaryEngine: summarySelect.value,
+    });
+}
+
+window.renderAppState = function renderAppState(state) {
+    renderChecklist();
 
     const label = settingsLabel(Boolean(state.usesSettingsLabel));
+    const settings = state.settings || {};
+
+    renderOptions(providerSelect, state.providerOptions || [], settings.providerID || "openaiCodex");
+    renderOptions(modelSelect, state.modelOptions || [], settings.modelID || "gpt-5.5");
+    renderOptions(summarySelect, state.summaryOptions || [], settings.summaryEngine || "selectedModel");
+    syncSummaryModelLabel();
+
+    if (state.codex?.connected) {
+        codexStatus.textContent = "ChatGPT is connected.";
+        codexStatus.dataset.state = "connected";
+        codexSignInButton.hidden = true;
+        codexSignOutButton.hidden = false;
+    } else {
+        codexStatus.textContent = state.codex?.error
+            ? `ChatGPT is not connected: ${state.codex.error}`
+            : "ChatGPT is not connected.";
+        codexStatus.dataset.state = "missing";
+        codexSignInButton.hidden = false;
+        codexSignOutButton.hidden = true;
+    }
+
+    if (state.codexLogin) {
+        codexPairing.hidden = false;
+        codexCode.textContent = state.codexLogin.userCode || "";
+        codexSignInButton.textContent = "Signing in...";
+        codexSignInButton.disabled = true;
+    } else {
+        codexPairing.hidden = true;
+        codexCode.textContent = "";
+        codexSignInButton.textContent = "Sign in with ChatGPT";
+        codexSignInButton.disabled = false;
+    }
 
     if (typeof state.extensionEnabled === "boolean") {
         extensionStatus.textContent = state.extensionEnabled
@@ -77,33 +102,6 @@ window.renderAppState = function renderAppState(state) {
             : `The Safari extension is disabled. Open Safari ${label} and turn it on.`;
     } else {
         extensionStatus.textContent = `Safari ${label} can show whether the extension is enabled after the app finishes checking.`;
-    }
-
-    if (isSignedIn) {
-        connectionStatus.textContent = "Google is connected.";
-        connectionStatus.dataset.state = "connected";
-        connectionStatus.hidden = false;
-    } else if (isSigningIn) {
-        connectionStatus.textContent = "Finish the Google sign-in flow in your browser, then return here.";
-        connectionStatus.dataset.state = "configured";
-        connectionStatus.hidden = false;
-    } else if (state.isConfigured) {
-        if (usesBundledConfig) {
-            connectionStatus.textContent = "";
-            connectionStatus.dataset.state = "";
-            connectionStatus.hidden = true;
-        } else {
-            connectionStatus.textContent = "Setup is saved. Finish by signing in with Google.";
-            connectionStatus.dataset.state = "configured";
-            connectionStatus.hidden = false;
-        }
-    } else {
-        connectionStatus.textContent = "Add your OAuth Client ID and Project ID to finish Gemini setup.";
-        if (!usesBundledConfig) {
-            connectionStatus.textContent = "Add your OAuth Client ID, Client Secret, and Project ID to finish Gemini setup.";
-        }
-        connectionStatus.dataset.state = "missing";
-        connectionStatus.hidden = false;
     }
 
     if (state.message) {
@@ -114,39 +112,32 @@ window.renderAppState = function renderAppState(state) {
         messageBanner.textContent = "";
     }
 
-    document.getElementById("open-preferences").textContent = `Open Safari Extension ${label}`;
+    openPreferencesButton.textContent = `Open Safari Extension ${label}`;
 };
 
-document.getElementById("save-config").addEventListener("click", () => {
-    post("saveConfig", {
-        clientID: clientIDInput.value,
-        clientSecret: clientSecretInput.value,
-        projectID: projectIDInput.value,
-    });
-});
-
-document.getElementById("sign-in").addEventListener("click", () => {
-    post("startSignIn");
-});
-
-document.getElementById("sign-out").addEventListener("click", () => {
-    post("signOut");
-});
-
-savePromptsButton.addEventListener("click", () => {
-    post("savePrompts", {
-        selectedModel: modelSelect.value,
-        timestampsPrompt: timestampsPromptInput.value,
-        summaryPrompt: summaryPromptInput.value,
-    });
-});
-
-resetPromptsButton.addEventListener("click", () => {
-    post("resetPrompts");
-});
-
-document.getElementById("open-preferences").addEventListener("click", () => {
+openPreferencesButton.addEventListener("click", () => {
     post("openPreferences");
+});
+
+providerSelect.addEventListener("change", saveGenerationSettings);
+
+modelSelect.addEventListener("change", () => {
+    syncSummaryModelLabel();
+    saveGenerationSettings();
+});
+
+summarySelect.addEventListener("change", saveGenerationSettings);
+
+codexSignInButton.addEventListener("click", () => {
+    post("startCodexLogin");
+});
+
+codexSignOutButton.addEventListener("click", () => {
+    post("signOutCodex");
+});
+
+copyCodexCodeButton.addEventListener("click", () => {
+    post("copyCodexCode");
 });
 
 post("ready");

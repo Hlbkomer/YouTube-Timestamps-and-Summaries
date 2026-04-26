@@ -21,43 +21,40 @@
             </ol>
         </section>
 
-        <section class="panel">
-            <div class="panel-head">
-                <div>
-                    <p class="section-label">Gemini OAuth Setup</p>
-                    <h2 id="setup-title">Google Cloud values</h2>
+        <section class="panel status-panel">
+            <div>
+                <p class="section-label">Generation Setup</p>
+                <label class="field compact-field">
+                    <span>Provider</span>
+                    <select id="provider-select"></select>
+                </label>
+                <label class="field compact-field">
+                    <span>Timestamps model</span>
+                    <select id="model-select"></select>
+                </label>
+                <label class="field compact-field">
+                    <span>Summary model</span>
+                    <select id="summary-select"></select>
+                </label>
+            </div>
+        </section>
+
+        <section class="panel status-panel">
+            <div>
+                <p class="section-label">ChatGPT Login</p>
+                <p id="codex-status" class="connection-status">Checking ChatGPT…</p>
+                <div id="codex-pairing" class="pairing-panel" hidden>
+                    <p class="hint">Enter this code on the ChatGPT sign-in page:</p>
+                    <div class="pairing-code-row">
+                        <p id="codex-code" class="pairing-code"></p>
+                        <button id="copy-codex-code" class="secondary compact-button" type="button">Copy</button>
+                    </div>
                 </div>
             </div>
-
-            <div id="config-fields">
-                <label class="field">
-                    <span>OAuth Client ID</span>
-                    <input id="client-id" type="text" placeholder="1234567890-abcdef.apps.googleusercontent.com" autocomplete="off">
-                </label>
-
-                <label class="field">
-                    <span>OAuth Client Secret</span>
-                    <input id="client-secret" type="password" placeholder="GOCSPX-..." autocomplete="off">
-                </label>
-
-                <label class="field">
-                    <span>Google Cloud Project ID</span>
-                    <input id="project-id" type="text" placeholder="your-project-id" autocomplete="off">
-                </label>
+            <div class="button-stack">
+                <button id="codex-sign-in" class="primary">Sign in with ChatGPT</button>
+                <button id="codex-sign-out" class="secondary">Sign Out</button>
             </div>
-
-            <div class="button-row">
-                <button id="save-config" class="primary">Save Setup</button>
-                <button id="sign-in" class="secondary">Sign In With Google</button>
-                <button id="sign-out" class="ghost">Sign Out</button>
-            </div>
-
-            <p id="connection-status" class="connection-status">Waiting for configuration…</p>
-
-            <p id="setup-hint" class="hint">
-                Use a <strong>Desktop app</strong> OAuth client in Google Cloud, enable the
-                <strong>Google Generative Language API</strong>, and keep your test users added while you are developing.
-            </p>
         </section>
 
         <section class="panel status-panel">
@@ -66,40 +63,6 @@
                 <p id="extension-status" class="status-line">Checking Safari extension status…</p>
             </div>
             <button id="open-preferences" class="secondary">Open Safari Extension Settings</button>
-        </section>
-
-        <section class="panel">
-            <div class="panel-head">
-                <div>
-                    <p class="section-label">Generation Setup</p>
-                    <h2>Model and prompts</h2>
-                </div>
-            </div>
-
-            <label class="field">
-                <span>Gemini model</span>
-                <select id="model">
-                    <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-                    <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                    <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
-                </select>
-            </label>
-
-            <label class="field">
-                <span>Timestamps prompt</span>
-                <textarea id="timestamps-prompt" rows="5" placeholder="Create chronological YouTube timestamps..."></textarea>
-            </label>
-
-            <label class="field">
-                <span>Summary prompt</span>
-                <textarea id="summary-prompt" rows="5" placeholder="Summarize this YouTube video..."></textarea>
-            </label>
-
-            <div class="button-row">
-                <button id="save-prompts" class="primary">Save Settings</button>
-                <button id="reset-prompts" class="ghost">Reset Defaults</button>
-            </div>
         </section>
 
         <p id="message" class="flash-message" hidden></p>

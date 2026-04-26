@@ -79,57 +79,6 @@
         return "";
     }
 
-    function buildCanonicalVideoURL(videoId) {
-        return `https://www.youtube.com/watch?v=${videoId}`;
-    }
-
-    function looksLikeInputRequest(text) {
-        const normalized = String(text ?? "").trim().toLowerCase();
-        if (!normalized) {
-            return true;
-        }
-
-        if (normalized.length > 700) {
-            return false;
-        }
-
-        const requestLeadPatterns = [
-            /^i(?:'|’)d be happy to help\b/,
-            /^i(?:'|’)d love to help\b/,
-            /^please (?:provide|paste|upload|send|share)\b/,
-            /^\s*once you provide\b/,
-            /\byou haven(?:'|’)t provided\b/,
-            /\bplease provide the\b/,
-        ];
-        const missingInputPatterns = [
-            /\byoutube (?:link|url)\b/,
-            /\bvideo (?:link|url|file)\b/,
-            /\btranscript\b/,
-            /\bupload (?:the )?video\b/,
-            /\bpaste (?:the )?(?:youtube )?(?:link|url)\b/,
-            /\bprovide (?:the )?(?:video|content|link)\b/,
-            /\bshare (?:the )?(?:video|link|url)\b/,
-        ];
-        const summarySignalPatterns = [
-            /\b(?:this|the) video (?:covers|discusses|explains|highlights|mentions|shows|walks through|is about)\b/,
-            /\bin this video\b/,
-            /\bcovers\b/,
-            /\bdiscuss(?:es|ed)\b/,
-            /\bexplains?\b/,
-            /\bhighlights?\b/,
-            /\bmentions?\b/,
-            /\btakeaways?\b/,
-            /\bkey points?\b/,
-            /\bsummary\b/,
-        ];
-
-        const hasRequestLead = requestLeadPatterns.some((pattern) => pattern.test(normalized));
-        const hasMissingInputSignal = missingInputPatterns.some((pattern) => pattern.test(normalized));
-        const hasSummarySignal = summarySignalPatterns.some((pattern) => pattern.test(normalized));
-
-        return hasRequestLead && hasMissingInputSignal && !hasSummarySignal;
-    }
-
     function timeToSeconds(time) {
         const parts = String(time ?? "").split(":").map(Number);
         if (parts.length < 2 || parts.some(Number.isNaN)) {
@@ -164,18 +113,16 @@
     }
 
     const helpers = {
-        buildCanonicalVideoURL,
         extractVideoKey,
         getNavigationURL,
         isShortsURL,
         isVideoURL,
         isWatchURL,
-        looksLikeInputRequest,
         parseTimestamps,
         timeToSeconds,
     };
 
-    globalScope.GeminiYouTubeHelpers = helpers;
+    globalScope.YouTubeTimestampsHelpers = helpers;
 
     if (typeof module !== "undefined" && module.exports) {
         module.exports = helpers;

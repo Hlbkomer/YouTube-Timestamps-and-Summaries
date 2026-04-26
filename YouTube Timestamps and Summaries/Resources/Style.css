@@ -100,6 +100,10 @@ body {
     gap: 12px;
 }
 
+.status-panel > div:first-child {
+    min-width: 0;
+}
+
 .panel-head {
     align-items: end;
     margin-bottom: 18px;
@@ -116,6 +120,12 @@ body {
     display: grid;
     gap: 8px;
     margin-bottom: 16px;
+}
+
+.compact-field {
+    grid-template-columns: 150px minmax(220px, 1fr);
+    align-items: center;
+    margin: 10px 0 0;
 }
 
 .field span {
@@ -163,6 +173,14 @@ body {
     margin-top: 4px;
 }
 
+.button-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+    min-width: 176px;
+}
+
 button {
     appearance: none;
     border: 0;
@@ -171,11 +189,11 @@ button {
     font: inherit;
     font-weight: 700;
     padding: 11px 16px;
-    transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+    transition: opacity 120ms ease, background 120ms ease;
 }
 
 button:hover {
-    transform: translateY(-1px);
+    opacity: 0.92;
 }
 
 button.primary {
@@ -227,6 +245,33 @@ button.ghost {
 
 .connection-status[data-state="missing"] {
     color: var(--danger);
+}
+
+.pairing-panel {
+    margin-top: 12px;
+}
+
+.pairing-code-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.pairing-code {
+    flex: 1;
+    margin: 0;
+    border-radius: 14px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 10px 12px;
+    font: 750 20px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    letter-spacing: 0.12em;
+}
+
+.compact-button {
+    padding: 10px 14px;
+    white-space: nowrap;
 }
 
 .flash-message {

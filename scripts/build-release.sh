@@ -16,6 +16,13 @@ ZIP_PATH="${ZIP_PATH:-$ARTIFACTS_PATH/$SCHEME.zip}"
 NOTARIZE="${NOTARIZE:-0}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 CLEAN="${CLEAN:-1}"
+ALLOW_PROVISIONING_UPDATES="${ALLOW_PROVISIONING_UPDATES:-1}"
+
+xcodebuild_args=()
+
+if [[ "$ALLOW_PROVISIONING_UPDATES" == "1" ]]; then
+    xcodebuild_args+=(-allowProvisioningUpdates)
+fi
 
 need_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -55,6 +62,7 @@ archive_app() {
         -archivePath "$ARCHIVE_PATH" \
         DEVELOPMENT_TEAM="$TEAM_ID" \
         CODE_SIGN_STYLE=Automatic \
+        "${xcodebuild_args[@]}" \
         "${build_action[@]}"
 }
 
@@ -63,7 +71,8 @@ export_app() {
         -exportArchive \
         -archivePath "$ARCHIVE_PATH" \
         -exportPath "$EXPORT_PATH" \
-        -exportOptionsPlist "$EXPORT_OPTIONS_PATH"
+        -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \
+        "${xcodebuild_args[@]}"
 }
 
 find_exported_app() {

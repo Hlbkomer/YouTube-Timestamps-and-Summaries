@@ -9,7 +9,7 @@ Video Timestamps and Summaries for YouTube is a Safari extension and macOS compa
 - chronological timestamps for YouTube videos
 - short summaries for YouTube videos
 
-The extension adds a right-side sidebar on supported YouTube video pages. The companion app handles Google sign-in and shares that signed-in state with the extension.
+The extension adds a right-side sidebar on supported YouTube video pages. It reads the available YouTube transcript, uses the user's selected signed-in ChatGPT model for timestamps, and creates summaries with either that model or Apple Intelligence on the Mac. A ChatGPT account is required.
 
 ![Companion app screenshot](readme-assets/companion-app.png)
 
@@ -17,23 +17,26 @@ The extension adds a right-side sidebar on supported YouTube video pages. The co
 
 ## How It Works
 
-1. The user signs in with Google in the macOS companion app.
-2. The Safari extension detects the current YouTube video URL.
-3. The app sends the YouTube URL and the selected prompt to Google's Gemini service.
-4. Gemini returns text that the extension displays as timestamps or a summary.
+1. The Safari extension detects a supported YouTube watch or live page.
+2. The extension fetches the available YouTube transcript for that video.
+3. If needed, the companion app asks the user to sign in with ChatGPT.
+4. The selected ChatGPT model creates timestamp candidates from the transcript.
+5. The selected ChatGPT model or Apple Intelligence creates the summary.
+6. The extension validates timestamp candidates against real transcript cue times before showing clickable timestamps.
 
-## What The App Uses Google Authorization For
+## Requirements
 
-Google authorization is used only so the app can call Gemini on behalf of the signed-in user.
-
-The app is not designed to access Gmail, Google Drive, Calendar, Contacts, or other personal Google account content.
+- macOS 26 or later
+- ChatGPT sign-in
+- Apple Intelligence enabled and compatible Apple silicon hardware only if Apple Intelligence is selected for summaries
+- a YouTube video with captions or an available transcript
 
 ## Data Flow
 
-- The current YouTube video URL is sent to Gemini when the user requests a summary or when timestamps are generated.
-- The selected Gemini prompt is sent to Gemini as part of the request.
-- OAuth tokens are stored locally on the user's Mac so the user does not have to sign in every time.
-- There is no separate developer-operated backend server for these Gemini requests. Requests are sent from the local app to Google.
+- The extension reads the current YouTube video URL to identify supported video pages.
+- Transcript text is sent to ChatGPT for timestamp generation.
+- Transcript text is sent to ChatGPT or processed locally with Apple Intelligence for summary generation, depending on the summary setting.
+- The app does not use Google sign-in, API keys, or a developer-operated backend for generation.
 
 ## Support
 

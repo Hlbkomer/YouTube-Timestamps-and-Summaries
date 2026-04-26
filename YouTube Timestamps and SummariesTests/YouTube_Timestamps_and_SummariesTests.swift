@@ -5,40 +5,58 @@
 //  Created by Matus Vojtek on 21/04/2026.
 //
 
+import Foundation
 import Testing
-@testable import YouTube_Timestamps_and_Summaries
 
 struct YouTube_Timestamps_and_SummariesTests {
 
-    @Test func modelResolutionFallsBackToDefault() {
-        #expect(GeminiModelOption.resolved(from: nil) == .defaultOption)
-        #expect(GeminiModelOption.resolved(from: "unknown-model") == .defaultOption)
-        #expect(GeminiModelOption.resolved(from: GeminiModelOption.gemini3ProPreview.rawValue) == .gemini3ProPreview)
+    @Test func extensionBundleIdentifierMatchesSafariExtensionTarget() throws {
+        let viewControllerSource = try source("YouTube Timestamps and Summaries/ViewController.swift")
+
+        #expect(viewControllerSource.contains(#"let extensionBundleIdentifier = "Matuko.YouTube-Timestamps-and-Summaries.Extension""#))
     }
 
-    @Test func oauthConfigRequiresTrimmedValues() {
-        let incomplete = GeminiOAuthConfig(
-            clientID: " client-id ",
-            clientSecret: "   ",
-            projectID: " project-id "
-        )
-        let complete = GeminiOAuthConfig(
-            clientID: " client-id ",
-            clientSecret: " client-secret ",
-            projectID: " project-id "
-        )
+    @Test func generationDefaultsUseChatGPTForTimestampsAndSummary() throws {
+        let appSettingsSource = try source("YouTube Timestamps and Summaries/GenerationSettings.swift")
 
-        #expect(incomplete.isComplete == false)
-        #expect(complete.isComplete == true)
-        #expect(complete.trimmedClientID == "client-id")
-        #expect(complete.trimmedClientSecret == "client-secret")
-        #expect(complete.trimmedProjectID == "project-id")
+        #expect(appSettingsSource.contains(#"static let defaultProviderID = "openaiCodex""#))
+        #expect(appSettingsSource.contains(#"static let defaultModelID = "gpt-5.5""#))
+        #expect(appSettingsSource.contains(#"static let defaultSummaryEngine = "selectedModel""#))
     }
 
-    @Test func defaultPromptsMatchCurrentProductDefaults() {
-        let prompts = GeminiPromptConfig.default
+    @Test func appAndExtensionGenerationDefaultsStayInSync() throws {
+        let appSettingsSource = try source("YouTube Timestamps and Summaries/GenerationSettings.swift")
+        let extensionSettingsSource = try source("YouTube Timestamps and Summaries Extension/GenerationSettings.swift")
 
-        #expect(prompts.timestamps == "Please create chronological timestamps for this video. No bullet points, one timestamp per line in the format MM:SS Title.")
-        #expect(prompts.summary == "Please summarize this video.")
+        let sharedContracts = [
+            #"static let appGroupIdentifier = "group.Matuko.YouTube-Timestamps-and-Summaries.shared""#,
+            #"static let providerIDKey = "generation.providerID""#,
+            #"static let modelIDKey = "generation.modelID""#,
+            #"static let summaryEngineKey = "generation.summaryEngine""#,
+            #"static let defaultProviderID = "openaiCodex""#,
+            #"static let defaultModelID = "gpt-5.5""#,
+            #"static let defaultSummaryEngine = "selectedModel""#,
+            #"static let supportedModelIDs = Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini"])"#,
+        ]
+
+        for contract in sharedContracts {
+            #expect(appSettingsSource.contains(contract))
+            #expect(extensionSettingsSource.contains(contract))
+        }
+    }
+
+    @Test func appleIntelligenceRemainsOptionalSummaryChoice() throws {
+        let appSettingsSource = try source("YouTube Timestamps and Summaries/GenerationSettings.swift")
+
+        #expect(appSettingsSource.contains(#""id": "selectedModel""#))
+        #expect(appSettingsSource.contains(#""id": "appleIntelligence""#))
+    }
+
+    private func source(_ path: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let url = root.appending(path: path)
+        return try String(contentsOf: url, encoding: .utf8)
     }
 }

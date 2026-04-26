@@ -10,7 +10,10 @@ import os.log
 
 final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
 
-    private let service = GeminiNativeService()
+    private let service = AppleIntelligenceService()
+    private let codexService = CodexGenerationService()
+    private let codexAuthService = CodexAuthService()
+    private let companionAppURL = URL(string: "youtube-timestamps-summaries://open")!
     private let logger = Logger(subsystem: "Matuko.YouTube-Timestamps-and-Summaries", category: "NativeBridge")
 
     func beginRequest(with context: NSExtensionContext) {
@@ -37,7 +40,7 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         )
 
         Task {
-            let payload = await handleMessage(message)
+            let payload = await handleMessage(message, context: context)
             print("[NativeBridge] Completed native message with ok=\((payload["ok"] as? Bool) == true)")
             logger.log("Completed native message with ok=\((payload["ok"] as? Bool) == true, privacy: .public)")
             let response = NSExtensionItem()
@@ -52,7 +55,7 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         }
     }
 
-    private func handleMessage(_ message: Any?) async -> [String: Any] {
+    private func handleMessage(_ message: Any?, context: NSExtensionContext) async -> [String: Any] {
         guard let payload = message as? [String: Any], let action = payload["action"] as? String else {
             return [
                 "ok": false,
@@ -62,15 +65,31 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
 
         switch action {
         case "getStatus":
-            return service.statusPayload()
+            return await statusPayload()
 
         case "openContainerApp":
-            return service.openContainerApp()
+            return await openContainerApp(from: context)
 
         case "generateContent":
-            let videoURL = payload["videoURL"] as? String ?? ""
             let kind = payload["kind"] as? String ?? "timestamps"
-            return await service.generate(videoURL: videoURL, kind: kind)
+            let transcript = payload["transcript"] as? String ?? ""
+            return await service.generate(kind: kind, transcript: transcript)
+
+        case "generateCodexTimestamps":
+            let transcript = payload["transcript"] as? String ?? ""
+            let model = payload["model"] as? String ?? GenerationSettings.load().modelID
+            return await codexService.generateTimestamps(
+                transcript: transcript,
+                model: model
+            )
+
+        case "generateCodexSummary":
+            let transcript = payload["transcript"] as? String ?? ""
+            let model = payload["model"] as? String ?? GenerationSettings.load().modelID
+            return await codexService.generateSummary(
+                transcript: transcript,
+                model: model
+            )
 
         default:
             return [
@@ -78,5 +97,48 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 "error": "Unsupported native action: \(action)"
             ]
         }
+    }
+
+    private func openContainerApp(from context: NSExtensionContext) async -> [String: Any] {
+        // Do not use NSWorkspace from the extension sandbox. It can fail with
+        // "(null) does not have permission to open (null)". Opening the app's
+        // registered URL scheme through the extension context keeps the handoff
+        // inside the host-approved extension API.
+        await withCheckedContinuation { continuation in
+            context.open(companionAppURL) { success in
+                continuation.resume(returning: [
+                    "ok": success,
+                    "error": success ? "" : "The companion app could not be opened from Safari."
+                ])
+            }
+        }
+    }
+
+    private func statusPayload() async -> [String: Any] {
+        let appleStatus = service.statusPayload()
+        let codexStatus = await codexAuthService.statusPayload(refresh: true)
+        let settings = GenerationSettings.load()
+        let appleConfigured = (appleStatus["isConfigured"] as? Bool) == true
+        let codexConnected = (codexStatus["connected"] as? Bool) == true
+        let effectiveSummaryEngine = settings.summaryEngine == "appleIntelligence" && !appleConfigured
+            ? "selectedModel"
+            : settings.summaryEngine
+        let summaryUsesApple = effectiveSummaryEngine == "appleIntelligence"
+        let modelLabel = GenerationSettings.modelLabel(for: settings.modelID)
+        let summaryEngineLabel = summaryUsesApple ? "Apple Intelligence" : modelLabel
+        var settingsPayload = settings.payload
+        settingsPayload["summaryEngine"] = effectiveSummaryEngine
+        settingsPayload["modelLabel"] = modelLabel
+        settingsPayload["summaryEngineLabel"] = summaryEngineLabel
+
+        return [
+            "ok": true,
+            "engine": summaryUsesApple ? "\(modelLabel) + Apple Intelligence" : modelLabel,
+            "generationMode": "selectedProvider",
+            "isConfigured": codexConnected && (!summaryUsesApple || appleConfigured),
+            "appleIntelligence": appleStatus,
+            "codex": codexStatus,
+            "settings": settingsPayload,
+        ]
     }
 }

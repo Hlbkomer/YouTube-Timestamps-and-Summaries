@@ -4,7 +4,7 @@ title: Terms of Service
 
 # Terms of Service
 
-Last updated: April 23, 2026
+Last updated: April 26, 2026
 
 These Terms of Service govern the use of Video Timestamps and Summaries for YouTube.
 
@@ -12,16 +12,15 @@ These Terms of Service govern the use of Video Timestamps and Summaries for YouT
 
 You may use the app only in compliance with applicable laws, platform rules, and third-party service terms that apply to you.
 
-You are responsible for your own use of YouTube, Google services, Safari, and any related accounts.
+You are responsible for your own use of YouTube, Safari, macOS, Apple Intelligence, ChatGPT, and any related accounts.
 
 ## Third-Party Services
 
 The app depends on third-party services and platforms, including:
 
-- Google OAuth
-- Google Gemini
 - YouTube
-- Safari and macOS
+- Safari, macOS, and Apple Intelligence
+- ChatGPT
 
 Those services may change, become unavailable, or impose their own restrictions.
 

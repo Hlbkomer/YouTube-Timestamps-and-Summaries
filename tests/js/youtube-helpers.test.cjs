@@ -49,14 +49,6 @@ test("extractVideoKey resolves watch, live, canonical, and player-response sourc
     }), "fromPlayerResponse");
 });
 
-test("looksLikeInputRequest matches Gemini missing-input replies without hiding normal summaries", () => {
-    const missingInputReply = "Please provide the link to the video, a transcript, or the video file itself. Once you provide the content, I will generate the timestamps for you in the requested format.";
-    const realSummary = "This video explains how to share a video link with your team, highlights the main steps, and ends with practical takeaways.";
-
-    assert.equal(helpers.looksLikeInputRequest(missingInputReply), true);
-    assert.equal(helpers.looksLikeInputRequest(realSummary), false);
-});
-
 test("parseTimestamps parses common timestamp formats", () => {
     const parsed = helpers.parseTimestamps([
         "00:00 Intro",

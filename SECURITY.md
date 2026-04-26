@@ -2,30 +2,24 @@
 
 ## Secrets
 
-Keep the following values out of Git:
+The app does not require Google OAuth credentials, API keys, or a bundled secrets file.
 
-- Google OAuth client secret
-- access tokens
-- refresh tokens
-- downloaded Google OAuth credential JSON files
+Timestamp generation uses the user's own ChatGPT sign-in. The companion app stores ChatGPT sign-in tokens locally in the shared app group container so the app and extension can refresh the user's session.
 
-Use `YouTube Timestamps and Summaries/LocalSecrets.plist` for local configuration. The repo includes a template file only.
+Keep local build artifacts, logs, and screenshots that reveal private browsing context out of Git.
 
 ## Stored Data
 
-- Google OAuth configuration is stored locally on the machine.
-- OAuth tokens are stored in the macOS Keychain for local use by the companion app and Safari extension.
-- Prompt configuration and selected model are stored locally in shared app preferences.
+- App settings are stored locally on the user's Mac.
+- ChatGPT sign-in tokens are stored locally in the shared app group container.
+- YouTube transcript text is sent to ChatGPT for timestamp generation.
+- YouTube transcript text is sent to ChatGPT or processed locally with Apple Intelligence for summary generation, depending on the summary setting.
+- The app does not use Google sign-in, so it does not store Google OAuth tokens.
 
 ## Network Access
 
-This project sends requests to:
-
-- Google OAuth endpoints
-- Google Gemini API endpoints
-
-The Safari extension injects UI only on YouTube domains declared in the extension manifest.
+The Safari extension injects UI only on YouTube watch/live pages. The WebExtension requests host access only for YouTube transcript extraction. ChatGPT sign-in and generation requests are handled by the native app/extension layer.
 
 ## Reporting
 
-If you find a security issue, please avoid posting live credentials or tokens in public issues.
+If you find a security issue, please avoid posting private video URLs, transcripts, logs, or credentials in public issues.
