@@ -11,6 +11,14 @@ The extension reads the available YouTube transcript, sends it to the user's sel
 
 Under the hood, the extension keeps transcript timing deterministic, validates generated timestamps against real transcript cue times, and keeps Apple Intelligence available as an optional local summary engine. See [ARCHITECTURE.md](ARCHITECTURE.md) for the current generation pipeline and guardrails.
 
+## Download
+
+Download the signed and notarized macOS app:
+
+[Download Timestamps & Summaries for YT v1.0.0](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.0/Timestamps-and-Summaries-for-YT-v1.0.0.zip)
+
+After unzipping, move the app to `Applications`, open it, then enable the Safari extension from the companion app.
+
 ## Preview
 
 ### Demo

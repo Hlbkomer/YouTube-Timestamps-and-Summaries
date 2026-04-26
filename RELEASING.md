@@ -87,7 +87,9 @@ For a simple first public release, upload the notarized zip artifact to GitHub R
 
 Recommended artifact:
 
-- `build/release/artifacts/Timestamps & Summaries for YT.zip`
+- `build/release/artifacts/Timestamps-and-Summaries-for-YT-v1.0.0.zip`
+
+The release script currently creates a ZIP using the Xcode scheme name. For public GitHub uploads, copy or rename the notarized ZIP to the recommended artifact name before uploading it.
 
 ## Final Checks
 

@@ -11,6 +11,14 @@ Timestamps & Summaries for YT is a Safari extension and macOS companion app that
 
 The extension adds a right-side sidebar on supported YouTube video pages. It reads the available YouTube transcript, uses the user's selected signed-in ChatGPT model for timestamps, and creates summaries with either that model or Apple Intelligence on the Mac. A ChatGPT account is required.
 
+## Download
+
+Download the signed and notarized macOS app:
+
+[Download Timestamps & Summaries for YT v1.0.0](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.0/Timestamps-and-Summaries-for-YT-v1.0.0.zip)
+
+After unzipping, move the app to `Applications`, open it, then enable the Safari extension from the companion app.
+
 ![Companion app screenshot](readme-assets/companion-app.png)
 
 ![YouTube sidebar screenshot](readme-assets/youtube-sidebar.png)
