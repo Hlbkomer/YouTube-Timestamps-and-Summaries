@@ -2,7 +2,7 @@
 
 This file is a working draft for App Store Connect.
 
-Status note: the current default build uses ChatGPT/Codex sign-in for timestamps and summaries. Apple Intelligence remains available as an optional local summary engine. Re-check App Review, privacy, and third-party-service wording before submitting this version.
+Status note: the current default build uses ChatGPT sign-in for timestamps and summaries. Apple Intelligence remains available as an optional local summary engine. Re-check App Review, privacy, and third-party-service wording before submitting this version.
 
 It is based on the current app behavior and Apple’s current App Store Connect requirements for:
 
@@ -85,14 +85,14 @@ Features:
 - simple Safari sidebar for timestamps and summaries
 - clickable timestamp links that jump to the right moment
 - transcript-based generation
-- ChatGPT/Codex generation through the user's account
+- ChatGPT generation through the user's account
 - optional Apple Intelligence summaries on your Mac
 - no API key or developer backend required
 
 Important notes:
 
 - requires Safari on macOS 26 or later
-- requires ChatGPT/Codex sign-in for timestamp generation
+- requires ChatGPT sign-in for timestamp generation
 - Apple Intelligence summaries require Apple Intelligence enabled on a compatible Mac
 - videos need captions or an available transcript
 - generated output may be incomplete or inaccurate
@@ -122,7 +122,7 @@ Fill with your real details in App Store Connect:
 
 `Yes`
 
-This app requires ChatGPT/Codex sign-in for timestamp generation. Summaries use ChatGPT/Codex by default, with Apple Intelligence available as an optional local summary engine.
+This app requires ChatGPT sign-in for timestamp generation. Summaries use ChatGPT by default, with Apple Intelligence available as an optional local summary engine.
 
 ### Demo account
 
@@ -135,7 +135,7 @@ Suggested review note:
 ```text
 This app is a macOS container app for a Safari web extension.
 
-The extension adds a sidebar on supported YouTube video pages. It generates timestamps from the available YouTube transcript through the user's ChatGPT/Codex sign-in. Summaries use ChatGPT/Codex by default, or Apple Intelligence on the Mac if selected in the companion app.
+The extension adds a sidebar on supported YouTube video pages. It generates timestamps from the available YouTube transcript through the user's ChatGPT sign-in. Summaries use ChatGPT by default, or Apple Intelligence on the Mac if selected in the companion app.
 
 No API key or developer-operated backend is required.
 
@@ -143,11 +143,11 @@ Review steps:
 1. Launch the macOS app.
 2. Click "Open Safari Extension Settings" and enable the Safari extension.
 3. Open a supported YouTube watch page in Safari.
-4. Sign in with ChatGPT/Codex in the companion app if not already signed in.
+4. Sign in with ChatGPT in the companion app if not already signed in.
 5. Use the Timestamps and Summary tabs in the extension sidebar.
 
 Important:
-- Review requires ChatGPT/Codex sign-in for timestamp generation.
+- Review requires ChatGPT sign-in for timestamp generation.
 - Apple Intelligence is optional and only required if selected for summaries.
 - Timestamps and Summary generate automatically on supported watch pages.
 - Videos without captions or an available transcript will show a clear error.
@@ -176,15 +176,15 @@ Reasoning:
 
 Suggested answer:
 
-- Re-check in App Store Connect. The app does not collect data to a developer backend, but transcript text is sent to ChatGPT/Codex for timestamp generation and, by default, summary generation through the user's account.
+- Re-check in App Store Connect. The app does not collect data to a developer backend, but transcript text is sent to ChatGPT for timestamp generation and, by default, summary generation through the user's account.
 
 Reasoning:
 
 - no analytics SDK
 - no developer backend
 - no bundled generation credentials
-- ChatGPT/Codex OAuth tokens are stored locally in Safari extension storage
-- transcript text is sent to ChatGPT/Codex for timestamp generation and, by default, summary generation
+- ChatGPT OAuth tokens are stored locally in Safari extension storage
+- transcript text is sent to ChatGPT for timestamp generation and, by default, summary generation
 - transcript text is used locally for Apple Intelligence summary generation when that summary option is selected
 
 ### Data not collected
