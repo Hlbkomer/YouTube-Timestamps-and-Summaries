@@ -35,12 +35,14 @@ const MAX_GENERATION_TIMEOUT_MS = 20 * 60 * 1000;
 const GENERATION_TIMEOUT_FREE_CHARACTERS = 30000;
 const GENERATION_TIMEOUT_CHARACTER_BLOCK = 10000;
 const GENERATION_TIMEOUT_EXTRA_MS_PER_BLOCK = 45 * 1000;
+const PENDING_GENERATION_START_GRACE_MS = 30000;
 const TRANSCRIPT_CACHE_LIMIT = 5;
 const TRANSCRIPT_TRACK_WAIT_ATTEMPTS = 16;
 const transcriptCache = new Map();
 const timedTextTrackCache = new Map();
 const innertubePlayerTrackCache = new Map();
 const generationRequestKeys = new Set();
+const generationResultCache = new Map();
 let initialPlayerResponseCache = {
     videoKey: "",
     response: null,
@@ -169,6 +171,139 @@ function generationKindForTab(kind, usesSelectedProvider) {
     }
 
     return kind === "summary" ? "codexSummary" : "codexTimestamps";
+}
+
+function generationResultCacheKey(videoKey, kind) {
+    const providerID = state.settings.providerID || "provider";
+    const modelID = state.settings.modelID || "model";
+    const summaryEngine = kind === "summary"
+        ? state.settings.summaryEngine || "selectedModel"
+        : "timestamps";
+
+    return [
+        "youtube-timestamps-generation",
+        videoKey || "",
+        kind,
+        providerID,
+        modelID,
+        summaryEngine,
+    ].join(":");
+}
+
+function pendingGenerationCacheKey(videoKey, kind) {
+    return `${generationResultCacheKey(videoKey, kind)}:pending`;
+}
+
+function cachedGenerationText(videoKey, kind) {
+    const key = generationResultCacheKey(videoKey, kind);
+    const inMemory = generationResultCache.get(key);
+    if (inMemory) {
+        return inMemory;
+    }
+
+    try {
+        const stored = window.sessionStorage?.getItem(key) || "";
+        if (stored) {
+            generationResultCache.set(key, stored);
+        }
+        return stored;
+    } catch (_) {
+        return "";
+    }
+}
+
+function rememberGeneratedText(videoKey, kind, text) {
+    const generatedText = String(text || "").trim();
+    if (!videoKey || !generatedText) {
+        return;
+    }
+
+    const key = generationResultCacheKey(videoKey, kind);
+    generationResultCache.set(key, generatedText);
+
+    try {
+        window.sessionStorage?.setItem(key, generatedText);
+    } catch (_) {
+        // Session storage can be unavailable in some Safari contexts. The
+        // in-memory cache still protects this content-script instance.
+    }
+}
+
+function readPendingGeneration(videoKey, kind) {
+    try {
+        const rawValue = window.sessionStorage?.getItem(pendingGenerationCacheKey(videoKey, kind)) || "";
+        if (!rawValue) {
+            return null;
+        }
+
+        const pending = JSON.parse(rawValue);
+        const deadline = Number(pending?.deadline || 0);
+        const createdAt = Number(pending?.createdAt || 0);
+        const hasJobID = Boolean(pending?.jobId);
+        const graceDeadline = hasJobID
+            ? deadline
+            : createdAt + PENDING_GENERATION_START_GRACE_MS;
+
+        if (!graceDeadline || Date.now() > graceDeadline) {
+            clearPendingGeneration(videoKey, kind);
+            return null;
+        }
+
+        return {
+            jobId: String(pending.jobId || ""),
+            createdAt,
+            deadline,
+            timeoutMs: Number(pending.timeoutMs || MIN_GENERATION_TIMEOUT_MS),
+        };
+    } catch (_) {
+        clearPendingGeneration(videoKey, kind);
+        return null;
+    }
+}
+
+function writePendingGeneration(videoKey, kind, pending) {
+    try {
+        window.sessionStorage?.setItem(
+            pendingGenerationCacheKey(videoKey, kind),
+            JSON.stringify(pending)
+        );
+    } catch (_) {
+        // If sessionStorage is unavailable, the in-memory generationRequestKeys
+        // guard still protects normal same-runtime duplicate starts.
+    }
+}
+
+function rememberPendingGenerationStart(videoKey, kind, timeoutMs) {
+    writePendingGeneration(videoKey, kind, {
+        jobId: "",
+        createdAt: Date.now(),
+        deadline: Date.now() + timeoutMs,
+        timeoutMs,
+    });
+}
+
+function rememberPendingGenerationJob(videoKey, kind, jobId, timeoutMs) {
+    writePendingGeneration(videoKey, kind, {
+        jobId,
+        createdAt: Date.now(),
+        deadline: Date.now() + timeoutMs,
+        timeoutMs,
+    });
+}
+
+function clearPendingGeneration(videoKey, kind, jobId = "") {
+    try {
+        if (jobId) {
+            const pending = readPendingGeneration(videoKey, kind);
+            if (pending?.jobId && pending.jobId !== jobId) {
+                return;
+            }
+        }
+
+        window.sessionStorage?.removeItem(pendingGenerationCacheKey(videoKey, kind));
+    } catch (_) {
+        // Nothing to clear.
+    }
 }
 
 function generationStepDescription(kind, usesSelectedProvider) {
@@ -983,6 +1118,15 @@ function applyGenerationText(kind, text) {
     state.timestampsText = generatedText;
     state.errors.timestamps = "";
     return true;
+}
+
+function restoreCachedGenerationText(videoKey, kind) {
+    const cachedText = cachedGenerationText(videoKey, kind);
+    if (!cachedText || activeText(kind)) {
+        return false;
+    }
+
+    return applyGenerationText(kind, cachedText);
 }
 
 async function tryTranscriptTracks(videoKey, kind, source, tracks) {
@@ -1841,125 +1985,34 @@ async function maybeAutogenerateAnalysis() {
     ]);
 }
 
-async function requestGeneration(kind) {
-    if (!state.isConfigured || state.isLoading[kind] || activeText(kind)) {
-        return;
+async function waitForPendingGenerationJob(videoKey, kind, generationID) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < PENDING_GENERATION_START_GRACE_MS) {
+        if (!isCurrentGeneration(videoKey, kind, generationID)) {
+            return null;
+        }
+
+        if (restoreCachedGenerationText(videoKey, kind)) {
+            render();
+            return null;
+        }
+
+        const pending = readPendingGeneration(videoKey, kind);
+        if (!pending) {
+            return null;
+        }
+
+        if (pending.jobId) {
+            return pending;
+        }
+
+        await sleep(500);
     }
 
-    const videoKey = currentVideoKey || getVideoKey() || "";
-    const requestKey = `${videoKey}:${kind}`;
-    if (generationRequestKeys.has(requestKey)) {
-        return;
-    }
-
-    generationRequestKeys.add(requestKey);
-    try {
-        await generate(kind);
-    } finally {
-        generationRequestKeys.delete(requestKey);
-    }
+    return null;
 }
 
-async function generate(kind) {
-    if (!state.isConfigured || state.isLoading[kind]) {
-        return;
-    }
-
-    const videoKey = getVideoKey();
-    if (!videoKey) {
-        return;
-    }
-
-    state.errors[kind] = "";
-    state.debug[kind] = "";
-    state.isLoading[kind] = true;
-    state.generationIDs[kind] += 1;
-    const generationID = state.generationIDs[kind];
-    logDebug(kind, `started: ${new Date().toLocaleTimeString()}`);
-    logDebug(kind, "video: supported YouTube video detected");
-    render();
-
-    const transcript = await getTranscript(videoKey, kind).catch((error) => {
-        logDebug(kind, `transcript: failed (${error?.message || String(error)})`);
-        return null;
-    });
-    if (!isCurrentGeneration(videoKey, kind, generationID)) {
-        stopLoadingForStaleGeneration(videoKey, kind, generationID);
-        return;
-    }
-
-    if (!transcript?.text) {
-        state.isLoading[kind] = false;
-        state.errors[kind] = "This video does not have an available transcript.";
-        render();
-        return;
-    }
-
-    const usesSelectedProvider = state.generationMode === "selectedProvider" || state.generationMode === "codexChatGPT";
-    const requestKind = generationKindForTab(kind, usesSelectedProvider);
-    const requestTranscript = transcriptForGeneration(kind, transcript?.text || "");
-    const generationTimeoutMs = generationTimeoutForTranscript(requestTranscript);
-
-    logDebug(kind, generationStepDescription(kind, usesSelectedProvider));
-    logDebug(kind, `timeout budget: ${Math.round(generationTimeoutMs / 1000)}s`);
-    render();
-
-    const startResponse = await sendMessageWithTimeout({
-        type: "ai:startGenerate",
-        kind: requestKind,
-        transcript: requestTranscript,
-        timeoutMs: generationTimeoutMs,
-    }, 20000).catch((error) => {
-        logDebug(kind, "step: start request failed", error);
-        return {
-            ok: false,
-            error: error?.message || "The extension could not start the background job.",
-            debug: {
-                layer: "content",
-                step: "start-failed",
-                detail: error?.stack || error?.message || String(error),
-            },
-        };
-    });
-
-    if (!isCurrentGeneration(videoKey, kind, generationID)) {
-        stopLoadingForStaleGeneration(videoKey, kind, generationID);
-        return;
-    }
-
-    if (!startResponse?.ok || !startResponse?.jobId) {
-        const debugParts = [];
-        if (startResponse?.debug?.layer) {
-            debugParts.push(`layer: ${startResponse.debug.layer}`);
-        }
-        if (startResponse?.debug?.step) {
-            debugParts.push(`step: ${startResponse.debug.step}`);
-        }
-        if (startResponse?.debug?.detail) {
-            debugParts.push(`detail: ${startResponse.debug.detail}`);
-        }
-        if (typeof startResponse !== "undefined") {
-            try {
-                debugParts.push(`raw: ${JSON.stringify(startResponse)}`);
-            } catch (_) {
-                debugParts.push(`raw: ${String(startResponse)}`);
-            }
-        }
-        if (debugParts.length > 0) {
-            logDebug(kind, debugParts.join("\n"));
-        }
-        state.isLoading[kind] = false;
-        state.errors[kind] = startResponse?.error || "The extension could not start the generation job.";
-        render();
-        await refreshStatus();
-        return;
-    }
-
-    const jobID = startResponse.jobId;
-    logDebug(kind, `requestId: ${jobID}`);
-    logDebug(kind, generationWaitDescription(kind, usesSelectedProvider));
-    render();
-
+async function pollGenerationJob(kind, videoKey, generationID, jobID, generationTimeoutMs) {
     const deadline = Date.now() + generationTimeoutMs;
     const startedAt = Date.now();
     let lastWaitNoticeAt = startedAt;
@@ -1980,8 +2033,9 @@ async function generate(kind) {
         }));
 
         if (!isCurrentGeneration(videoKey, kind, generationID)) {
-            stopLoadingForStaleGeneration(videoKey, kind, generationID);
-            return;
+            return {
+                stale: true,
+            };
         }
 
         if (pollResponse?.debug?.messages) {
@@ -2022,18 +2076,187 @@ async function generate(kind) {
         await sleep(1000);
     }
 
-    if (!response) {
-        response = {
-            ok: false,
-            error: kind === "summary"
-                ? `Timed out waiting for ${summaryEngineLabel()} summary.`
-                : `Timed out waiting for ${modelLabel()} timestamps.`,
-            debug: {
-                layer: "content",
-                step: "poll-timeout",
-                detail: `jobId=${jobID}`,
-            },
-        };
+    return response || {
+        ok: false,
+        error: kind === "summary"
+            ? `Timed out waiting for ${summaryEngineLabel()} summary.`
+            : `Timed out waiting for ${modelLabel()} timestamps.`,
+        debug: {
+            layer: "content",
+            step: "poll-timeout",
+            detail: `jobId=${jobID}`,
+        },
+    };
+}
+
+async function requestGeneration(kind) {
+    if (!state.isConfigured || state.isLoading[kind] || activeText(kind)) {
+        return;
+    }
+
+    const videoKey = currentVideoKey || getVideoKey() || "";
+    if (restoreCachedGenerationText(videoKey, kind)) {
+        render();
+        return;
+    }
+
+    const requestKey = `${videoKey}:${kind}`;
+    if (generationRequestKeys.has(requestKey)) {
+        return;
+    }
+
+    generationRequestKeys.add(requestKey);
+    try {
+        await generate(kind);
+    } finally {
+        generationRequestKeys.delete(requestKey);
+    }
+}
+
+async function generate(kind) {
+    if (!state.isConfigured || state.isLoading[kind]) {
+        return;
+    }
+
+    const videoKey = getVideoKey();
+    if (!videoKey) {
+        return;
+    }
+
+    if (restoreCachedGenerationText(videoKey, kind)) {
+        render();
+        return;
+    }
+
+    state.errors[kind] = "";
+    state.debug[kind] = "";
+    state.isLoading[kind] = true;
+    state.generationIDs[kind] += 1;
+    const generationID = state.generationIDs[kind];
+    logDebug(kind, `started: ${new Date().toLocaleTimeString()}`);
+    logDebug(kind, "video: supported YouTube video detected");
+    render();
+
+    const transcript = await getTranscript(videoKey, kind).catch((error) => {
+        logDebug(kind, `transcript: failed (${error?.message || String(error)})`);
+        return null;
+    });
+    if (!isCurrentGeneration(videoKey, kind, generationID)) {
+        stopLoadingForStaleGeneration(videoKey, kind, generationID);
+        return;
+    }
+
+    if (!transcript?.text) {
+        state.isLoading[kind] = false;
+        state.errors[kind] = "This video does not have an available transcript.";
+        render();
+        return;
+    }
+
+    const usesSelectedProvider = state.generationMode === "selectedProvider" || state.generationMode === "codexChatGPT";
+    const requestKind = generationKindForTab(kind, usesSelectedProvider);
+    const requestTranscript = transcriptForGeneration(kind, transcript?.text || "");
+    const generationTimeoutMs = generationTimeoutForTranscript(requestTranscript);
+
+    logDebug(kind, generationStepDescription(kind, usesSelectedProvider));
+    logDebug(kind, `timeout budget: ${Math.round(generationTimeoutMs / 1000)}s`);
+    render();
+
+    let jobID = "";
+    let pendingGeneration = readPendingGeneration(videoKey, kind);
+
+    if (pendingGeneration?.jobId) {
+        jobID = pendingGeneration.jobId;
+        logDebug(kind, `requestId: ${jobID}`);
+        logDebug(kind, "step: reusing already running generation job");
+    } else if (pendingGeneration) {
+        logDebug(kind, "step: waiting for already starting generation job");
+        pendingGeneration = await waitForPendingGenerationJob(videoKey, kind, generationID);
+        if (!isCurrentGeneration(videoKey, kind, generationID)) {
+            stopLoadingForStaleGeneration(videoKey, kind, generationID);
+            return;
+        }
+
+        if (activeText(kind)) {
+            state.isLoading[kind] = false;
+            render();
+            return;
+        }
+
+        if (pendingGeneration?.jobId) {
+            jobID = pendingGeneration.jobId;
+            logDebug(kind, `requestId: ${jobID}`);
+            logDebug(kind, "step: reusing already running generation job");
+        }
+    }
+
+    if (!jobID) {
+        rememberPendingGenerationStart(videoKey, kind, generationTimeoutMs);
+
+        const startResponse = await sendMessageWithTimeout({
+            type: "ai:startGenerate",
+            kind: requestKind,
+            transcript: requestTranscript,
+            timeoutMs: generationTimeoutMs,
+        }, 20000).catch((error) => {
+            logDebug(kind, "step: start request failed", error);
+            return {
+                ok: false,
+                error: error?.message || "The extension could not start the background job.",
+                debug: {
+                    layer: "content",
+                    step: "start-failed",
+                    detail: error?.stack || error?.message || String(error),
+                },
+            };
+        });
+
+        if (!isCurrentGeneration(videoKey, kind, generationID)) {
+            stopLoadingForStaleGeneration(videoKey, kind, generationID);
+            return;
+        }
+
+        if (!startResponse?.ok || !startResponse?.jobId) {
+            clearPendingGeneration(videoKey, kind);
+            const debugParts = [];
+            if (startResponse?.debug?.layer) {
+                debugParts.push(`layer: ${startResponse.debug.layer}`);
+            }
+            if (startResponse?.debug?.step) {
+                debugParts.push(`step: ${startResponse.debug.step}`);
+            }
+            if (startResponse?.debug?.detail) {
+                debugParts.push(`detail: ${startResponse.debug.detail}`);
+            }
+            if (typeof startResponse !== "undefined") {
+                try {
+                    debugParts.push(`raw: ${JSON.stringify(startResponse)}`);
+                } catch (_) {
+                    debugParts.push(`raw: ${String(startResponse)}`);
+                }
+            }
+            if (debugParts.length > 0) {
+                logDebug(kind, debugParts.join("\n"));
+            }
+            state.isLoading[kind] = false;
+            state.errors[kind] = startResponse?.error || "The extension could not start the generation job.";
+            render();
+            await refreshStatus();
+            return;
+        }
+
+        jobID = startResponse.jobId;
+        rememberPendingGenerationJob(videoKey, kind, jobID, generationTimeoutMs);
+        logDebug(kind, `requestId: ${jobID}`);
+    }
+
+    logDebug(kind, generationWaitDescription(kind, usesSelectedProvider));
+    render();
+
+    const response = await pollGenerationJob(kind, videoKey, generationID, jobID, generationTimeoutMs);
+    if (response?.stale) {
+        stopLoadingForStaleGeneration(videoKey, kind, generationID);
+        return;
     }
 
     if (!isCurrentGeneration(videoKey, kind, generationID)) {
@@ -2044,6 +2267,7 @@ async function generate(kind) {
     state.isLoading[kind] = false;
 
     if (!response?.ok) {
+        clearPendingGeneration(videoKey, kind, jobID);
         const debugParts = [];
         if (response?.debug?.layer) {
             debugParts.push(`layer: ${response.debug.layer}`);
@@ -2073,12 +2297,29 @@ async function generate(kind) {
     }
 
     logDebug(kind, "step: generation response received");
+    const cachedText = cachedGenerationText(videoKey, kind);
+    if (cachedText) {
+        applyGenerationText(kind, cachedText);
+        clearPendingGeneration(videoKey, kind, jobID);
+        render();
+        return;
+    }
+
+    if (activeText(kind)) {
+        clearPendingGeneration(videoKey, kind, jobID);
+        render();
+        return;
+    }
+
     if (!applyGenerationText(kind, response.text)) {
+        clearPendingGeneration(videoKey, kind, jobID);
         state.errors[kind] = unavailableMessage(kind);
         render();
         return;
     }
 
+    rememberGeneratedText(videoKey, kind, activeText(kind));
+    clearPendingGeneration(videoKey, kind, jobID);
     render();
     return;
 }

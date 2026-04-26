@@ -15,7 +15,7 @@ Under the hood, the extension keeps transcript timing deterministic, validates g
 
 Download the signed and notarized macOS app:
 
-[Download Timestamps & Summaries for YT v1.0.0](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.0/Timestamps-and-Summaries-for-YT-v1.0.0.zip)
+[Download Timestamps & Summaries for YT v1.0.1](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.1/Timestamps-and-Summaries-for-YT-v1.0.1.zip)
 
 After unzipping, move the app to `Applications`, open it, then enable the Safari extension from the companion app.
 
@@ -69,6 +69,8 @@ The `tests/js/manifest-routing.test.cjs` test protects this split.
 ## Releasing
 
 For Developer ID signing, notarization, and release packaging, see [RELEASING.md](RELEASING.md).
+
+For release notes, see [CHANGELOG.md](CHANGELOG.md).
 
 For the transcript-analysis design, see [ARCHITECTURE.md](ARCHITECTURE.md).
 

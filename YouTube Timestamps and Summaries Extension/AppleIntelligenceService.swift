@@ -264,7 +264,7 @@ final class AppleIntelligenceService {
         }
 
         if chunks.count == 1 {
-            return try await respond(
+            let text = try await respond(
                 model: model,
                 instructions: "You summarize YouTube transcripts clearly and concisely.",
                 prompt: """
@@ -282,10 +282,12 @@ final class AppleIntelligenceService {
                 """,
                 maximumResponseTokens: 1_100
             )
+            return cleanedSummaryText(text)
         }
 
-        return try await summarizeFullSummaryChunks(chunks, model: model)
+        let text = try await summarizeFullSummaryChunks(chunks, model: model)
             .joined(separator: "\n\n")
+        return cleanedSummaryText(text)
     }
 
     private func summarizeFullSummaryChunks(_ chunks: [String], model: SystemLanguageModel) async throws -> [String] {
@@ -360,6 +362,7 @@ final class AppleIntelligenceService {
             Write 3 to 5 useful bullets for part \(index + 1) of \(totalCount).
             Keep concrete claims, examples, names, numbers, and conclusions.
             Skip filler, ads, greetings, and repeated phrases.
+            Do not repeat the same point in multiple bullets.
 
             Transcript:
             \(chunk)
@@ -611,6 +614,51 @@ final class AppleIntelligenceService {
         }
 
         return text
+    }
+
+    private func cleanedSummaryText(_ text: String) -> String {
+        var lines: [String] = []
+        var seenLines = Set<String>()
+
+        for rawLine in text.components(separatedBy: .newlines) {
+            let line = rawLine
+                .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if line.isEmpty {
+                if !lines.isEmpty, lines.last != "" {
+                    lines.append("")
+                }
+                continue
+            }
+
+            if line.range(of: #"^(?:part|section)\s+\d+(?:\s+of\s+\d+)?[:.]?$"#, options: [.regularExpression, .caseInsensitive]) != nil {
+                continue
+            }
+
+            let normalized = normalizedSummaryLine(line)
+            guard !normalized.isEmpty else {
+                continue
+            }
+
+            if seenLines.insert(normalized).inserted {
+                lines.append(line)
+            }
+        }
+
+        while lines.last == "" {
+            lines.removeLast()
+        }
+
+        return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func normalizedSummaryLine(_ line: String) -> String {
+        line
+            .replacingOccurrences(of: #"^[-*]\s+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+            .lowercased()
     }
 
     private func chunkTranscript(_ transcript: String, maxCharacters: Int? = nil) -> [String] {
