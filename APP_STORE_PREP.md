@@ -22,7 +22,6 @@ For paste-ready App Store Connect fields and privacy answers, see:
 - The containing macOS app and Safari web extension are working end to end.
 - GitHub repo, README, support links, privacy policy, and terms already exist.
 - A root site for public links exists at `https://hlbkomer.github.io/`.
-- The app no longer requires Google OAuth, Google Cloud branding, or Gemini API access.
 - The current default generation path requires ChatGPT/Codex sign-in for timestamps.
 - Developer signing and notarization work is already underway for outside-the-store distribution.
 
@@ -55,7 +54,7 @@ Recommended plan:
 
 App Store Connect requires app privacy disclosures before submission.
 
-This app does not operate its own backend and no longer sends generation requests to Google Gemini. The current default build sends transcript text to ChatGPT/Codex through the user's signed-in account for timestamps and summaries.
+This app does not operate its own backend. The current default build sends transcript text to ChatGPT/Codex through the user's signed-in account for timestamps and summaries.
 
 The current likely direction is:
 
@@ -98,7 +97,7 @@ Features:
 - transcript-based generation
 - ChatGPT/Codex generation through the user's account
 - optional Apple Intelligence summaries on your Mac
-- no Google setup, API key, or developer backend required
+- no API key or developer backend required
 
 Important notes:
 
@@ -121,7 +120,7 @@ This app is a macOS container app for a Safari web extension.
 
 The extension adds a sidebar on supported YouTube video pages. It generates timestamps from the available YouTube transcript through the user's ChatGPT/Codex sign-in. Summaries use ChatGPT/Codex by default, or Apple Intelligence on the Mac if selected in the companion app.
 
-No Google setup, API key, or developer-operated backend is required.
+No API key or developer-operated backend is required.
 
 Review steps:
 1. Launch the macOS app.

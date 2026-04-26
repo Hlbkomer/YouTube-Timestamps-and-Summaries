@@ -2,7 +2,7 @@
 
 ## Secrets
 
-The app does not require Google OAuth credentials, API keys, or a bundled secrets file.
+The app does not require bundled generation credentials, API keys, or a bundled secrets file.
 
 Timestamp generation uses the user's own ChatGPT sign-in. The companion app stores ChatGPT sign-in tokens locally in the shared app group container so the app and extension can refresh the user's session.
 
@@ -14,7 +14,6 @@ Keep local build artifacts, logs, and screenshots that reveal private browsing c
 - ChatGPT sign-in tokens are stored locally in the shared app group container.
 - YouTube transcript text is sent to ChatGPT for timestamp generation.
 - YouTube transcript text is sent to ChatGPT or processed locally with Apple Intelligence for summary generation, depending on the summary setting.
-- The app does not use Google sign-in, so it does not store Google OAuth tokens.
 
 ## Network Access
 

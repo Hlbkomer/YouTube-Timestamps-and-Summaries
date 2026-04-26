@@ -36,7 +36,7 @@ The extension adds a right-side sidebar on supported YouTube video pages. It rea
 - The extension reads the current YouTube video URL to identify supported video pages.
 - Transcript text is sent to ChatGPT for timestamp generation.
 - Transcript text is sent to ChatGPT or processed locally with Apple Intelligence for summary generation, depending on the summary setting.
-- The app does not use Google sign-in, API keys, or a developer-operated backend for generation.
+- The app does not require API keys or a developer-operated backend for generation.
 
 ## Support
 

@@ -85,7 +85,7 @@ The content script caches the resulting analysis per video, so whichever tab is 
 
 - Do not broaden `content.js` to all YouTube pages. Shorts and non-video pages have fragile layouts.
 - Do not let any model output final timestamps without code validation.
-- Do not reintroduce Google OAuth, Gemini API keys, or a developer backend.
+- Do not add bundled generation credentials or a developer backend.
 - Be explicit in docs/privacy copy that transcript text is sent to ChatGPT for timestamp generation and optionally for summary generation.
 - Treat YouTube transcript extraction as best-effort because YouTube does not provide a stable public transcript API for this use case.
 

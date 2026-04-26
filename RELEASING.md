@@ -32,7 +32,7 @@ You can also use an App Store Connect API key instead of Apple ID credentials if
 
 ## Build A Developer ID Release
 
-Before building a consumer release, confirm the app builds without any local secrets, Google OAuth configuration, or API keys. Generation should use the user's ChatGPT sign-in, optional Apple Intelligence summaries, and the YouTube transcript.
+Before building a consumer release, confirm the app builds without any local secrets, bundled generation credentials, or API keys. Generation should use the user's ChatGPT sign-in, optional Apple Intelligence summaries, and the YouTube transcript.
 
 To create a signed release archive and exported app bundle:
 

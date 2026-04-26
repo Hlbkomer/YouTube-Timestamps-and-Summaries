@@ -87,7 +87,7 @@ Features:
 - transcript-based generation
 - ChatGPT/Codex generation through the user's account
 - optional Apple Intelligence summaries on your Mac
-- no Google setup, API key, or developer backend required
+- no API key or developer backend required
 
 Important notes:
 
@@ -137,7 +137,7 @@ This app is a macOS container app for a Safari web extension.
 
 The extension adds a sidebar on supported YouTube video pages. It generates timestamps from the available YouTube transcript through the user's ChatGPT/Codex sign-in. Summaries use ChatGPT/Codex by default, or Apple Intelligence on the Mac if selected in the companion app.
 
-No Google setup, API key, or developer-operated backend is required.
+No API key or developer-operated backend is required.
 
 Review steps:
 1. Launch the macOS app.
@@ -182,7 +182,7 @@ Reasoning:
 
 - no analytics SDK
 - no developer backend
-- no Google OAuth or Gemini API requests
+- no bundled generation credentials
 - ChatGPT/Codex OAuth tokens are stored locally in Safari extension storage
 - transcript text is sent to ChatGPT/Codex for timestamp generation and, by default, summary generation
 - transcript text is used locally for Apple Intelligence summary generation when that summary option is selected

@@ -7,7 +7,7 @@ It adds a right-side sidebar to YouTube with:
 - automatic video timestamps
 - automatic video summaries
 
-The extension reads the available YouTube transcript, sends it to the user's selected signed-in ChatGPT model for timestamps, and creates the summary with either that model or Apple Intelligence on the Mac. A ChatGPT account is required. No Google sign-in, API key, or developer backend is required.
+The extension reads the available YouTube transcript, sends it to the user's selected signed-in ChatGPT model for timestamps, and creates the summary with either that model or Apple Intelligence on the Mac. A ChatGPT account is required. No API key or developer backend is required.
 
 Under the hood, the extension keeps transcript timing deterministic, validates generated timestamps against real transcript cue times, and keeps Apple Intelligence available as an optional local summary engine. See [ARCHITECTURE.md](ARCHITECTURE.md) for the current generation pipeline and guardrails.
 
@@ -31,7 +31,7 @@ Under the hood, the extension keeps transcript timing deterministic, validates g
 - transcript-based generation for better timestamp accuracy
 - configurable generation model, backed by the user's ChatGPT session
 - summaries can use either the selected ChatGPT model or Apple Intelligence
-- no Google OAuth setup, API keys, or developer backend
+- no API key or developer backend
 
 ## Project Structure
 
@@ -98,7 +98,7 @@ For the transcript-analysis design, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Security Notes
 
-- No Google OAuth client secret, Google API key, or developer-operated backend is required.
+- No API key or developer-operated backend is required.
 - ChatGPT sign-in tokens are stored locally in the app group container so the app and extension can use the user's own signed-in account.
 - Transcript text is sent to ChatGPT for timestamp generation and, if selected, summary generation.
 - When Apple Intelligence is selected for summaries, transcript text is processed locally by the app extension on the user's Mac.

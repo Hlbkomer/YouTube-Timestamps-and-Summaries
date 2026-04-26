@@ -12,7 +12,7 @@ This Privacy Policy explains how Video Timestamps and Summaries for YouTube hand
 
 Video Timestamps and Summaries for YouTube is a Safari extension and macOS companion app that generates timestamps and summaries for YouTube videos.
 
-The app uses the user's signed-in ChatGPT account for timestamp generation. Summaries can be generated either with ChatGPT or with Apple Intelligence on the user's Mac. It does not require Google sign-in, API keys, or a developer-operated backend.
+The app uses the user's signed-in ChatGPT account for timestamp generation. Summaries can be generated either with ChatGPT or with Apple Intelligence on the user's Mac. It does not require API keys or a developer-operated backend.
 
 ## Information Processed By The App
 
@@ -34,8 +34,6 @@ This information is used only to:
 ## Local Storage
 
 The app stores its settings locally on the user's Mac.
-
-The app does not use Google sign-in, so it does not store Google OAuth tokens.
 
 ChatGPT sign-in tokens are stored locally in the shared app group container. Users can remove them by signing out in the companion app or removing the app's local data.
 
