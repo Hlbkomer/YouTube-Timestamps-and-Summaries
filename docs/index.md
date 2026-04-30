@@ -11,14 +11,6 @@ Timestamps & Summaries for YT is a Safari extension and macOS companion app that
 
 The extension adds a right-side sidebar on supported YouTube video pages. It reads the available YouTube transcript, uses the user's selected signed-in ChatGPT model for timestamps, and creates summaries with either that model or Apple Intelligence on the Mac. A ChatGPT account is required.
 
-## Download
-
-Download the signed and notarized macOS app:
-
-[Download Timestamps & Summaries for YT v1.0.2](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.2/Timestamps-and-Summaries-for-YT-v1.0.2.zip)
-
-After unzipping, move the app to `Applications`, open it, then enable the Safari extension from the companion app.
-
 ![Companion app screenshot](readme-assets/companion-app.png)
 
 ![YouTube sidebar screenshot](readme-assets/youtube-sidebar.png)
@@ -46,15 +38,29 @@ After unzipping, move the app to `Applications`, open it, then enable the Safari
 - Transcript text is sent to ChatGPT or processed locally with Apple Intelligence for summary generation, depending on the summary setting.
 - The app does not require API keys or a developer-operated backend for generation.
 
-## Support
+## Download And Support
 
-Project repository:
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin: 1.5rem 0;">
+  <section style="border: 1px solid #d8dee4; border-radius: 12px; padding: 1rem;">
+    <h3 style="margin-top: 0;">Download</h3>
+    <p>Download the signed and notarized macOS app.</p>
+    <p>
+      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.2/Timestamps-and-Summaries-for-YT-v1.0.2.zip">Download Timestamps &amp; Summaries for YT v1.0.2</a>
+    </p>
+    <p>After unzipping, move the app to <code>Applications</code>, open it, then enable the Safari extension from the companion app.</p>
+  </section>
 
-[https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries)
-
-Issue tracker:
-
-[https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/issues](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/issues)
+  <section style="border: 1px solid #d8dee4; border-radius: 12px; padding: 1rem;">
+    <h3 style="margin-top: 0;">Support</h3>
+    <p>Need help, found a bug, or want to follow the project?</p>
+    <p>
+      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries">Project repository</a>
+    </p>
+    <p>
+      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/issues">Issue tracker</a>
+    </p>
+  </section>
+</div>
 
 ## Policies
 
