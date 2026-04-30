@@ -17,7 +17,7 @@ Download the signed and notarized macOS app:
 
 [Download Timestamps & Summaries for YT v1.0.2](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.2/Timestamps-and-Summaries-for-YT-v1.0.2.zip)
 
-After unzipping, move the app to `Applications`, open it, then enable the Safari extension from the companion app.
+After unzipping, move the app to `Applications`, open it and enable the Safari extension.
 
 ## Preview
 

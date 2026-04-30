@@ -47,7 +47,7 @@ The extension adds a right-side sidebar on supported YouTube video pages. It rea
     <p>
       <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.2/Timestamps-and-Summaries-for-YT-v1.0.2.zip">Download Timestamps &amp; Summaries for YT v1.0.2</a>
     </p>
-    <p>After unzipping, move the app to <code>Applications</code>, open it, then enable the Safari extension from the companion app.</p>
+    <p>After unzipping, move the app to <code>Applications</code>, open it and enable the Safari extension.</p>
   </section>
 
   <section style="border: 1px solid #d8dee4; border-radius: 12px; padding: 1rem;">
