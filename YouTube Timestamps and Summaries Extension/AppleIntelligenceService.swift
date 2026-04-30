@@ -32,9 +32,10 @@ final class AppleIntelligenceService {
     private let maxAnalysisChunkCharacters = 3_000
     private let maxDirectSummaryCharacters = 10_000
     private let maxFullSummaryChunkCharacters = 10_000
+    private let maxUnsupportedLanguageDirectSummaryCharacters = 6_000
+    private let maxUnsupportedLanguageFullSummaryChunkCharacters = 6_000
     private let maxParallelAnalysisRequests = 2
     private let maxParallelSummaryRequests = 3
-
     private struct TranscriptChunk {
         let text: String
         let startSeconds: Int
@@ -63,6 +64,51 @@ final class AppleIntelligenceService {
         let error: String?
     }
 
+    private struct LanguageContext {
+        let code: String
+        let label: String
+
+        init(code: String, label: String) {
+            self.code = code
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            self.label = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        var baseCode: String {
+            code.split(separator: "-").first.map(String.init) ?? ""
+        }
+
+        var displayName: String {
+            if !label.isEmpty {
+                return label
+            }
+
+            return code
+        }
+
+        var debugLabel: String {
+            if !displayName.isEmpty, !code.isEmpty {
+                return "\(displayName) (\(code))"
+            }
+
+            if !displayName.isEmpty {
+                return displayName
+            }
+
+            return "unknown"
+        }
+
+        func isAppleSupported(by model: SystemLanguageModel) -> Bool {
+            guard !code.isEmpty else {
+                return true
+            }
+
+            return model.supportsLocale(Locale(identifier: code))
+        }
+
+    }
+
     func statusPayload() -> [String: Any] {
         let model = SystemLanguageModel.default
         let availability = availabilityDescription(model.availability)
@@ -75,13 +121,19 @@ final class AppleIntelligenceService {
         ]
     }
 
-    func generate(kind: String, transcript: String = "") async -> [String: Any] {
+    func generate(
+        kind: String,
+        transcript: String = "",
+        languageCode: String = "",
+        languageLabel: String = ""
+    ) async -> [String: Any] {
         let model = model(for: kind)
         let guardrailMode = guardrailMode(for: kind)
         let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let languageContext = LanguageContext(code: languageCode, label: languageLabel)
 
-        print("[AppleIntelligence] Starting generation. kind=\(kind)")
-        logger.log("Starting local generation. kind=\(kind, privacy: .public) guardrails=\(guardrailMode, privacy: .public)")
+        print("[AppleIntelligence] Starting generation. kind=\(kind) language=\(languageContext.debugLabel)")
+        logger.log("Starting local generation. kind=\(kind, privacy: .public) guardrails=\(guardrailMode, privacy: .public) language=\(languageContext.debugLabel, privacy: .public)")
 
         do {
             guard model.isAvailable else {
@@ -100,17 +152,17 @@ final class AppleIntelligenceService {
                 chunkCount = chunks.count
                 text = try await generateVideoAnalysis(from: chunks, model: model)
             } else if kind == "summaryFull" {
-                let chunks = fullSummaryChunks(from: analysisTranscriptText)
+                let chunks = fullSummaryChunks(from: analysisTranscriptText, languageContext: languageContext, model: model)
                 chunkCount = chunks.count
-                text = try await generateFullSummary(from: chunks, model: model)
+                text = try await generateFullSummary(from: chunks, model: model, languageContext: languageContext)
             } else if kind == "summary" {
                 let chunks = chunkTranscript(transcriptText)
                 chunkCount = chunks.count
-                text = try await generateSummary(from: chunks, model: model)
+                text = try await generateSummary(from: chunks, model: model, languageContext: languageContext)
             } else {
                 let chunks = chunkTranscript(transcriptText)
                 chunkCount = chunks.count
-                text = try await generateTimestamps(from: chunks, model: model)
+                text = try await generateTimestamps(from: chunks, model: model, languageContext: languageContext)
             }
 
             print("[AppleIntelligence] Generation succeeded. kind=\(kind) chunks=\(chunkCount) textLength=\(text.count)")
@@ -125,6 +177,9 @@ final class AppleIntelligenceService {
                     "model": "Apple Intelligence",
                     "guardrails": guardrailMode,
                     "inputMode": "transcript",
+                    "languageCode": languageContext.code,
+                    "languageLabel": languageContext.label,
+                    "languageIsAppleSupported": languageContext.isAppleSupported(by: model),
                     "chunks": chunkCount,
                     "step": "completed",
                     "textLength": text.count,
@@ -143,6 +198,9 @@ final class AppleIntelligenceService {
                     "kind": kind,
                     "model": "Apple Intelligence",
                     "guardrails": guardrailMode,
+                    "languageCode": languageContext.code,
+                    "languageLabel": languageContext.label,
+                    "languageIsAppleSupported": languageContext.isAppleSupported(by: model),
                     "step": "failed",
                     "detail": message,
                 ],
@@ -168,7 +226,11 @@ final class AppleIntelligenceService {
         kind == "summaryFull" || kind == "summary"
     }
 
-    private func generateTimestamps(from chunks: [String], model: SystemLanguageModel) async throws -> String {
+    private func generateTimestamps(
+        from chunks: [String],
+        model: SystemLanguageModel,
+        languageContext: LanguageContext
+    ) async throws -> String {
         var allLines: [String] = []
         let transcriptTimes = transcriptCueTimes(from: chunks.joined(separator: "\n"))
 
@@ -183,6 +245,7 @@ final class AppleIntelligenceService {
                 """,
                 prompt: """
                 Create chronological chapter timestamps for transcript section \(index + 1) of \(chunks.count).
+                \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "timestamp titles"))
 
                 Rules:
                 - Output one timestamp per line.
@@ -213,13 +276,18 @@ final class AppleIntelligenceService {
         return deduped.joined(separator: "\n")
     }
 
-    private func generateSummary(from chunks: [String], model: SystemLanguageModel) async throws -> String {
+    private func generateSummary(
+        from chunks: [String],
+        model: SystemLanguageModel,
+        languageContext: LanguageContext
+    ) async throws -> String {
         if chunks.count == 1 {
             return try await respond(
                 model: model,
                 instructions: "You summarize YouTube transcripts clearly and concisely.",
                 prompt: """
                 Summarize this video transcript.
+                \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "summary"))
 
                 Transcript:
                 \(chunks[0])
@@ -235,6 +303,7 @@ final class AppleIntelligenceService {
                 instructions: "You summarize sections of YouTube transcripts clearly and concisely.",
                 prompt: """
                 Summarize transcript section \(index + 1) of \(chunks.count) in 3 to 5 short bullets.
+                \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "summary"))
 
                 Transcript:
                 \(chunk)
@@ -249,6 +318,7 @@ final class AppleIntelligenceService {
             instructions: "You combine section summaries into a concise full-video summary.",
             prompt: """
             Create one clear summary of the full video from these section summaries.
+            \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "summary"))
             Avoid repeating the section labels.
 
             Section summaries:
@@ -258,7 +328,11 @@ final class AppleIntelligenceService {
         )
     }
 
-    private func generateFullSummary(from chunks: [String], model: SystemLanguageModel) async throws -> String {
+    private func generateFullSummary(
+        from chunks: [String],
+        model: SystemLanguageModel,
+        languageContext: LanguageContext
+    ) async throws -> String {
         guard !chunks.isEmpty else {
             throw AppleIntelligenceError.missingTranscript
         }
@@ -266,31 +340,23 @@ final class AppleIntelligenceService {
         if chunks.count == 1 {
             let text = try await respond(
                 model: model,
-                instructions: "You summarize YouTube transcripts clearly and concisely.",
-                prompt: """
-                Summarize this video transcript in a useful way.
-
-                Format:
-                Overview:
-                One or two sentences.
-
-                Key points:
-                - 4 to 8 concise bullets.
-
-                Transcript:
-                \(chunks[0])
-                """,
+                instructions: fullSummaryInstructions(languageContext: languageContext),
+                prompt: fullSummaryPrompt(for: chunks[0], languageContext: languageContext, model: model),
                 maximumResponseTokens: 1_100
             )
             return cleanedSummaryText(text)
         }
 
-        let text = try await summarizeFullSummaryChunks(chunks, model: model)
+        let text = try await summarizeFullSummaryChunks(chunks, model: model, languageContext: languageContext)
             .joined(separator: "\n\n")
         return cleanedSummaryText(text)
     }
 
-    private func summarizeFullSummaryChunks(_ chunks: [String], model: SystemLanguageModel) async throws -> [String] {
+    private func summarizeFullSummaryChunks(
+        _ chunks: [String],
+        model: SystemLanguageModel,
+        languageContext: LanguageContext
+    ) async throws -> [String] {
         let results = await withTaskGroup(of: SummaryChunkResult.self) { group in
             var results: [SummaryChunkResult] = []
             var nextIndex = 0
@@ -310,7 +376,8 @@ final class AppleIntelligenceService {
                             chunk,
                             index: chunkIndex,
                             totalCount: chunks.count,
-                            model: model
+                            model: model,
+                            languageContext: languageContext
                         )
                         return SummaryChunkResult(index: chunkIndex, text: summary, error: nil)
                     } catch {
@@ -353,22 +420,78 @@ final class AppleIntelligenceService {
         _ chunk: String,
         index: Int,
         totalCount: Int,
-        model: SystemLanguageModel
+        model: SystemLanguageModel,
+        languageContext: LanguageContext
     ) async throws -> String {
-        try await respond(
-            model: model,
-            instructions: "You summarize YouTube transcript parts.",
-            prompt: """
-            Write 3 to 5 useful bullets for part \(index + 1) of \(totalCount).
-            Keep concrete claims, examples, names, numbers, and conclusions.
-            Skip filler, ads, greetings, and repeated phrases.
-            Do not repeat the same point in multiple bullets.
+        let response: String
 
-            Transcript:
-            \(chunk)
-            """,
-            maximumResponseTokens: 420
-        )
+        if index == 0 {
+            response = try await respond(
+                model: model,
+                instructions: fullSummaryInstructions(languageContext: languageContext),
+                prompt: fullSummaryPrompt(for: chunk, languageContext: languageContext, model: model),
+                maximumResponseTokens: 1_100
+            )
+        } else {
+            response = try await respond(
+                model: model,
+                instructions: laterSummaryInstructions(languageContext: languageContext),
+                prompt: laterSummaryPrompt(for: chunk, languageContext: languageContext, model: model),
+                maximumResponseTokens: 420
+            )
+        }
+
+        return response
+    }
+
+    private func fullSummaryInstructions(languageContext: LanguageContext) -> String {
+        return "You summarize YouTube transcripts clearly and concisely."
+    }
+
+    private func fullSummaryPrompt(
+        for chunk: String,
+        languageContext: LanguageContext,
+        model: SystemLanguageModel
+    ) -> String {
+        return """
+        Summarize this video transcript clearly and concisely.
+        \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "summary"))
+        Start with a short overview, then include useful bullet points.
+
+        Transcript:
+        \(chunk)
+        """
+    }
+
+    private func laterSummaryInstructions(languageContext: LanguageContext) -> String {
+        return "You summarize YouTube transcript parts."
+    }
+
+    private func laterSummaryPrompt(
+        for chunk: String,
+        languageContext: LanguageContext,
+        model: SystemLanguageModel
+    ) -> String {
+        return """
+        Write useful bullet points for this later transcript excerpt.
+        \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "summary"))
+
+        Transcript:
+        \(chunk)
+        """
+    }
+
+    private func outputLanguageInstruction(
+        languageContext: LanguageContext,
+        model: SystemLanguageModel,
+        outputName: String
+    ) -> String {
+        guard !languageContext.displayName.isEmpty else {
+            return ""
+        }
+
+        let outputLanguage = languageContext.isAppleSupported(by: model) ? languageContext.displayName : "English"
+        return "The detected caption language is \(languageContext.displayName). Write the \(outputName) in \(outputLanguage)."
     }
 
     private func generateVideoAnalysis(from chunks: [TranscriptChunk], model: SystemLanguageModel) async throws -> String {
@@ -557,17 +680,36 @@ final class AppleIntelligenceService {
         )
     }
 
-    private func fullSummaryChunks(from transcript: String) -> [String] {
+    private func fullSummaryChunks(
+        from transcript: String,
+        languageContext: LanguageContext,
+        model: SystemLanguageModel
+    ) -> [String] {
         let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !transcriptText.isEmpty else {
             return []
         }
 
-        if transcriptText.count <= maxDirectSummaryCharacters {
+        let directLimit = summaryDirectCharacterLimit(languageContext: languageContext, model: model)
+        let chunkLimit = summaryChunkCharacterLimit(languageContext: languageContext, model: model)
+
+        if transcriptText.count <= directLimit {
             return [transcriptText]
         }
 
-        return chunkTranscript(transcriptText, maxCharacters: maxFullSummaryChunkCharacters)
+        return chunkTranscript(transcriptText, maxCharacters: chunkLimit)
+    }
+
+    private func summaryDirectCharacterLimit(languageContext: LanguageContext, model: SystemLanguageModel) -> Int {
+        languageContext.isAppleSupported(by: model)
+            ? maxDirectSummaryCharacters
+            : maxUnsupportedLanguageDirectSummaryCharacters
+    }
+
+    private func summaryChunkCharacterLimit(languageContext: LanguageContext, model: SystemLanguageModel) -> Int {
+        languageContext.isAppleSupported(by: model)
+            ? maxFullSummaryChunkCharacters
+            : maxUnsupportedLanguageFullSummaryChunkCharacters
     }
 
     private func sectionSummary(from response: String) -> String {

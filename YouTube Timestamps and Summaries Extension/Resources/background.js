@@ -7,8 +7,17 @@ const JOB_RETENTION_MS = 30 * 60 * 1000;
 const JOB_MESSAGE_LIMIT = 80;
 const CODEX_DEFAULT_MODEL = "gpt-5.5";
 const ENABLE_APPLE_SUMMARY_SELECTED_MODEL_FALLBACK = false;
+const ENABLE_APPLE_SUMMARY_TRANSCRIPT_REDACTION = true;
 const APPLE_SUMMARY_CHUNK_CHARACTER_LIMIT = 10000;
+const APPLE_SUMMARY_UNSUPPORTED_LANGUAGE_CHUNK_CHARACTER_LIMIT = 6000;
 const APPLE_SUMMARY_PARALLEL_REQUESTS = 3;
+const APPLE_SUPPORTED_LANGUAGE_CODES = new Set([
+    "da", "de", "en", "es", "fr", "it", "ja", "ko", "nl", "no", "pt", "sv", "tr", "vi", "zh",
+]);
+const APPLE_SUMMARY_REDACTION_PATTERNS = [
+    /\b(?:fuck(?:er|ing)?|fucking|fucked|shit(?:ty)?|bullshit|bitch(?:es)?|asshole|dick|pussy|cunt)\b/gi,
+    /\b(?:nigg(?:a|er)s?|fag(?:got)?s?|retard(?:ed)?|whore(?:s)?|slut(?:s)?)\b/gi,
+];
 const jobs = new Map();
 let nextJobID = 0;
 
@@ -111,6 +120,42 @@ function appendJobMessage(job, message) {
     job.messages = [...(job.messages || []), line].slice(-JOB_MESSAGE_LIMIT);
 }
 
+function redactAppleSummaryTranscript(transcriptText) {
+    if (!ENABLE_APPLE_SUMMARY_TRANSCRIPT_REDACTION) {
+        return {
+            text: transcriptText,
+            count: 0,
+        };
+    }
+
+    let redactionCount = 0;
+    let redactedText = String(transcriptText || "");
+    for (const pattern of APPLE_SUMMARY_REDACTION_PATTERNS) {
+        redactedText = redactedText.replace(pattern, () => {
+            redactionCount += 1;
+            return "[redacted]";
+        });
+    }
+
+    return {
+        text: redactedText,
+        count: redactionCount,
+    };
+}
+
+function normalizedLanguageCode(languageCode) {
+    return String(languageCode || "").trim().toLowerCase().split("-")[0];
+}
+
+function appleSummaryChunkLimit(metadata = {}) {
+    const languageCode = normalizedLanguageCode(metadata.languageCode);
+    if (languageCode && !APPLE_SUPPORTED_LANGUAGE_CODES.has(languageCode)) {
+        return APPLE_SUMMARY_UNSUPPORTED_LANGUAGE_CHUNK_CHARACTER_LIMIT;
+    }
+
+    return APPLE_SUMMARY_CHUNK_CHARACTER_LIMIT;
+}
+
 function generationLabel(kind) {
     if (kind === "codexTimestamps") {
         return "timestamps";
@@ -148,16 +193,21 @@ async function statusPayload() {
     return await sendNative("getStatus");
 }
 
-async function generateCodexTimestamps(job, transcriptText, nativeTimeoutMs) {
+async function generateCodexTimestamps(job, transcriptText, nativeTimeoutMs, metadata = {}) {
     const status = await statusPayload();
     const settings = status?.settings || {};
     const model = settings.modelID || CODEX_DEFAULT_MODEL;
     const modelLabel = settings.modelLabel || model;
 
+    if (metadata.languageCode || metadata.languageLabel) {
+        appendJobMessage(job, `caption language: ${metadata.languageLabel || metadata.languageCode}${metadata.languageCode ? ` (${metadata.languageCode})` : ""}`);
+    }
     appendJobMessage(job, `asking ${modelLabel} to create timestamps`);
     const response = await sendNative("generateCodexTimestamps", {
         transcript: transcriptText,
         model,
+        languageCode: metadata.languageCode || "",
+        languageLabel: metadata.languageLabel || "",
     }, nativeTimeoutMs);
 
     if (response?.ok) {
@@ -169,7 +219,7 @@ async function generateCodexTimestamps(job, transcriptText, nativeTimeoutMs) {
     return response;
 }
 
-async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs) {
+async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, metadata = {}) {
     const status = await statusPayload();
     const settings = status?.settings || {};
     const model = settings.modelID || CODEX_DEFAULT_MODEL;
@@ -178,10 +228,15 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs) {
     const summaryEngineLabel = settings.summaryEngineLabel || (summaryEngine === "selectedModel" ? modelLabel : "Apple Intelligence");
 
     if (summaryEngine === "selectedModel") {
+        if (metadata.languageCode || metadata.languageLabel) {
+            appendJobMessage(job, `caption language: ${metadata.languageLabel || metadata.languageCode}${metadata.languageCode ? ` (${metadata.languageCode})` : ""}`);
+        }
         appendJobMessage(job, `asking ${summaryEngineLabel} to create summary`);
         const response = await sendNative("generateCodexSummary", {
             transcript: transcriptText,
             model,
+            languageCode: metadata.languageCode || "",
+            languageLabel: metadata.languageLabel || "",
         }, nativeTimeoutMs);
 
         if (response?.ok) {
@@ -193,14 +248,26 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs) {
         return response;
     }
 
-    const estimatedChunks = Math.max(1, Math.ceil(transcriptText.length / APPLE_SUMMARY_CHUNK_CHARACTER_LIMIT));
+    const redactedTranscript = redactAppleSummaryTranscript(transcriptText);
+    if (redactedTranscript.count > 0) {
+        appendJobMessage(job, `redacted ${redactedTranscript.count} explicit transcript term${redactedTranscript.count === 1 ? "" : "s"} for Apple Intelligence`);
+    }
+
+    const appleTranscriptText = redactedTranscript.text;
+    const chunkLimit = appleSummaryChunkLimit(metadata);
+    const estimatedChunks = Math.max(1, Math.ceil(appleTranscriptText.length / chunkLimit));
     const estimatedWaves = Math.max(1, Math.ceil(estimatedChunks / APPLE_SUMMARY_PARALLEL_REQUESTS));
+    if (metadata.languageCode || metadata.languageLabel) {
+        appendJobMessage(job, `caption language: ${metadata.languageLabel || metadata.languageCode}${metadata.languageCode ? ` (${metadata.languageCode})` : ""}`);
+    }
     appendJobMessage(job, estimatedChunks > 1
         ? `asking Apple Intelligence to create summary (~${estimatedChunks} chunks, ${estimatedWaves} waves)`
         : "asking Apple Intelligence to create summary");
     const appleResponse = await sendNative("generateContent", {
         kind: "summaryFull",
-        transcript: transcriptText,
+        transcript: appleTranscriptText,
+        languageCode: metadata.languageCode || "",
+        languageLabel: metadata.languageLabel || "",
     }, nativeTimeoutMs);
 
     if (appleResponse?.ok) {
@@ -221,6 +288,8 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs) {
     const fallbackResponse = await sendNative("generateCodexSummary", {
         transcript: transcriptText,
         model,
+        languageCode: metadata.languageCode || "",
+        languageLabel: metadata.languageLabel || "",
     }, nativeTimeoutMs);
 
     if (fallbackResponse?.ok) {
@@ -232,7 +301,7 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs) {
     return fallbackResponse;
 }
 
-function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_MS) {
+function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_MS, metadata = {}) {
     pruneJobs();
     const transcriptText = typeof transcript === "string" ? transcript.trim() : "";
     const nativeTimeoutMs = boundedTimeout(timeoutMs);
@@ -257,12 +326,17 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
     void (async () => {
         let response;
         if (kind === "codexTimestamps") {
-            response = await generateCodexTimestamps(job, transcriptText, nativeTimeoutMs);
+            response = await generateCodexTimestamps(job, transcriptText, nativeTimeoutMs, metadata);
         } else if (kind === "codexSummary") {
-            response = await generateConfiguredSummary(job, transcriptText, nativeTimeoutMs);
+            response = await generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, metadata);
         } else {
             appendJobMessage(job, "asking the app to use Apple Intelligence");
-            response = await sendNative("generateContent", { kind, transcript: transcriptText }, nativeTimeoutMs);
+            response = await sendNative("generateContent", {
+                kind,
+                transcript: transcriptText,
+                languageCode: metadata.languageCode || "",
+                languageLabel: metadata.languageLabel || "",
+            }, nativeTimeoutMs);
         }
         job.nativeDebug = response?.debug || null;
 
@@ -328,7 +402,7 @@ browser.runtime.onMessage.addListener(async (message) => {
         return await sendNative("openContainerApp");
 
     case "ai:startGenerate":
-        return startGenerateJob(message.kind, message.transcript, message.timeoutMs);
+        return startGenerateJob(message.kind, message.transcript, message.timeoutMs, message.transcriptMetadata || {});
 
     case "ai:getGenerateJob":
         return getGenerateJob(message.jobId);

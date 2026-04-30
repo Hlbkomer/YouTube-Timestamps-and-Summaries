@@ -31,11 +31,37 @@ final class CodexGenerationService {
     private let endpoint = URL(string: "https://chatgpt.com/backend-api/codex/responses")!
     private let authService = CodexAuthService()
 
-    func generateTimestamps(transcript: String, model: String) async -> [String: Any] {
+    private struct LanguageContext {
+        let code: String
+        let label: String
+
+        init(code: String, label: String) {
+            self.code = code
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            self.label = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        var displayName: String {
+            if !label.isEmpty {
+                return label
+            }
+
+            return code
+        }
+    }
+
+    func generateTimestamps(
+        transcript: String,
+        model: String,
+        languageCode: String = "",
+        languageLabel: String = ""
+    ) async -> [String: Any] {
         let startedAt = Date()
         let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
         let safeModel = requestedModel.isEmpty ? GenerationSettings.defaultModelID : requestedModel
+        let languageContext = LanguageContext(code: languageCode, label: languageLabel)
 
         do {
             guard !transcriptText.isEmpty else {
@@ -47,7 +73,8 @@ final class CodexGenerationService {
             let rawText = try await requestTimestamps(
                 transcript: transcriptText,
                 accessToken: accessToken,
-                model: safeModel
+                model: safeModel,
+                languageContext: languageContext
             )
             let cleanedText = cleanTimestamps(rawText, transcript: transcriptText)
             guard !cleanedText.isEmpty else {
@@ -63,6 +90,8 @@ final class CodexGenerationService {
                     "kind": "codexTimestamps",
                     "model": safeModel,
                     "inputMode": "transcript",
+                    "languageCode": languageContext.code,
+                    "languageLabel": languageContext.label,
                     "step": "completed",
                     "durationMs": Int(Date().timeIntervalSince(startedAt) * 1000),
                     "textLength": cleanedText.count,
@@ -78,6 +107,8 @@ final class CodexGenerationService {
                     "layer": "native",
                     "kind": "codexTimestamps",
                     "model": safeModel,
+                    "languageCode": languageContext.code,
+                    "languageLabel": languageContext.label,
                     "step": "failed",
                     "durationMs": Int(Date().timeIntervalSince(startedAt) * 1000),
                     "detail": message,
@@ -86,11 +117,17 @@ final class CodexGenerationService {
         }
     }
 
-    func generateSummary(transcript: String, model: String) async -> [String: Any] {
+    func generateSummary(
+        transcript: String,
+        model: String,
+        languageCode: String = "",
+        languageLabel: String = ""
+    ) async -> [String: Any] {
         let startedAt = Date()
         let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
         let safeModel = requestedModel.isEmpty ? GenerationSettings.defaultModelID : requestedModel
+        let languageContext = LanguageContext(code: languageCode, label: languageLabel)
 
         do {
             guard !transcriptText.isEmpty else {
@@ -103,6 +140,8 @@ final class CodexGenerationService {
                 instructions: "You summarize YouTube transcripts clearly and concisely.",
                 prompt: """
                 Summarize this video transcript clearly and concisely.
+                \(outputLanguageInstruction(languageContext: languageContext, outputName: "summary"))
+                Start with a short overview, then include useful bullet points.
 
                 Transcript:
                 \(transcriptText)
@@ -124,6 +163,8 @@ final class CodexGenerationService {
                     "kind": "codexSummary",
                     "model": safeModel,
                     "inputMode": "transcript",
+                    "languageCode": languageContext.code,
+                    "languageLabel": languageContext.label,
                     "step": "completed",
                     "durationMs": Int(Date().timeIntervalSince(startedAt) * 1000),
                     "textLength": text.count,
@@ -139,6 +180,8 @@ final class CodexGenerationService {
                     "layer": "native",
                     "kind": "codexSummary",
                     "model": safeModel,
+                    "languageCode": languageContext.code,
+                    "languageLabel": languageContext.label,
                     "step": "failed",
                     "durationMs": Int(Date().timeIntervalSince(startedAt) * 1000),
                     "detail": message,
@@ -147,11 +190,17 @@ final class CodexGenerationService {
         }
     }
 
-    private func requestTimestamps(transcript: String, accessToken: String, model: String) async throws -> String {
+    private func requestTimestamps(
+        transcript: String,
+        accessToken: String,
+        model: String,
+        languageContext: LanguageContext
+    ) async throws -> String {
         let rawText = try await requestCodexText(
             instructions: "You create accurate YouTube chapter timestamps from transcripts.",
             prompt: """
             Create chronological YouTube chapter timestamps from this transcript.
+            \(outputLanguageInstruction(languageContext: languageContext, outputName: "timestamp titles"))
 
             Rules:
             - Use only the bracketed transcript timestamps as the source of truth.
@@ -170,6 +219,14 @@ final class CodexGenerationService {
             emptyResponseMessage: "ChatGPT returned an empty timestamp response."
         )
         return rawText
+    }
+
+    private func outputLanguageInstruction(languageContext: LanguageContext, outputName: String) -> String {
+        guard !languageContext.displayName.isEmpty else {
+            return ""
+        }
+
+        return "The detected caption language is \(languageContext.displayName). Write the \(outputName) in \(languageContext.displayName)."
     }
 
     private func requestCodexText(

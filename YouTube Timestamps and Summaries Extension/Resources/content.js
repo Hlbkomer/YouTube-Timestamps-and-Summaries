@@ -38,6 +38,7 @@ const GENERATION_TIMEOUT_EXTRA_MS_PER_BLOCK = 45 * 1000;
 const PENDING_GENERATION_START_GRACE_MS = 30000;
 const TRANSCRIPT_CACHE_LIMIT = 5;
 const TRANSCRIPT_TRACK_WAIT_ATTEMPTS = 16;
+const SHOW_GENERATION_TIMING_IN_TABS = true;
 const transcriptCache = new Map();
 const timedTextTrackCache = new Map();
 const innertubePlayerTrackCache = new Map();
@@ -84,8 +85,18 @@ let state = {
         timestamps: 0,
         summary: 0,
     },
+    generationDurationsMs: {
+        timestamps: 0,
+        summary: 0,
+    },
+    copyFeedback: {
+        timestamps: false,
+        summary: false,
+    },
     didAutogenerateAnalysis: false,
 };
+
+let copyFeedbackTimeout = null;
 
 function logDebug(kind, message, extra) {
     const prefix = `[Apple Intelligence content:${kind}]`;
@@ -304,6 +315,19 @@ function clearPendingGeneration(videoKey, kind, jobId = "") {
     } catch (_) {
         // Nothing to clear.
     }
+}
+
+function formatGenerationDuration(durationMs) {
+    const seconds = Math.max(1, Math.round(Number(durationMs || 0) / 1000));
+    return `${seconds} s`;
+}
+
+function rememberGenerationDuration(kind, startedAt) {
+    if (!SHOW_GENERATION_TIMING_IN_TABS || !startedAt) {
+        return;
+    }
+
+    state.generationDurationsMs[kind] = Math.max(0, Date.now() - startedAt);
 }
 
 function generationStepDescription(kind, usesSelectedProvider) {
@@ -673,6 +697,22 @@ function trackLabel(track) {
         || track?.name?.runs?.map((run) => run.text).filter(Boolean).join("")
         || track?.languageCode
         || "caption track";
+}
+
+function trackLanguageLabel(track) {
+    const languageCode = track?.languageCode || "";
+    const label = trackLabel(track);
+    if (!languageCode) {
+        return label;
+    }
+
+    try {
+        // Keep model-facing language names stable regardless of the user's Safari UI language.
+        const languageNames = new Intl.DisplayNames(["en"], { type: "language" });
+        return languageNames.of(languageCode) || label || languageCode;
+    } catch (_) {
+        return label || languageCode;
+    }
 }
 
 function selectCaptionTrack(tracks) {
@@ -1076,6 +1116,9 @@ async function fetchTranscript(track) {
                 text: lines.join("\n"),
                 lineCount: lines.length,
                 label: trackLabel(track),
+                languageCode: track?.languageCode || "",
+                languageLabel: trackLanguageLabel(track),
+                trackKind: track?.kind || "",
             };
         }
 
@@ -1137,6 +1180,9 @@ async function tryTranscriptTracks(videoKey, kind, source, tracks) {
             const transcript = await fetchTranscript(track);
             rememberTranscript(videoKey, transcript);
             logDebug(kind, `transcript: ready (${transcript.lineCount} lines)`);
+            if (transcript.languageCode || transcript.languageLabel) {
+                logDebug(kind, `transcript: language ${transcript.languageLabel || transcript.languageCode}${transcript.languageCode ? ` (${transcript.languageCode})` : ""}`);
+            }
             return {
                 transcript,
                 error: "",
@@ -1157,6 +1203,9 @@ async function getTranscript(videoKey, kind) {
     if (transcriptCache.has(videoKey)) {
         const cachedTranscript = transcriptCache.get(videoKey);
         logDebug(kind, `transcript: using cached captions (${cachedTranscript.lineCount} lines)`);
+        if (cachedTranscript.languageCode || cachedTranscript.languageLabel) {
+            logDebug(kind, `transcript: language ${cachedTranscript.languageLabel || cachedTranscript.languageCode}${cachedTranscript.languageCode ? ` (${cachedTranscript.languageCode})` : ""}`);
+        }
         return cachedTranscript;
     }
 
@@ -1350,6 +1399,14 @@ function resetPanelState() {
         timestamps: 0,
         summary: 0,
     };
+    state.generationDurationsMs = {
+        timestamps: 0,
+        summary: 0,
+    };
+    state.copyFeedback = {
+        timestamps: false,
+        summary: false,
+    };
     state.didAutogenerateAnalysis = false;
 }
 
@@ -1380,7 +1437,13 @@ function buttonLabel(kind) {
         return kind === "timestamps" ? "Timestamps..." : "Summary...";
     }
 
-    return kind === "timestamps" ? "Timestamps" : "Summary";
+    const baseLabel = kind === "timestamps" ? "Timestamps" : "Summary";
+    const durationMs = state.generationDurationsMs[kind];
+    if (SHOW_GENERATION_TIMING_IN_TABS && durationMs > 0) {
+        return `${baseLabel} (${formatGenerationDuration(durationMs)})`;
+    }
+
+    return baseLabel;
 }
 
 function activeText(kind) {
@@ -1389,6 +1452,98 @@ function activeText(kind) {
 
 function activeError(kind) {
     return kind === "timestamps" ? state.errors.timestamps : state.errors.summary;
+}
+
+function copiedAttribution(kind) {
+    return kind === "timestamps"
+        ? "Timestamps created with Timestamps & Summaries for YT, a free Safari extension."
+        : "Summary created with Timestamps & Summaries for YT, a free Safari extension.";
+}
+
+function copyText(kind) {
+    const text = activeText(kind).trim();
+    if (!text) {
+        return "";
+    }
+
+    return `${copiedAttribution(kind)}\n\n${text}`;
+}
+
+function hasCopyText(kind) {
+    return copyText(kind).length > 0;
+}
+
+function copyButtonLabel(kind) {
+    if (state.copyFeedback[kind]) {
+        return kind === "timestamps" ? "Copied timestamps" : "Copied summary";
+    }
+
+    return kind === "timestamps" ? "Copy timestamps" : "Copy summary";
+}
+
+function copyIcon() {
+    return `
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
+            <path d="M8 7.5A2.5 2.5 0 0 1 10.5 5H17a2.5 2.5 0 0 1 2.5 2.5V14a2.5 2.5 0 0 1-2.5 2.5h-6.5A2.5 2.5 0 0 1 8 14V7.5Zm2.5-.5A.5.5 0 0 0 10 7.5V14a.5.5 0 0 0 .5.5H17a.5.5 0 0 0 .5-.5V7.5A.5.5 0 0 0 17 7h-6.5Z"></path>
+            <path d="M4.5 10A2.5 2.5 0 0 1 7 7.5v2A.5.5 0 0 0 6.5 10v6.5a.5.5 0 0 0 .5.5h6.5a.5.5 0 0 0 .5-.5h2A2.5 2.5 0 0 1 13.5 19H7a2.5 2.5 0 0 1-2.5-2.5V10Z"></path>
+        </svg>
+    `;
+}
+
+async function writeToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return;
+        } catch (error) {
+            console.debug("[Apple Intelligence content:copy] Clipboard API failed, trying fallback", error);
+        }
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.top = "-1000px";
+    textarea.style.left = "-1000px";
+    document.documentElement.append(textarea);
+    textarea.select();
+    const didCopy = document.execCommand("copy");
+    textarea.remove();
+
+    if (!didCopy) {
+        throw new Error("Clipboard copy failed.");
+    }
+}
+
+async function copyActiveResult() {
+    const kind = state.activeTab;
+    const text = copyText(kind);
+    if (!text) {
+        return;
+    }
+
+    try {
+        await writeToClipboard(text);
+        state.copyFeedback = {
+            ...state.copyFeedback,
+            [kind]: true,
+        };
+        render();
+
+        if (copyFeedbackTimeout) {
+            clearTimeout(copyFeedbackTimeout);
+        }
+        copyFeedbackTimeout = setTimeout(() => {
+            state.copyFeedback = {
+                ...state.copyFeedback,
+                [kind]: false,
+            };
+            render();
+        }, 1400);
+    } catch (error) {
+        console.debug("[Apple Intelligence content:copy] Clipboard copy failed", error);
+    }
 }
 
 function renderConnectionState(message) {
@@ -1594,6 +1749,33 @@ function renderActiveContent() {
     return state.activeTab === "timestamps" ? renderTimestampsResult() : renderSummaryResult();
 }
 
+function captureRenderScrollState(root) {
+    const surface = root.querySelector(".body > .surface");
+    if (!surface) {
+        return null;
+    }
+
+    return {
+        activeTab: state.activeTab,
+        scrollTop: surface.scrollTop,
+        scrollLeft: surface.scrollLeft,
+    };
+}
+
+function restoreRenderScrollState(root, scrollState) {
+    if (!scrollState || scrollState.activeTab !== state.activeTab) {
+        return;
+    }
+
+    const surface = root.querySelector(".body > .surface");
+    if (!surface) {
+        return;
+    }
+
+    surface.scrollTop = scrollState.scrollTop;
+    surface.scrollLeft = scrollState.scrollLeft;
+}
+
 function render() {
     if (!panelHost) {
         return;
@@ -1603,6 +1785,8 @@ function render() {
     if (!root) {
         return;
     }
+
+    const scrollState = captureRenderScrollState(root);
 
     root.innerHTML = `
         <style>
@@ -1676,13 +1860,21 @@ function render() {
             .tabs {
                 display: flex;
                 gap: 12px;
-                padding: 16px 16px 10px;
                 overflow-x: auto;
                 scrollbar-width: none;
+                min-width: 0;
+                flex: 1 1 auto;
             }
 
             .tabs::-webkit-scrollbar {
                 display: none;
+            }
+
+            .toolbar {
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 16px 16px 10px;
             }
 
             .tab {
@@ -1701,6 +1893,40 @@ function render() {
                 white-space: nowrap;
                 cursor: pointer;
                 transition: background 120ms ease, color 120ms ease;
+            }
+
+            .copy-button {
+                appearance: none;
+                border: 0;
+                border-radius: 999px;
+                background: transparent;
+                color: var(--muted);
+                width: 34px;
+                height: 34px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                flex: 0 0 auto;
+                cursor: pointer;
+                opacity: 0.58;
+                transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+            }
+
+            .copy-button svg {
+                display: block;
+                fill: currentColor;
+            }
+
+            .copy-button:hover:not(:disabled),
+            .copy-button[data-copied="true"] {
+                background: var(--surface-strong);
+                color: var(--text);
+                opacity: 0.9;
+            }
+
+            .copy-button:disabled {
+                cursor: default;
+                opacity: 0.22;
             }
 
             .tab:hover {
@@ -1850,20 +2076,32 @@ function render() {
         </style>
         <div class="wrap">
             <div class="panel">
-                <div class="tabs">
+                <div class="toolbar">
+                    <div class="tabs">
+                        <button
+                            class="tab ${state.activeTab === "timestamps" ? "active" : ""}"
+                            data-tab="timestamps"
+                            aria-busy="${state.isLoading.timestamps ? "true" : "false"}"
+                        >
+                            ${escapeHTML(buttonLabel("timestamps"))}
+                        </button>
+                        <button
+                            class="tab ${state.activeTab === "summary" ? "active" : ""}"
+                            data-tab="summary"
+                            aria-busy="${state.isLoading.summary ? "true" : "false"}"
+                        >
+                            ${escapeHTML(buttonLabel("summary"))}
+                        </button>
+                    </div>
                     <button
-                        class="tab ${state.activeTab === "timestamps" ? "active" : ""}"
-                        data-tab="timestamps"
-                        aria-busy="${state.isLoading.timestamps ? "true" : "false"}"
+                        class="copy-button"
+                        data-copy-active
+                        data-copied="${state.copyFeedback[state.activeTab] ? "true" : "false"}"
+                        aria-label="${escapeHTML(copyButtonLabel(state.activeTab))}"
+                        title="${escapeHTML(copyButtonLabel(state.activeTab))}"
+                        ${hasCopyText(state.activeTab) ? "" : "disabled"}
                     >
-                        ${escapeHTML(buttonLabel("timestamps"))}
-                    </button>
-                    <button
-                        class="tab ${state.activeTab === "summary" ? "active" : ""}"
-                        data-tab="summary"
-                        aria-busy="${state.isLoading.summary ? "true" : "false"}"
-                    >
-                        ${escapeHTML(buttonLabel("summary"))}
+                        ${copyIcon()}
                     </button>
                 </div>
                 <div class="body">
@@ -1883,12 +2121,18 @@ function render() {
         button.addEventListener("click", openCompanionApp);
     }
 
+    for (const button of root.querySelectorAll("[data-copy-active]")) {
+        button.addEventListener("click", copyActiveResult);
+    }
+
     for (const link of root.querySelectorAll("[data-seconds]")) {
         link.addEventListener("click", (event) => {
             event.preventDefault();
             jumpToTime(Number(link.getAttribute("data-seconds") || 0));
         });
     }
+
+    restoreRenderScrollState(root, scrollState);
 }
 
 async function refreshStatus() {
@@ -2131,8 +2375,10 @@ async function generate(kind) {
     state.errors[kind] = "";
     state.debug[kind] = "";
     state.isLoading[kind] = true;
+    state.generationDurationsMs[kind] = 0;
     state.generationIDs[kind] += 1;
     const generationID = state.generationIDs[kind];
+    let generationStartedAt = Date.now();
     logDebug(kind, `started: ${new Date().toLocaleTimeString()}`);
     logDebug(kind, "video: supported YouTube video detected");
     render();
@@ -2156,6 +2402,11 @@ async function generate(kind) {
     const usesSelectedProvider = state.generationMode === "selectedProvider" || state.generationMode === "codexChatGPT";
     const requestKind = generationKindForTab(kind, usesSelectedProvider);
     const requestTranscript = transcriptForGeneration(kind, transcript?.text || "");
+    const transcriptMetadata = {
+        languageCode: transcript?.languageCode || "",
+        languageLabel: transcript?.languageLabel || "",
+        trackKind: transcript?.trackKind || "",
+    };
     const generationTimeoutMs = generationTimeoutForTranscript(requestTranscript);
 
     logDebug(kind, generationStepDescription(kind, usesSelectedProvider));
@@ -2167,6 +2418,7 @@ async function generate(kind) {
 
     if (pendingGeneration?.jobId) {
         jobID = pendingGeneration.jobId;
+        generationStartedAt = pendingGeneration.createdAt || generationStartedAt;
         logDebug(kind, `requestId: ${jobID}`);
         logDebug(kind, "step: reusing already running generation job");
     } else if (pendingGeneration) {
@@ -2185,6 +2437,7 @@ async function generate(kind) {
 
         if (pendingGeneration?.jobId) {
             jobID = pendingGeneration.jobId;
+            generationStartedAt = pendingGeneration.createdAt || generationStartedAt;
             logDebug(kind, `requestId: ${jobID}`);
             logDebug(kind, "step: reusing already running generation job");
         }
@@ -2197,6 +2450,7 @@ async function generate(kind) {
             type: "ai:startGenerate",
             kind: requestKind,
             transcript: requestTranscript,
+            transcriptMetadata,
             timeoutMs: generationTimeoutMs,
         }, 20000).catch((error) => {
             logDebug(kind, "step: start request failed", error);
@@ -2300,12 +2554,14 @@ async function generate(kind) {
     const cachedText = cachedGenerationText(videoKey, kind);
     if (cachedText) {
         applyGenerationText(kind, cachedText);
+        rememberGenerationDuration(kind, generationStartedAt);
         clearPendingGeneration(videoKey, kind, jobID);
         render();
         return;
     }
 
     if (activeText(kind)) {
+        rememberGenerationDuration(kind, generationStartedAt);
         clearPendingGeneration(videoKey, kind, jobID);
         render();
         return;
@@ -2319,6 +2575,7 @@ async function generate(kind) {
     }
 
     rememberGeneratedText(videoKey, kind, activeText(kind));
+    rememberGenerationDuration(kind, generationStartedAt);
     clearPendingGeneration(videoKey, kind, jobID);
     render();
     return;

@@ -73,22 +73,37 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         case "generateContent":
             let kind = payload["kind"] as? String ?? "timestamps"
             let transcript = payload["transcript"] as? String ?? ""
-            return await service.generate(kind: kind, transcript: transcript)
+            let languageCode = payload["languageCode"] as? String ?? ""
+            let languageLabel = payload["languageLabel"] as? String ?? ""
+            return await service.generate(
+                kind: kind,
+                transcript: transcript,
+                languageCode: languageCode,
+                languageLabel: languageLabel
+            )
 
         case "generateCodexTimestamps":
             let transcript = payload["transcript"] as? String ?? ""
             let model = payload["model"] as? String ?? GenerationSettings.load().modelID
+            let languageCode = payload["languageCode"] as? String ?? ""
+            let languageLabel = payload["languageLabel"] as? String ?? ""
             return await codexService.generateTimestamps(
                 transcript: transcript,
-                model: model
+                model: model,
+                languageCode: languageCode,
+                languageLabel: languageLabel
             )
 
         case "generateCodexSummary":
             let transcript = payload["transcript"] as? String ?? ""
             let model = payload["model"] as? String ?? GenerationSettings.load().modelID
+            let languageCode = payload["languageCode"] as? String ?? ""
+            let languageLabel = payload["languageLabel"] as? String ?? ""
             return await codexService.generateSummary(
                 transcript: transcript,
-                model: model
+                model: model,
+                languageCode: languageCode,
+                languageLabel: languageLabel
             )
 
         default:
