@@ -2,7 +2,7 @@
 
 This file is a working draft for App Store Connect.
 
-Status note: the current default build uses ChatGPT sign-in for timestamps and summaries. Apple Intelligence remains available as an optional local summary engine. Re-check App Review, privacy, and third-party-service wording before submitting this version.
+Status note: the current build can generate Apple Intelligence summaries without ChatGPT sign-in. ChatGPT sign-in is optional and unlocks timestamp generation plus GPT summaries. Re-check App Review, privacy, and third-party-service wording before submitting this version.
 
 It is based on the current app behavior and Apple’s current App Store Connect requirements for:
 
@@ -85,14 +85,14 @@ Features:
 - simple Safari sidebar for timestamps and summaries
 - clickable timestamp links that jump to the right moment
 - transcript-based generation
-- ChatGPT generation through the user's account
-- optional Apple Intelligence summaries on your Mac
+- Apple Intelligence summaries on your Mac without ChatGPT sign-in
+- optional ChatGPT generation through the user's account
 - no API key or developer backend required
 
 Important notes:
 
 - requires Safari on macOS 26 or later
-- requires ChatGPT sign-in for timestamp generation
+- requires ChatGPT sign-in only for timestamp generation and optional GPT summaries
 - Apple Intelligence summaries require Apple Intelligence enabled on a compatible Mac
 - videos need captions or an available transcript
 - generated output may be incomplete or inaccurate
@@ -120,9 +120,9 @@ Fill with your real details in App Store Connect:
 
 ### Sign-in required
 
-`Yes`
+`No`
 
-This app requires ChatGPT sign-in for timestamp generation. Summaries use ChatGPT by default, with Apple Intelligence available as an optional local summary engine.
+The app can generate summaries with Apple Intelligence without sign-in. ChatGPT sign-in is optional and unlocks timestamp generation plus GPT summaries.
 
 ### Demo account
 
@@ -135,7 +135,7 @@ Suggested review note:
 ```text
 This app is a macOS container app for a Safari web extension.
 
-The extension adds a sidebar on supported YouTube video pages. It generates timestamps from the available YouTube transcript through the user's ChatGPT sign-in. Summaries use ChatGPT by default, or Apple Intelligence on the Mac if selected in the companion app.
+The extension adds a sidebar on supported YouTube video pages. Without sign-in, it opens the Summary tab by default and generates summaries locally with Apple Intelligence when available. ChatGPT sign-in is optional and unlocks timestamp generation plus GPT summaries.
 
 No API key or developer-operated backend is required.
 
@@ -143,13 +143,13 @@ Review steps:
 1. Launch the macOS app.
 2. Click "Open Safari Extension Settings" and enable the Safari extension.
 3. Open a supported YouTube watch page in Safari.
-4. Sign in with ChatGPT in the companion app if not already signed in.
-5. Use the Timestamps and Summary tabs in the extension sidebar.
+4. Use the Summary tab in the extension sidebar. No ChatGPT account is required for this Apple Intelligence summary path.
+5. Optional: sign in with ChatGPT in the companion app to test timestamp generation.
 
 Important:
-- Review requires ChatGPT sign-in for timestamp generation.
-- Apple Intelligence is optional and only required if selected for summaries.
-- Timestamps and Summary generate automatically on supported watch pages.
+- Timestamp generation requires optional ChatGPT sign-in.
+- Summary generation works without ChatGPT when Apple Intelligence is available.
+- Summary generates automatically on supported watch pages; timestamps generate automatically after ChatGPT is connected.
 - Videos without captions or an available transcript will show a clear error.
 ```
 

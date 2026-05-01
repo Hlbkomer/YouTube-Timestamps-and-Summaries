@@ -112,7 +112,30 @@
             .filter(Boolean);
     }
 
+    function canGenerateTimestampsFromStatus(status = {}) {
+        return Boolean(status.timestampsAvailable || status.codexConnected);
+    }
+
+    function canGenerateSummaryFromStatus(status = {}) {
+        if (typeof status.summaryAvailable === "boolean") {
+            return status.summaryAvailable;
+        }
+
+        const summaryEngine = status.summaryEngine || status.settings?.summaryEngine || "";
+
+        return summaryEngine === "appleIntelligence"
+            ? Boolean(status.appleIntelligenceAvailable)
+            : Boolean(status.codexConnected);
+    }
+
+    function defaultGenerationTab(status = {}) {
+        return canGenerateTimestampsFromStatus(status) ? "timestamps" : "summary";
+    }
+
     const helpers = {
+        canGenerateSummaryFromStatus,
+        canGenerateTimestampsFromStatus,
+        defaultGenerationTab,
         extractVideoKey,
         getNavigationURL,
         isShortsURL,

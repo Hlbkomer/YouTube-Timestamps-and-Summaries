@@ -52,6 +52,18 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(appSettingsSource.contains(#""id": "appleIntelligence""#))
     }
 
+    @Test func chatGPTIsOptionalWhenAppleIntelligenceCanSummarize() throws {
+        let viewControllerSource = try source(appPath("ViewController.swift"))
+        let extensionHandlerSource = try source(extensionPath("SafariWebExtensionHandler.swift"))
+
+        #expect(viewControllerSource.contains(#"if !codexConnected, appleIntelligenceAvailable"#))
+        #expect(viewControllerSource.contains(#"summaryEngine: "appleIntelligence""#))
+        #expect(viewControllerSource.contains(#"if !codexConnected {"#))
+        #expect(extensionHandlerSource.contains(#"if !codexConnected, appleConfigured {"#))
+        #expect(extensionHandlerSource.contains(#""timestampsAvailable": codexConnected"#))
+        #expect(extensionHandlerSource.contains(#""summaryAvailable": summaryAvailable"#))
+    }
+
     private func source(_ path: String) throws -> String {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

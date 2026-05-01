@@ -8,6 +8,7 @@ const openPreferencesButton = document.getElementById("open-preferences");
 const providerSelect = document.getElementById("provider-select");
 const modelSelect = document.getElementById("model-select");
 const summarySelect = document.getElementById("summary-select");
+const generationSetupHint = document.getElementById("generation-setup-hint");
 const codexSignInButton = document.getElementById("codex-sign-in");
 const codexSignOutButton = document.getElementById("codex-sign-out");
 const copyCodexCodeButton = document.getElementById("copy-codex-code");
@@ -22,11 +23,11 @@ function settingsLabel(useSettingsLabel) {
 
 function renderChecklist() {
     const items = [
-        "Choose the model used for timestamps and summary.",
-        "Sign in with ChatGPT.",
+        "Optional: Sign in with ChatGPT for Timestamps and GPT Summaries.",
+        "Choose the models used for Timestamps and Summary.",
         "Enable the Safari extension.",
         "Open a YouTube video with captions or a transcript.",
-        "<strong>Timestamps</strong> and <strong>Summary</strong> will appear automatically.",
+        "<strong>Summary</strong> appears automatically. <strong>Timestamps</strong> appear when ChatGPT is connected.",
     ];
     checklist.innerHTML = items.map((item) => `<li>${item}</li>`).join("");
 }
@@ -70,7 +71,14 @@ window.renderAppState = function renderAppState(state) {
     renderOptions(summarySelect, state.summaryOptions || [], settings.summaryEngine || "selectedModel");
     syncSummaryModelLabel();
 
-    if (state.codex?.connected) {
+    const chatGPTConnected = Boolean(state.codex?.connected);
+    providerSelect.disabled = !chatGPTConnected;
+    modelSelect.disabled = !chatGPTConnected;
+    generationSetupHint.textContent = chatGPTConnected
+        ? ""
+        : "Connect ChatGPT to enable timestamp model settings.";
+
+    if (chatGPTConnected) {
         codexStatus.textContent = "ChatGPT is connected.";
         codexStatus.dataset.state = "connected";
         codexSignInButton.hidden = true;
@@ -78,7 +86,7 @@ window.renderAppState = function renderAppState(state) {
     } else {
         codexStatus.textContent = state.codex?.error
             ? `ChatGPT is not connected: ${state.codex.error}`
-            : "ChatGPT is not connected.";
+            : "ChatGPT is not connected. Apple Intelligence summaries still work when available.";
         codexStatus.dataset.state = "missing";
         codexSignInButton.hidden = false;
         codexSignOutButton.hidden = true;

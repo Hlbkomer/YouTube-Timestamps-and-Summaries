@@ -62,3 +62,52 @@ test("parseTimestamps parses common timestamp formats", () => {
         { time: "1:02:03", label: "Deep Dive", seconds: 3723 },
     ]);
 });
+
+test("generation availability defaults to Summary when ChatGPT is disconnected and Apple Intelligence can summarize", () => {
+    const status = {
+        codexConnected: false,
+        timestampsAvailable: false,
+        summaryAvailable: true,
+        appleIntelligenceAvailable: true,
+        summaryEngine: "appleIntelligence",
+    };
+
+    assert.equal(helpers.canGenerateTimestampsFromStatus(status), false);
+    assert.equal(helpers.canGenerateSummaryFromStatus(status), true);
+    assert.equal(helpers.defaultGenerationTab(status), "summary");
+});
+
+test("generation availability defaults to Timestamps when ChatGPT is connected", () => {
+    const status = {
+        codexConnected: true,
+        timestampsAvailable: true,
+        summaryAvailable: true,
+        summaryEngine: "selectedModel",
+    };
+
+    assert.equal(helpers.canGenerateTimestampsFromStatus(status), true);
+    assert.equal(helpers.canGenerateSummaryFromStatus(status), true);
+    assert.equal(helpers.defaultGenerationTab(status), "timestamps");
+});
+
+test("selected-model summaries are unavailable without ChatGPT", () => {
+    const status = {
+        codexConnected: false,
+        appleIntelligenceAvailable: true,
+        summaryEngine: "selectedModel",
+    };
+
+    assert.equal(helpers.canGenerateSummaryFromStatus(status), false);
+});
+
+test("Apple Intelligence summary availability can be inferred from settings when explicit status is absent", () => {
+    const status = {
+        codexConnected: false,
+        appleIntelligenceAvailable: true,
+        settings: {
+            summaryEngine: "appleIntelligence",
+        },
+    };
+
+    assert.equal(helpers.canGenerateSummaryFromStatus(status), true);
+});

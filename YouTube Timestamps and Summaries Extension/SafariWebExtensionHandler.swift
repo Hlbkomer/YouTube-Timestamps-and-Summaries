@@ -135,10 +135,16 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         let settings = GenerationSettings.load()
         let appleConfigured = (appleStatus["isConfigured"] as? Bool) == true
         let codexConnected = (codexStatus["connected"] as? Bool) == true
-        let effectiveSummaryEngine = settings.summaryEngine == "appleIntelligence" && !appleConfigured
-            ? "selectedModel"
-            : settings.summaryEngine
+        let effectiveSummaryEngine: String
+        if !codexConnected, appleConfigured {
+            effectiveSummaryEngine = "appleIntelligence"
+        } else if settings.summaryEngine == "appleIntelligence", !appleConfigured {
+            effectiveSummaryEngine = "selectedModel"
+        } else {
+            effectiveSummaryEngine = settings.summaryEngine
+        }
         let summaryUsesApple = effectiveSummaryEngine == "appleIntelligence"
+        let summaryAvailable = summaryUsesApple ? appleConfigured : codexConnected
         let modelLabel = GenerationSettings.modelLabel(for: settings.modelID)
         let summaryEngineLabel = summaryUsesApple ? "Apple Intelligence" : modelLabel
         var settingsPayload = settings.payload
@@ -150,7 +156,9 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             "ok": true,
             "engine": summaryUsesApple ? "\(modelLabel) + Apple Intelligence" : modelLabel,
             "generationMode": "selectedProvider",
-            "isConfigured": codexConnected && (!summaryUsesApple || appleConfigured),
+            "isConfigured": codexConnected || summaryAvailable,
+            "timestampsAvailable": codexConnected,
+            "summaryAvailable": summaryAvailable,
             "appleIntelligence": appleStatus,
             "codex": codexStatus,
             "settings": settingsPayload,

@@ -143,6 +143,12 @@ body {
     font: inherit;
 }
 
+.field select:disabled {
+    color: color-mix(in srgb, var(--muted) 76%, transparent);
+    background: color-mix(in srgb, var(--surface) 72%, var(--panel-border));
+    cursor: not-allowed;
+}
+
 .field textarea {
     width: 100%;
     min-height: 120px;

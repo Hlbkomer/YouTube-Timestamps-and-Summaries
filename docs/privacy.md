@@ -12,7 +12,7 @@ This Privacy Policy explains how Timestamps & Summaries for YT handles data when
 
 Timestamps & Summaries for YT is a Safari extension and macOS companion app that generates timestamps and summaries for YouTube videos.
 
-The app uses the user's signed-in ChatGPT account for timestamp generation. Summaries can be generated either with ChatGPT or with Apple Intelligence on the user's Mac. It does not require API keys or a developer-operated backend.
+The app can generate summaries locally with Apple Intelligence without ChatGPT sign-in. ChatGPT sign-in is optional and is used for timestamp generation or GPT summaries. The app does not require API keys or a developer-operated backend.
 
 ## Information Processed By The App
 

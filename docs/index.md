@@ -9,7 +9,7 @@ Timestamps & Summaries for YT is a Safari extension and macOS companion app that
 - chronological timestamps for YouTube videos
 - short summaries for YouTube videos
 
-The extension adds a right-side sidebar on supported YouTube video pages. It reads the available YouTube transcript, uses the user's selected signed-in ChatGPT model for timestamps, and creates summaries with either that model or Apple Intelligence on the Mac. A ChatGPT account is required.
+The extension adds a right-side sidebar on supported YouTube video pages. It reads the available YouTube transcript, creates summaries with Apple Intelligence on the Mac or the user's selected signed-in ChatGPT model, and creates timestamps when ChatGPT is connected. No API key or developer backend is required.
 
 ![Companion app screenshot](readme-assets/companion-app.png)
 
@@ -19,15 +19,15 @@ The extension adds a right-side sidebar on supported YouTube video pages. It rea
 
 1. The Safari extension detects a supported YouTube watch or live page.
 2. The extension fetches the available YouTube transcript for that video.
-3. If needed, the companion app asks the user to sign in with ChatGPT.
-4. The selected ChatGPT model creates timestamp candidates from the transcript.
-5. The selected ChatGPT model or Apple Intelligence creates the summary.
+3. Apple Intelligence can create summaries locally without ChatGPT sign-in.
+4. If ChatGPT is connected, the selected ChatGPT model creates timestamp candidates from the transcript.
+5. The selected ChatGPT model or Apple Intelligence creates the summary, depending on the user's setting.
 6. The extension validates timestamp candidates against real transcript cue times before showing clickable timestamps.
 
 ## Requirements
 
 - macOS 26 or later
-- ChatGPT sign-in
+- ChatGPT sign-in only for timestamps and optional GPT summaries
 - Apple Intelligence enabled and compatible Apple silicon hardware only if Apple Intelligence is selected for summaries
 - a YouTube video with captions or an available transcript
 
@@ -45,7 +45,7 @@ The extension adds a right-side sidebar on supported YouTube video pages. It rea
     <h3 style="margin-top: 0;">Download</h3>
     <p>Download the signed and notarized macOS app.</p>
     <p>
-      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.2/Timestamps-and-Summaries-for-YT-v1.0.2.zip">Download Timestamps &amp; Summaries for YT v1.0.2</a>
+      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.3/Timestamps-and-Summaries-for-YT-v1.0.3.zip">Download Timestamps &amp; Summaries for YT v1.0.3</a>
     </p>
     <p>After unzipping, move the app to <code>Applications</code>, open it and enable the Safari extension.</p>
   </section>

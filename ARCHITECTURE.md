@@ -1,25 +1,25 @@
 # Architecture
 
-This project generates YouTube timestamps and summaries from the video's available transcript. The current default path uses the user's signed-in ChatGPT model for timestamps and summaries. Apple Intelligence is optional for local summary generation on supported Macs.
+This project generates YouTube timestamps and summaries from the video's available transcript. Summaries can run locally with Apple Intelligence without ChatGPT sign-in. ChatGPT sign-in unlocks timestamp generation and optional GPT summaries.
 
 ## Current Generation Pipeline
 
-The current default approach is split into transcript extraction, ChatGPT timestamp generation, configurable summary generation, and deterministic timestamp validation:
+The current approach is split into transcript extraction, optional ChatGPT timestamp generation, configurable summary generation, and deterministic timestamp validation:
 
 1. The Safari content script runs only on supported YouTube watch and live pages.
 2. The content script fetches the available YouTube captions/transcript for the current video.
-3. The companion app asks the user to choose a ChatGPT model and sign in if no ChatGPT token is available yet.
+3. The companion app lets the user choose generation settings and optionally sign in with ChatGPT.
 4. The background script starts separate timestamp and summary jobs so each tab can report its own progress and failure state.
-5. The native extension sends the timestamped transcript to the selected ChatGPT model for timestamp generation.
-6. In parallel, the native extension sends the transcript to the selected ChatGPT model or Apple Intelligence for summary generation.
+5. If ChatGPT is connected, the native extension sends the timestamped transcript to the selected ChatGPT model for timestamp generation.
+6. The native extension sends the transcript to Apple Intelligence or the selected ChatGPT model for summary generation.
 7. Generated timestamp candidates are aligned back to real transcript cue times before the sidebar renders clickable timestamps.
 
-Both tabs are generated automatically when a supported video opens. The user should not need to click `Summary` to start the summary request.
+Available tabs are generated automatically when a supported video opens. Without ChatGPT sign-in, the sidebar opens `Summary` by default and shows a connection prompt only on the `Timestamps` tab.
 
 The core rule is:
 
 - code owns timing
-- ChatGPT owns timestamp topic wording
+- ChatGPT owns timestamp topic wording when connected
 - the selected summary engine owns summary wording
 
 ChatGPT may choose topic titles, but generated timestamp candidates are validated against real transcript timestamps before they become clickable sidebar timestamps.

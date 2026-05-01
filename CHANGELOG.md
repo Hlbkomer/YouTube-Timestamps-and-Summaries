@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.3 - 2026-05-02
+
+- Allow Apple Intelligence summaries to work without ChatGPT sign-in, defaulting the sidebar to Summary and gating only Timestamps behind ChatGPT.
+- Update companion app setup wording so ChatGPT sign-in is optional instead of required.
+- Refresh the companion app checklist for the optional ChatGPT flow.
+- Add regression tests for the no-ChatGPT Summary default and generation availability logic.
+
 ## v1.0.2 - 2026-04-30
 
 - Restore the stable Apple Intelligence summary path after the token-aware structured-output experiment proved slower and more likely to hit local safety refusals.

@@ -337,8 +337,13 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         let extensionEnabled = await fetchExtensionEnabled()
         let appleIntelligenceState = appleIntelligenceState()
         let settings = GenerationSettings.load()
-        let effectiveSettings = effectiveGenerationSettings(settings, appleIntelligenceAvailable: appleIntelligenceState.available)
         let codexStatus = await codexAuthService.statusPayload(refresh: true)
+        let codexConnected = (codexStatus["connected"] as? Bool) == true
+        let effectiveSettings = effectiveGenerationSettings(
+            settings,
+            appleIntelligenceAvailable: appleIntelligenceState.available,
+            codexConnected: codexConnected
+        )
 
         return [
             "appleIntelligenceAvailable": appleIntelligenceState.available,
@@ -348,7 +353,11 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             "settings": effectiveSettings.payload,
             "providerOptions": GenerationSettings.providerOptions,
             "modelOptions": GenerationSettings.modelOptions,
-            "summaryOptions": summaryOptions(modelID: effectiveSettings.modelID, appleIntelligenceAvailable: appleIntelligenceState.available),
+            "summaryOptions": summaryOptions(
+                modelID: effectiveSettings.modelID,
+                appleIntelligenceAvailable: appleIntelligenceState.available,
+                codexConnected: codexConnected
+            ),
             "extensionEnabled": extensionEnabled as Any,
             "usesSettingsLabel": ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 13,
             "message": (message ?? statusMessage) ?? NSNull(),
@@ -357,8 +366,17 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
 
     private func effectiveGenerationSettings(
         _ settings: GenerationSettings,
-        appleIntelligenceAvailable: Bool
+        appleIntelligenceAvailable: Bool,
+        codexConnected: Bool
     ) -> GenerationSettings {
+        if !codexConnected, appleIntelligenceAvailable {
+            return GenerationSettings(
+                providerID: settings.providerID,
+                modelID: settings.modelID,
+                summaryEngine: "appleIntelligence"
+            )
+        }
+
         guard settings.summaryEngine == "appleIntelligence", !appleIntelligenceAvailable else {
             return settings
         }
@@ -370,7 +388,11 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         )
     }
 
-    private func summaryOptions(modelID: String, appleIntelligenceAvailable: Bool) -> [[String: String]] {
+    private func summaryOptions(
+        modelID: String,
+        appleIntelligenceAvailable: Bool,
+        codexConnected: Bool
+    ) -> [[String: String]] {
         let modelLabel = GenerationSettings.modelOptions
             .first { $0["id"] == modelID }?["label"]
             ?? "Selected model"
@@ -378,6 +400,17 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             "id": "selectedModel",
             "label": modelLabel,
         ]
+
+        if !codexConnected {
+            return appleIntelligenceAvailable
+                ? [
+                    [
+                        "id": "appleIntelligence",
+                        "label": "Apple Intelligence",
+                    ],
+                ]
+                : []
+        }
 
         guard appleIntelligenceAvailable else {
             return [modelOption]

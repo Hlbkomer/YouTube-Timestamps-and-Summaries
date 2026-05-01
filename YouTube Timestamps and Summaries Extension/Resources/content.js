@@ -1,5 +1,8 @@
 (() => {
 const {
+    canGenerateSummaryFromStatus,
+    canGenerateTimestampsFromStatus,
+    defaultGenerationTab,
     extractVideoKey,
     getNavigationURL,
     isShortsURL,
@@ -38,7 +41,9 @@ const GENERATION_TIMEOUT_EXTRA_MS_PER_BLOCK = 45 * 1000;
 const PENDING_GENERATION_START_GRACE_MS = 30000;
 const TRANSCRIPT_CACHE_LIMIT = 5;
 const TRANSCRIPT_TRACK_WAIT_ATTEMPTS = 16;
-const SHOW_GENERATION_TIMING_IN_TABS = true;
+// Flip this to true when comparing provider/model speed during local testing.
+// Keep it false for release builds so the sidebar matches the clean YouTube UI.
+const SHOW_GENERATION_TIMING_IN_TABS = false;
 const transcriptCache = new Map();
 const timedTextTrackCache = new Map();
 const innertubePlayerTrackCache = new Map();
@@ -60,6 +65,8 @@ let state = {
     engine: "",
     appleIntelligenceAvailable: false,
     codexConnected: false,
+    timestampsAvailable: false,
+    summaryAvailable: false,
     codexLoginError: "",
     settings: {
         providerID: "openaiCodex",
@@ -67,6 +74,7 @@ let state = {
         summaryEngine: "selectedModel",
     },
     activeTab: "timestamps",
+    userSelectedTab: false,
     timestampsText: "",
     summaryText: "",
     errors: {
@@ -174,6 +182,28 @@ function modelLabel() {
 function summaryEngineLabel() {
     return state.settings.summaryEngineLabel
         || (state.settings.summaryEngine === "selectedModel" ? modelLabel() : "Apple Intelligence");
+}
+
+function currentGenerationStatus() {
+    return {
+        appleIntelligenceAvailable: state.appleIntelligenceAvailable,
+        codexConnected: state.codexConnected,
+        timestampsAvailable: state.timestampsAvailable,
+        summaryAvailable: state.summaryAvailable,
+        summaryEngine: state.settings.summaryEngine,
+    };
+}
+
+function canGenerateTimestamps() {
+    return canGenerateTimestampsFromStatus(currentGenerationStatus());
+}
+
+function canGenerateSummary() {
+    return canGenerateSummaryFromStatus(currentGenerationStatus());
+}
+
+function defaultActiveTab() {
+    return defaultGenerationTab(currentGenerationStatus());
 }
 
 function generationKindForTab(kind, usesSelectedProvider) {
@@ -1380,7 +1410,8 @@ function removePanel() {
 }
 
 function resetPanelState() {
-    state.activeTab = "timestamps";
+    state.activeTab = defaultActiveTab();
+    state.userSelectedTab = false;
     state.timestampsText = "";
     state.summaryText = "";
     state.errors = {
@@ -1565,6 +1596,14 @@ function renderCodexConnectionState() {
     `;
 }
 
+function renderSummaryUnavailableState() {
+    if (state.appleIntelligenceAvailable) {
+        return renderConnectionState("Connect ChatGPT in the companion app to generate summaries with the selected model.");
+    }
+
+    return renderConnectionState("Apple Intelligence is not available on this Mac. Connect ChatGPT in the companion app to generate summaries.");
+}
+
 function renderLoadingState(kind) {
     const debug = debugSummary(kind);
     return `
@@ -1738,11 +1777,15 @@ function renderInlineSummary(value) {
 }
 
 function renderActiveContent() {
-    if (!state.codexConnected) {
+    if (state.activeTab === "timestamps" && !canGenerateTimestamps()) {
         return renderCodexConnectionState();
     }
 
-    if (state.settings.summaryEngine === "appleIntelligence" && !state.appleIntelligenceAvailable) {
+    if (state.activeTab === "summary" && !canGenerateSummary()) {
+        return renderSummaryUnavailableState();
+    }
+
+    if (state.activeTab === "summary" && state.settings.summaryEngine === "appleIntelligence" && !state.appleIntelligenceAvailable) {
         return renderConnectionState("Apple Intelligence is not available on this Mac.");
     }
 
@@ -2143,16 +2186,28 @@ async function refreshStatus() {
     state.generationMode = response?.generationMode || state.generationMode;
     state.appleIntelligenceAvailable = Boolean(response?.appleIntelligence?.isConfigured ?? response?.isConfigured);
     state.codexConnected = Boolean(response?.codex?.connected);
+    state.timestampsAvailable = Boolean(response?.timestampsAvailable ?? state.codexConnected);
+    state.summaryAvailable = Boolean(response?.summaryAvailable ?? (
+        state.codexConnected
+        || (state.settings.summaryEngine === "appleIntelligence" && state.appleIntelligenceAvailable)
+    ));
     state.settings = {
         ...state.settings,
         ...(response?.settings || {}),
     };
+    state.summaryAvailable = Boolean(response?.summaryAvailable ?? (
+        state.codexConnected
+        || (state.settings.summaryEngine === "appleIntelligence" && state.appleIntelligenceAvailable)
+    ));
     state.isConfigured = Boolean(response?.isConfigured);
     state.engine = response?.engine || state.engine;
     if (state.codexConnected) {
         state.codexLoginError = "";
     } else if (response?.codex?.error) {
         state.codexLoginError = response.codex.error;
+    }
+    if (!state.userSelectedTab) {
+        state.activeTab = defaultActiveTab();
     }
     render();
 }
@@ -2184,6 +2239,7 @@ async function openCompanionApp() {
 
 async function handleTabSelection(kind) {
     state.activeTab = kind;
+    state.userSelectedTab = true;
     render();
 
     if (kind === "timestamps") {
@@ -2194,7 +2250,7 @@ async function handleTabSelection(kind) {
 }
 
 async function maybeGenerateTimestamps() {
-    if (!state.isConfigured || state.timestampsText) {
+    if (!canGenerateTimestamps() || state.timestampsText) {
         return;
     }
 
@@ -2202,7 +2258,7 @@ async function maybeGenerateTimestamps() {
 }
 
 async function maybeGenerateSummary() {
-    if (!state.isConfigured || state.summaryText) {
+    if (!canGenerateSummary() || state.summaryText) {
         return;
     }
 
@@ -2215,18 +2271,25 @@ async function maybeAutogenerateAnalysis() {
         || !panelHost
         || !panelHost.isConnected
         || document.hidden
-        || !state.isConfigured
         || state.didAutogenerateAnalysis
         || (state.timestampsText && state.summaryText)
     ) {
         return;
     }
 
+    const requests = [];
+    if (canGenerateTimestamps() && !state.timestampsText) {
+        requests.push(requestGeneration("timestamps"));
+    }
+    if (canGenerateSummary() && !state.summaryText) {
+        requests.push(requestGeneration("summary"));
+    }
+    if (requests.length === 0) {
+        return;
+    }
+
     state.didAutogenerateAnalysis = true;
-    await Promise.all([
-        requestGeneration("timestamps"),
-        requestGeneration("summary"),
-    ]);
+    await Promise.all(requests);
 }
 
 async function waitForPendingGenerationJob(videoKey, kind, generationID) {
