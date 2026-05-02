@@ -15,7 +15,7 @@ Under the hood, the extension keeps transcript timing deterministic, validates g
 
 Download the signed and notarized macOS app:
 
-[Download Timestamps & Summaries for YT v1.0.3](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/download/v1.0.3/Timestamps-and-Summaries-for-YT-v1.0.3.zip)
+[Download Timestamps & Summaries for YT](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip)
 
 After unzipping, move the app to `Applications`, open it and enable the Safari extension.
 
