@@ -13,6 +13,7 @@ const {
 const SIDEBAR_HOST_ID = "youtube-timestamps-sidebar-root";
 const SIDEBAR_HOST_IDS = [SIDEBAR_HOST_ID];
 const COMPANION_APP_URL = "youtube-timestamps-summaries://open";
+const EXTENSION_ENABLED_STORAGE_KEY = "extensionEnabled";
 
 // Keep this script scoped to watch/live pages in manifest.json. Running the
 // sidebar script on Shorts or other YouTube surfaces can disturb YouTube's own
@@ -32,6 +33,7 @@ if (!supportedPath) {
 let panelHost = null;
 let currentVideoKey = null;
 let lastObservedURL = window.location.href;
+let extensionEnabled = true;
 const DEBUG_LINE_LIMIT = 80;
 const MIN_GENERATION_TIMEOUT_MS = 6 * 60 * 1000;
 const MAX_GENERATION_TIMEOUT_MS = 20 * 60 * 1000;
@@ -164,6 +166,37 @@ function debugSummary(kind) {
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function loadExtensionEnabled() {
+    try {
+        const result = await browser.storage.local.get({ [EXTENSION_ENABLED_STORAGE_KEY]: true });
+        return result[EXTENSION_ENABLED_STORAGE_KEY] !== false;
+    } catch (_) {
+        return true;
+    }
+}
+
+function listenForExtensionEnabledChanges() {
+    try {
+        browser.storage.onChanged.addListener((changes, areaName) => {
+            if (areaName !== "local" || !(EXTENSION_ENABLED_STORAGE_KEY in changes)) {
+                return;
+            }
+
+            extensionEnabled = changes[EXTENSION_ENABLED_STORAGE_KEY].newValue !== false;
+            if (!extensionEnabled) {
+                cleanupNonWatchPage();
+                return;
+            }
+
+            if (isWatchPage()) {
+                window.location.reload();
+            }
+        });
+    } catch (_) {
+        // If storage events are unavailable, the setting still applies on the next page load.
+    }
 }
 
 function generationTimeoutForTranscript(transcriptText) {
@@ -2741,6 +2774,11 @@ async function buildPanel() {
 }
 
 async function ensurePanel() {
+    if (!extensionEnabled) {
+        cleanupNonWatchPage();
+        return;
+    }
+
     if (!isWatchPage()) {
         cleanupNonWatchPage();
         return;
@@ -2844,6 +2882,12 @@ async function init() {
         return;
     }
 
+    extensionEnabled = await loadExtensionEnabled();
+    if (!extensionEnabled) {
+        cleanupNonWatchPage();
+        return;
+    }
+
     state.ready = true;
     lastObservedURL = window.location.href;
 
@@ -2865,5 +2909,6 @@ async function init() {
     }
 }
 
+listenForExtensionEnabledChanges();
 init();
 })();

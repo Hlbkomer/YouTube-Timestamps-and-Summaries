@@ -6,6 +6,7 @@
 //
 
 import SafariServices
+import AppKit
 import os.log
 
 final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
@@ -115,15 +116,54 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
     }
 
     private func openContainerApp(from context: NSExtensionContext) async -> [String: Any] {
-        // Do not use NSWorkspace from the extension sandbox. It can fail with
-        // "(null) does not have permission to open (null)". Opening the app's
-        // registered URL scheme through the extension context keeps the handoff
-        // inside the host-approved extension API.
-        await withCheckedContinuation { continuation in
+        // Toolbar popups should not navigate Safari to the custom URL scheme.
+        // Open the containing app bundle directly from the native extension,
+        // matching the pattern used by several macOS Safari companion apps.
+        if let appURL = containingAppURL() {
+            let result = await openApplication(at: appURL)
+            if (result["ok"] as? Bool) == true {
+                return result
+            }
+        }
+
+        if NSWorkspace.shared.open(companionAppURL) {
+            return [
+                "ok": true,
+                "error": ""
+            ]
+        }
+
+        return await withCheckedContinuation { continuation in
             context.open(companionAppURL) { success in
                 continuation.resume(returning: [
                     "ok": success,
                     "error": success ? "" : "The companion app could not be opened from Safari."
+                ])
+            }
+        }
+    }
+
+    private func containingAppURL() -> URL? {
+        let appexURL = Bundle.main.bundleURL
+        guard appexURL.pathExtension == "appex" else {
+            return NSWorkspace.shared.urlForApplication(withBundleIdentifier: "Matuko.YouTube-Timestamps-and-Summaries")
+        }
+
+        let contentsURL = appexURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return contentsURL.deletingLastPathComponent()
+    }
+
+    private func openApplication(at appURL: URL) async -> [String: Any] {
+        await withCheckedContinuation { continuation in
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+
+            NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { application, error in
+                continuation.resume(returning: [
+                    "ok": application != nil && error == nil,
+                    "error": error?.localizedDescription ?? ""
                 ])
             }
         }

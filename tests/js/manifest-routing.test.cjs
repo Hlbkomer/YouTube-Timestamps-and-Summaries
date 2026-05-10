@@ -46,3 +46,9 @@ test("route guard handles broad YouTube navigation without touching video pages"
     ]);
     assert.equal(entry.run_at, "document_start");
 });
+
+test("toolbar action exposes popup controls for settings and temporary sidebar disable", () => {
+    assert.equal(manifest.action.default_popup, "popup.html");
+    assert.ok(manifest.permissions.includes("storage"), "popup toggle needs extension storage");
+    assert.ok(manifest.permissions.includes("nativeMessaging"), "settings action opens the companion app through the native bridge");
+});

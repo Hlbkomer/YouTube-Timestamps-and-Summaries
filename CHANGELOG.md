@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.4 - 2026-05-10
+
+- Refresh the app and extension icon set to replace the previous YouTube-derived branding with original artwork.
+- Add a Safari extension toolbar popup with an Extension enabled toggle for temporarily hiding the sidebar.
+- Add a Settings shortcut in the toolbar popup that opens the companion app through the native Safari bridge.
+- Add regression coverage for the toolbar popup manifest wiring and permissions.
+
 ## v1.0.3 - 2026-05-02
 
 - Allow Apple Intelligence summaries to work without ChatGPT sign-in, defaulting the sidebar to Summary and gating only Timestamps behind ChatGPT.
