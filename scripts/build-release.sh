@@ -81,7 +81,7 @@ find_exported_app() {
 zip_app() {
     local app_path="$1"
     rm -f "$ZIP_PATH"
-    ditto -c -k --keepParent "$app_path" "$ZIP_PATH"
+    ditto -c -k --norsrc --noextattr --keepParent "$app_path" "$ZIP_PATH"
 }
 
 main() {
