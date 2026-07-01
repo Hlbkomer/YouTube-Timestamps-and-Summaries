@@ -43,9 +43,37 @@ const GENERATION_TIMEOUT_EXTRA_MS_PER_BLOCK = 45 * 1000;
 const PENDING_GENERATION_START_GRACE_MS = 30000;
 const TRANSCRIPT_CACHE_LIMIT = 5;
 const TRANSCRIPT_TRACK_WAIT_ATTEMPTS = 16;
-// Flip this to true when comparing provider/model speed during local testing.
-// Keep it false for release builds so the sidebar matches the clean YouTube UI.
-const SHOW_GENERATION_TIMING_IN_TABS = false;
+// Show successful generation time in the small result caption instead of the tab title.
+const SHOW_GENERATION_TIMING_IN_RESULT_CAPTIONS = true;
+const NATIVE_TRANSCRIPT_PANEL_SELECTORS = [
+    'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]',
+    'ytd-engagement-panel-section-list-renderer[target-id="PAmodern_transcript_view"]',
+    'ytd-engagement-panel-section-list-renderer[target-id*="transcript" i]',
+    'ytd-engagement-panel-section-list-renderer[target-id*="transkript" i]',
+    'ytd-engagement-panel-section-list-renderer[visibility$="EXPANDED"]',
+    "ytd-transcript-renderer",
+    "ytd-transcript-search-panel-renderer",
+    "ytd-transcript-segment-list-renderer",
+    "#segments-container",
+];
+const NATIVE_TRANSCRIPT_OPEN_BUTTON_SELECTORS = [
+    "ytd-video-description-transcript-section-renderer button",
+    "ytd-video-description-transcript-section-renderer [role='button']",
+    "ytd-video-description-transcript-section-renderer .yt-spec-button-shape-next",
+    "ytd-video-description-transcript-section-renderer button-view-model",
+    "ytd-video-description-transcript-section-renderer yt-button-view-model",
+    "ytd-video-description-transcript-section-renderer a",
+    "button[aria-label*='transcript' i]",
+    "[role='button'][aria-label*='transcript' i]",
+    "button[title*='transcript' i]",
+];
+const DESCRIPTION_EXPAND_BUTTON_SELECTORS = [
+    "ytd-watch-metadata ytd-text-inline-expander tp-yt-paper-button#expand",
+    "ytd-watch-metadata tp-yt-paper-button#expand",
+    "ytd-watch-metadata #description tp-yt-paper-button#expand",
+    "ytd-watch-metadata #description button[aria-label*='more' i]",
+    "ytd-watch-metadata #description [role='button'][aria-label*='more' i]",
+];
 const transcriptCache = new Map();
 const timedTextTrackCache = new Map();
 const innertubePlayerTrackCache = new Map();
@@ -67,6 +95,8 @@ let state = {
     engine: "",
     appleIntelligenceAvailable: false,
     codexConnected: false,
+    selectedProviderConnected: false,
+    providerError: "",
     timestampsAvailable: false,
     summaryAvailable: false,
     codexLoginError: "",
@@ -98,6 +128,10 @@ let state = {
     generationDurationsMs: {
         timestamps: 0,
         summary: 0,
+    },
+    generationEngineLabels: {
+        timestamps: "",
+        summary: "",
     },
     copyFeedback: {
         timestamps: false,
@@ -154,7 +188,6 @@ function mergeDebugLines(kind, messageBlock) {
 
 function debugSummary(kind) {
     const lines = [];
-
     lines.push(`engine: ${kind === "summary" ? summaryEngineLabel() : modelLabel()}`);
 
     if (state.debug[kind]) {
@@ -212,15 +245,31 @@ function modelLabel() {
     return state.settings.modelLabel || state.settings.modelID || "selected model";
 }
 
+function providerLabel() {
+    return state.settings.providerLabel || "selected provider";
+}
+
 function summaryEngineLabel() {
-    return state.settings.summaryEngineLabel
+    return state.settings.summaryModelLabel
+        || state.settings.summaryEngineLabel
         || (state.settings.summaryEngine === "selectedModel" ? modelLabel() : "Apple Intelligence");
+}
+
+function currentResultEngineLabel(kind) {
+    if (isTimestampTab(kind)) {
+        return modelLabel();
+    }
+
+    return state.settings.summaryEngine === "appleIntelligence"
+        ? "Apple Intelligence"
+        : summaryEngineLabel();
 }
 
 function currentGenerationStatus() {
     return {
         appleIntelligenceAvailable: state.appleIntelligenceAvailable,
         codexConnected: state.codexConnected,
+        selectedProviderConnected: state.selectedProviderConnected,
         timestampsAvailable: state.timestampsAvailable,
         summaryAvailable: state.summaryAvailable,
         summaryEngine: state.settings.summaryEngine,
@@ -235,6 +284,10 @@ function canGenerateSummary() {
     return canGenerateSummaryFromStatus(currentGenerationStatus());
 }
 
+function canStartGeneration(kind) {
+    return state.isConfigured;
+}
+
 function defaultActiveTab() {
     return defaultGenerationTab(currentGenerationStatus());
 }
@@ -244,12 +297,14 @@ function generationKindForTab(kind, usesSelectedProvider) {
         return kind === "summary" ? "summaryFull" : "timestamps";
     }
 
-    return kind === "summary" ? "codexSummary" : "codexTimestamps";
+    return kind === "summary" ? "selectedProviderSummary" : "selectedProviderTimestamps";
 }
 
 function generationResultCacheKey(videoKey, kind) {
     const providerID = state.settings.providerID || "provider";
-    const modelID = state.settings.modelID || "model";
+    const modelID = kind === "summary"
+        ? state.settings.summaryModelID || state.settings.modelID || "model"
+        : state.settings.modelID || "model";
     const summaryEngine = kind === "summary"
         ? state.settings.summaryEngine || "selectedModel"
         : "timestamps";
@@ -268,9 +323,49 @@ function pendingGenerationCacheKey(videoKey, kind) {
     return `${generationResultCacheKey(videoKey, kind)}:pending`;
 }
 
-function cachedGenerationText(videoKey, kind) {
+function normalizeCachedGenerationResult(value) {
+    if (!value) {
+        return null;
+    }
+
+    if (typeof value === "object") {
+        const text = String(value.text || "").trim();
+        if (!text) {
+            return null;
+        }
+
+        return {
+            text,
+            engineLabel: String(value.engineLabel || "").trim(),
+            durationMs: Math.max(0, Number(value.durationMs || 0)),
+        };
+    }
+
+    const rawText = String(value || "").trim();
+    if (!rawText) {
+        return null;
+    }
+
+    try {
+        const parsed = JSON.parse(rawText);
+        const parsedResult = normalizeCachedGenerationResult(parsed);
+        if (parsedResult) {
+            return parsedResult;
+        }
+    } catch (_) {
+        // Older session entries stored the generated text directly.
+    }
+
+    return {
+        text: rawText,
+        engineLabel: "",
+        durationMs: 0,
+    };
+}
+
+function cachedGenerationResult(videoKey, kind) {
     const key = generationResultCacheKey(videoKey, kind);
-    const inMemory = generationResultCache.get(key);
+    const inMemory = normalizeCachedGenerationResult(generationResultCache.get(key));
     if (inMemory) {
         return inMemory;
     }
@@ -278,25 +373,38 @@ function cachedGenerationText(videoKey, kind) {
     try {
         const stored = window.sessionStorage?.getItem(key) || "";
         if (stored) {
-            generationResultCache.set(key, stored);
+            const storedResult = normalizeCachedGenerationResult(stored);
+            if (storedResult) {
+                generationResultCache.set(key, storedResult);
+                return storedResult;
+            }
         }
-        return stored;
     } catch (_) {
-        return "";
+        return null;
     }
+
+    return null;
 }
 
-function rememberGeneratedText(videoKey, kind, text) {
+function rememberGeneratedText(videoKey, kind, text, metadata = {}) {
     const generatedText = String(text || "").trim();
     if (!videoKey || !generatedText) {
         return;
     }
 
     const key = generationResultCacheKey(videoKey, kind);
-    generationResultCache.set(key, generatedText);
+    const result = {
+        text: generatedText,
+        engineLabel: String(metadata.engineLabel || "").trim(),
+        durationMs: Math.max(0, Number(metadata.durationMs || 0)),
+    };
+    generationResultCache.set(key, result);
 
     try {
-        window.sessionStorage?.setItem(key, generatedText);
+        window.sessionStorage?.setItem(key, JSON.stringify({
+            version: 1,
+            ...result,
+        }));
     } catch (_) {
         // Session storage can be unavailable in some Safari contexts. The
         // in-memory cache still protects this content-script instance.
@@ -382,15 +490,29 @@ function clearPendingGeneration(videoKey, kind, jobId = "") {
 
 function formatGenerationDuration(durationMs) {
     const seconds = Math.max(1, Math.round(Number(durationMs || 0) / 1000));
-    return `${seconds} s`;
+    return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
 }
 
 function rememberGenerationDuration(kind, startedAt) {
-    if (!SHOW_GENERATION_TIMING_IN_TABS || !startedAt) {
+    if (!SHOW_GENERATION_TIMING_IN_RESULT_CAPTIONS || !startedAt) {
         return;
     }
 
     state.generationDurationsMs[kind] = Math.max(0, Date.now() - startedAt);
+}
+
+function rememberGenerationEngineLabel(kind, engineLabel) {
+    const label = String(engineLabel || "").trim();
+    state.generationEngineLabels[kind] = label || currentResultEngineLabel(kind);
+}
+
+function responseEngineLabel(kind, response) {
+    return String(
+        response?.engineLabel
+        || response?.debug?.engineLabel
+        || response?.debug?.native?.engineLabel
+        || ""
+    ).trim() || currentResultEngineLabel(kind);
 }
 
 function generationStepDescription(kind, usesSelectedProvider) {
@@ -1163,7 +1285,10 @@ async function fetchTranscript(track) {
     for (const url of transcriptURLCandidates(track.baseUrl)) {
         const response = await fetch(url, { credentials: "include" });
         if (!response.ok) {
-            lastError = `Transcript request failed with ${response.status}.`;
+            const body = await response.text().catch(() => "");
+            lastError = body
+                ? `Transcript request failed with ${response.status} (${describeTranscriptBody(body, response.headers.get("content-type") || "")}).`
+                : `Transcript request failed with ${response.status}.`;
             continue;
         }
 
@@ -1191,6 +1316,319 @@ async function fetchTranscript(track) {
     throw new Error(lastError || "Caption track returned no transcript lines.");
 }
 
+function uniqueElements(elements) {
+    return Array.from(new Set(elements.filter(Boolean)));
+}
+
+function querySelectorAllSafe(root, selector) {
+    try {
+        return Array.from(root.querySelectorAll(selector));
+    } catch (_) {
+        return [];
+    }
+}
+
+function isVisibleElement(element) {
+    if (!element?.isConnected) {
+        return false;
+    }
+
+    const style = window.getComputedStyle?.(element);
+    if (style && (style.display === "none" || style.visibility === "hidden" || style.opacity === "0")) {
+        return false;
+    }
+
+    const rect = element.getBoundingClientRect?.();
+    return !rect || (rect.width > 0 && rect.height > 0);
+}
+
+function visibleText(element) {
+    return normalizeTranscriptText(`${element?.innerText || ""} ${element?.textContent || ""} ${element?.getAttribute?.("aria-label") || ""} ${element?.getAttribute?.("title") || ""}`);
+}
+
+function transcriptTimeMatch(value) {
+    return String(value || "").match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/);
+}
+
+function transcriptEntry(timeText, text) {
+    const match = transcriptTimeMatch(timeText);
+    const line = normalizeTranscriptText(text);
+    if (!match || !line) {
+        return null;
+    }
+
+    return {
+        startSeconds: parseTranscriptTimeString(match[0]),
+        text: line,
+    };
+}
+
+function transcriptFromEntries(entries, label) {
+    const seen = new Set();
+    const lines = entries
+        .filter(Boolean)
+        .sort((first, second) => first.startSeconds - second.startSeconds)
+        .map((entry) => {
+            const key = `${entry.startSeconds}:${entry.text}`;
+            if (seen.has(key)) {
+                return "";
+            }
+            seen.add(key);
+            return `[${formatTranscriptTime(entry.startSeconds)}] ${entry.text}`;
+        })
+        .filter(Boolean);
+
+    if (lines.length === 0) {
+        return null;
+    }
+
+    return {
+        text: lines.join("\n"),
+        lineCount: lines.length,
+        label,
+        languageLabel: label,
+    };
+}
+
+function parseNativeTranscriptSegmentNode(node) {
+    const timestampNode = node.querySelector(".segment-timestamp, #segment-start-offset, yt-formatted-string.segment-timestamp");
+    const textNode = node.querySelector(".segment-text, #segment-text, yt-formatted-string.segment-text");
+    const timestampText = normalizeTranscriptText(timestampNode?.textContent || "");
+    let transcriptText = normalizeTranscriptText(textNode?.textContent || "");
+
+    if (!transcriptText) {
+        const fullText = normalizeTranscriptText(node.textContent || "");
+        const match = transcriptTimeMatch(fullText);
+        if (match) {
+            transcriptText = normalizeTranscriptText(fullText.replace(match[0], ""));
+        }
+    }
+
+    return transcriptEntry(timestampText || node.textContent, transcriptText);
+}
+
+function parseNativeTranscriptAlignedSegments(root) {
+    const textNodes = querySelectorAllSafe(root, ".segment-text, #segment-text, yt-formatted-string.segment-text");
+    const timestampNodes = querySelectorAllSafe(root, ".segment-timestamp, #segment-start-offset, yt-formatted-string.segment-timestamp");
+
+    return textNodes
+        .map((textNode, index) => transcriptEntry(timestampNodes[index]?.textContent || "", textNode.textContent || ""))
+        .filter(Boolean);
+}
+
+function parseNativeTranscriptAttributedStrings(root) {
+    const nodes = querySelectorAllSafe(root, "span.yt-core-attributed-string, yt-formatted-string")
+        .map((node) => normalizeTranscriptText(node.textContent || ""))
+        .filter(Boolean);
+    const entries = [];
+
+    for (let index = 0; index < nodes.length; index += 1) {
+        const current = nodes[index];
+        const currentTime = transcriptTimeMatch(current);
+        if (currentTime) {
+            const inlineText = normalizeTranscriptText(current.replace(currentTime[0], ""));
+            const nextText = normalizeTranscriptText(nodes[index + 1] || "");
+            const text = inlineText || (!transcriptTimeMatch(nextText) ? nextText : "");
+            const entry = transcriptEntry(currentTime[0], text);
+            if (entry) {
+                entries.push(entry);
+                if (!inlineText && text === nextText) {
+                    index += 1;
+                }
+            }
+            continue;
+        }
+
+        const nextTime = transcriptTimeMatch(nodes[index + 1] || "");
+        if (nextTime) {
+            const entry = transcriptEntry(nextTime[0], current);
+            if (entry) {
+                entries.push(entry);
+                index += 1;
+            }
+        }
+    }
+
+    return entries;
+}
+
+function parseNativeTranscriptTextBlock(root) {
+    const lines = String(root.innerText || root.textContent || "")
+        .split(/\r?\n/)
+        .map(normalizeTranscriptText)
+        .filter(Boolean);
+    const entries = [];
+
+    for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
+        const inlineMatch = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)$/);
+        if (inlineMatch) {
+            entries.push(transcriptEntry(inlineMatch[1], inlineMatch[2]));
+            continue;
+        }
+
+        if (!/^\d{1,2}:\d{2}(?::\d{2})?$/.test(line)) {
+            continue;
+        }
+
+        const nextLine = lines[index + 1] || "";
+        if (nextLine && !transcriptTimeMatch(nextLine)) {
+            entries.push(transcriptEntry(line, nextLine));
+            index += 1;
+        }
+    }
+
+    return entries.filter(Boolean);
+}
+
+function nativeTranscriptRoots() {
+    const roots = [];
+    for (const selector of NATIVE_TRANSCRIPT_PANEL_SELECTORS) {
+        roots.push(...querySelectorAllSafe(document, selector));
+    }
+
+    for (const segment of querySelectorAllSafe(document, "ytd-transcript-segment-renderer, .segment-text, #segment-text, span.yt-core-attributed-string")) {
+        let closestRoot = null;
+        try {
+            closestRoot = segment.closest(NATIVE_TRANSCRIPT_PANEL_SELECTORS.join(","));
+        } catch (_) {
+            closestRoot = null;
+        }
+        roots.push(closestRoot || segment.parentElement);
+    }
+
+    return uniqueElements(roots).filter((root) => (
+        isVisibleElement(root)
+        || querySelectorAllSafe(root, "ytd-transcript-segment-renderer, .segment-text, #segment-text, span.yt-core-attributed-string").length > 0
+        || transcriptTimeMatch(root.textContent || "")
+    ));
+}
+
+function nativeTranscriptDOMSummary() {
+    const roots = nativeTranscriptRoots();
+    const countInRoots = (selector) => roots
+        .reduce((count, root) => count + querySelectorAllSafe(root, selector).length, 0);
+    const timeMatches = roots
+        .reduce((count, root) => count + ((root.textContent || "").match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g) || []).length, 0);
+
+    return [
+        `roots=${roots.length}`,
+        `segments=${countInRoots("ytd-transcript-segment-renderer")}`,
+        `textNodes=${countInRoots(".segment-text, #segment-text, span.yt-core-attributed-string, yt-formatted-string")}`,
+        `timestampNodes=${countInRoots(".segment-timestamp, #segment-start-offset, yt-formatted-string.segment-timestamp")}`,
+        `timeMatches=${timeMatches}`,
+    ].join(", ");
+}
+
+function readNativeTranscriptPanel() {
+    const entries = [];
+    for (const root of nativeTranscriptRoots()) {
+        entries.push(...querySelectorAllSafe(root, "ytd-transcript-segment-renderer")
+            .map(parseNativeTranscriptSegmentNode));
+        entries.push(...parseNativeTranscriptAlignedSegments(root));
+        entries.push(...parseNativeTranscriptAttributedStrings(root));
+        entries.push(...parseNativeTranscriptTextBlock(root));
+    }
+
+    return transcriptFromEntries(entries, "YouTube transcript panel");
+}
+
+function actionableTranscriptButton(element) {
+    if (!element) {
+        return null;
+    }
+
+    if (element.matches?.("button, a, [role='button']")) {
+        return element;
+    }
+
+    return querySelectorAllSafe(element, "button, a, [role='button'], .yt-spec-button-shape-next, button-view-model, yt-button-view-model")
+        .find(isVisibleElement)
+        || element;
+}
+
+function nativeTranscriptOpenButtons() {
+    const selectorCandidates = NATIVE_TRANSCRIPT_OPEN_BUTTON_SELECTORS
+        .flatMap((selector) => querySelectorAllSafe(document, selector))
+        .map(actionableTranscriptButton);
+    const textCandidates = querySelectorAllSafe(document, "button, [role='button'], tp-yt-paper-button")
+        .filter((element) => {
+            const text = visibleText(element);
+            return /(transcript|transkript|transkrip|prepis|přepis)/i.test(text);
+        });
+
+    return uniqueElements([...selectorCandidates, ...textCandidates]).filter(isVisibleElement);
+}
+
+function descriptionExpandButtons() {
+    const selectorCandidates = DESCRIPTION_EXPAND_BUTTON_SELECTORS
+        .flatMap((selector) => querySelectorAllSafe(document, selector));
+    const textCandidates = querySelectorAllSafe(document, "ytd-watch-metadata button, ytd-watch-metadata [role='button'], ytd-watch-metadata tp-yt-paper-button")
+        .filter((element) => {
+            const text = visibleText(element);
+            return /\b(show more|more|viac|zobraziť viac|zobrazit vice|mehr|más|plus)\b/i.test(text);
+        });
+
+    return uniqueElements([...selectorCandidates, ...textCandidates]).filter(isVisibleElement);
+}
+
+async function openNativeTranscriptPanel(kind) {
+    let buttons = nativeTranscriptOpenButtons();
+    if (buttons.length === 0) {
+        const expanders = descriptionExpandButtons();
+        if (expanders.length > 0) {
+            logDebug(kind, "transcript: expanding YouTube description");
+            expanders[0].click();
+            await sleep(500);
+            buttons = nativeTranscriptOpenButtons();
+        }
+    }
+
+    if (buttons.length === 0) {
+        logDebug(kind, "transcript: native transcript button not found");
+        return false;
+    }
+
+    const button = actionableTranscriptButton(buttons[0]);
+    const label = visibleText(button).slice(0, 80) || button?.tagName?.toLowerCase() || "button";
+    logDebug(kind, `transcript: opening YouTube transcript panel (${label})`);
+    button?.click();
+    return true;
+}
+
+async function readNativeTranscriptPanelWithWait(videoKey, kind, label) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+        const transcript = readNativeTranscriptPanel();
+        if (transcript) {
+            rememberTranscript(videoKey, transcript);
+            logDebug(kind, `transcript: ${label} (${transcript.lineCount} lines)`);
+            return transcript;
+        }
+        await sleep(500);
+    }
+
+    return null;
+}
+
+async function tryNativeTranscriptPanel(videoKey, kind) {
+    const existingTranscript = readNativeTranscriptPanel();
+    if (existingTranscript) {
+        rememberTranscript(videoKey, existingTranscript);
+        logDebug(kind, `transcript: using visible YouTube transcript panel (${existingTranscript.lineCount} lines)`);
+        return existingTranscript;
+    }
+
+    if (await openNativeTranscriptPanel(kind)) {
+        const openedTranscript = await readNativeTranscriptPanelWithWait(videoKey, kind, "ready from YouTube transcript panel");
+        if (openedTranscript) {
+            return openedTranscript;
+        }
+        logDebug(kind, `transcript: native transcript panel opened but no lines were readable (${nativeTranscriptDOMSummary()})`);
+    }
+
+    return null;
+}
+
 function rememberTranscript(videoKey, transcript) {
     if (!videoKey || !transcript?.text) {
         return;
@@ -1205,7 +1643,7 @@ function rememberTranscript(videoKey, transcript) {
     }
 }
 
-function applyGenerationText(kind, text) {
+function applyGenerationText(kind, text, metadata = {}) {
     const generatedText = String(text || "").trim();
     if (!generatedText) {
         return false;
@@ -1214,6 +1652,12 @@ function applyGenerationText(kind, text) {
     if (kind === "summary") {
         state.summaryText = generatedText;
         state.errors.summary = "";
+        if (metadata.engineLabel) {
+            rememberGenerationEngineLabel(kind, metadata.engineLabel);
+        }
+        if (metadata.durationMs > 0) {
+            state.generationDurationsMs[kind] = Math.max(0, Number(metadata.durationMs || 0));
+        }
         return true;
     }
 
@@ -1223,16 +1667,22 @@ function applyGenerationText(kind, text) {
 
     state.timestampsText = generatedText;
     state.errors.timestamps = "";
+    if (metadata.engineLabel) {
+        rememberGenerationEngineLabel(kind, metadata.engineLabel);
+    }
+    if (metadata.durationMs > 0) {
+        state.generationDurationsMs[kind] = Math.max(0, Number(metadata.durationMs || 0));
+    }
     return true;
 }
 
 function restoreCachedGenerationText(videoKey, kind) {
-    const cachedText = cachedGenerationText(videoKey, kind);
-    if (!cachedText || activeText(kind)) {
+    const cachedResult = cachedGenerationResult(videoKey, kind);
+    if (!cachedResult?.text || activeText(kind)) {
         return false;
     }
 
-    return applyGenerationText(kind, cachedText);
+    return applyGenerationText(kind, cachedResult.text, cachedResult);
 }
 
 async function tryTranscriptTracks(videoKey, kind, source, tracks) {
@@ -1252,7 +1702,7 @@ async function tryTranscriptTracks(videoKey, kind, source, tracks) {
             };
         } catch (error) {
             lastError = error?.message || String(error);
-            logDebug(kind, `transcript: track failed (${trackLabel(track)})`);
+            logDebug(kind, `transcript: track failed (${trackLabel(track)}: ${lastError})`);
         }
     }
 
@@ -1306,6 +1756,11 @@ async function getTranscript(videoKey, kind) {
                 logDebug(kind, `transcript: panel fallback failed (${lastError})`);
             }
 
+            const nativePanelTranscript = await tryNativeTranscriptPanel(videoKey, kind);
+            if (nativePanelTranscript) {
+                return nativePanelTranscript;
+            }
+
             try {
                 const timedTextTracks = await fetchTimedTextTracks(videoKey);
                 const timedTextResult = await tryTranscriptTracks(videoKey, kind, "timed text", timedTextTracks);
@@ -1353,12 +1808,17 @@ async function getTranscript(videoKey, kind) {
         logDebug(kind, `transcript: panel fallback failed (${error?.message || String(error)})`);
     }
 
+    const nativePanelTranscript = await tryNativeTranscriptPanel(videoKey, kind);
+    if (nativePanelTranscript) {
+        return nativePanelTranscript;
+    }
+
     logDebug(kind, "transcript: unavailable");
     return null;
 }
 
 function unavailableMessage(kind) {
-    return kind === "timestamps"
+    return isTimestampTab(kind)
         ? "Timestamps could not be generated. If the video is still live, wait for it to finish and then try again."
         : "Summary could not be generated.";
 }
@@ -1467,6 +1927,10 @@ function resetPanelState() {
         timestamps: 0,
         summary: 0,
     };
+    state.generationEngineLabels = {
+        timestamps: "",
+        summary: "",
+    };
     state.copyFeedback = {
         timestamps: false,
         summary: false,
@@ -1496,18 +1960,16 @@ function escapeHTML(value) {
         .replaceAll('"', "&quot;");
 }
 
+function isTimestampTab(kind) {
+    return kind === "timestamps";
+}
+
 function buttonLabel(kind) {
     if (state.isLoading[kind]) {
         return kind === "timestamps" ? "Timestamps..." : "Summary...";
     }
 
-    const baseLabel = kind === "timestamps" ? "Timestamps" : "Summary";
-    const durationMs = state.generationDurationsMs[kind];
-    if (SHOW_GENERATION_TIMING_IN_TABS && durationMs > 0) {
-        return `${baseLabel} (${formatGenerationDuration(durationMs)})`;
-    }
-
-    return baseLabel;
+    return kind === "timestamps" ? "Timestamps" : "Summary";
 }
 
 function activeText(kind) {
@@ -1519,7 +1981,7 @@ function activeError(kind) {
 }
 
 function copiedAttribution(kind) {
-    return kind === "timestamps"
+    return isTimestampTab(kind)
         ? "Timestamps created with Timestamps & Summaries for YT, a free Safari extension."
         : "Summary created with Timestamps & Summaries for YT, a free Safari extension.";
 }
@@ -1530,7 +1992,7 @@ function copyText(kind) {
         return "";
     }
 
-    return `${copiedAttribution(kind)}\n\n${text}`;
+    return `${text}\n\n${copiedAttribution(kind)}`;
 }
 
 function hasCopyText(kind) {
@@ -1539,10 +2001,10 @@ function hasCopyText(kind) {
 
 function copyButtonLabel(kind) {
     if (state.copyFeedback[kind]) {
-        return kind === "timestamps" ? "Copied timestamps" : "Copied summary";
+        return isTimestampTab(kind) ? "Copied timestamps" : "Copied summary";
     }
 
-    return kind === "timestamps" ? "Copy timestamps" : "Copy summary";
+    return isTimestampTab(kind) ? "Copy timestamps" : "Copy summary";
 }
 
 function copyIcon() {
@@ -1552,6 +2014,16 @@ function copyIcon() {
             <path d="M4.5 10A2.5 2.5 0 0 1 7 7.5v2A.5.5 0 0 0 6.5 10v6.5a.5.5 0 0 0 .5.5h6.5a.5.5 0 0 0 .5-.5h2A2.5 2.5 0 0 1 13.5 19H7a2.5 2.5 0 0 1-2.5-2.5V10Z"></path>
         </svg>
     `;
+}
+
+function resultCaption(kind) {
+    const durationMs = state.generationDurationsMs[kind];
+    const durationSuffix = SHOW_GENERATION_TIMING_IN_RESULT_CAPTIONS && durationMs > 0
+        ? ` in ${formatGenerationDuration(durationMs)}`
+        : "";
+    const engineLabel = state.generationEngineLabels[kind] || currentResultEngineLabel(kind);
+
+    return `Generated with ${engineLabel}${durationSuffix}.`;
 }
 
 async function writeToClipboard(text) {
@@ -1619,29 +2091,29 @@ function renderConnectionState(message) {
     `;
 }
 
-function renderCodexConnectionState() {
+function renderProviderConnectionState() {
     return `
         <div class="surface state-surface">
-            <div class="state-copy">Connect ChatGPT in the companion app to generate timestamps.</div>
+            <div class="state-copy">Connect ${escapeHTML(providerLabel())} in the companion app to generate timestamps.</div>
             <button class="soft-button" data-open-app>Open Companion App</button>
-            ${state.codexLoginError ? `<div class="error-copy">${escapeHTML(state.codexLoginError)}</div>` : ""}
+            ${state.providerError ? `<div class="error-copy">${escapeHTML(state.providerError)}</div>` : ""}
         </div>
     `;
 }
 
 function renderSummaryUnavailableState() {
     if (state.appleIntelligenceAvailable) {
-        return renderConnectionState("Connect ChatGPT in the companion app to generate summaries with the selected model.");
+        return renderConnectionState(`Connect ${providerLabel()} in the companion app to generate summaries with the selected model.`);
     }
 
-    return renderConnectionState("Apple Intelligence is not available on this Mac. Connect ChatGPT in the companion app to generate summaries.");
+    return renderConnectionState(`Apple Intelligence is not available on this Mac. Connect ${providerLabel()} in the companion app to generate summaries.`);
 }
 
 function renderLoadingState(kind) {
     const debug = debugSummary(kind);
     return `
         <div class="surface state-surface">
-            <div class="state-copy">${kind === "timestamps" ? "Generating timestamps..." : "Generating summary..."}</div>
+            <div class="state-copy">${isTimestampTab(kind) ? "Generating timestamps..." : "Generating summary..."}</div>
             ${debug ? `<pre class="debug-copy">${escapeHTML(debug)}</pre>` : ""}
         </div>
     `;
@@ -1651,7 +2123,7 @@ function renderEmptyState(kind) {
     return `
         <div class="surface state-surface">
             <div class="state-copy">${
-                kind === "timestamps"
+                isTimestampTab(kind)
                     ? "Timestamps will appear here automatically."
                     : "Summary will appear here automatically."
             }</div>
@@ -1682,24 +2154,26 @@ function renderErrorState(kind, message) {
     `;
 }
 
-function renderTimestampsResult() {
-    if (state.isLoading.timestamps && !state.timestampsText) {
-        return renderLoadingState("timestamps");
+function renderTimestampsResult(kind = "timestamps") {
+    const text = activeText(kind);
+    if (state.isLoading[kind] && !text) {
+        return renderLoadingState(kind);
     }
 
-    if (state.errors.timestamps && !state.timestampsText) {
-        return renderErrorState("timestamps", state.errors.timestamps);
+    if (activeError(kind) && !text) {
+        return renderErrorState(kind, activeError(kind));
     }
 
-    if (!state.timestampsText) {
-        return renderEmptyState("timestamps");
+    if (!text) {
+        return renderEmptyState(kind);
     }
 
-    const parsed = parseTimestamps(state.timestampsText);
+    const parsed = parseTimestamps(text);
     if (parsed.length === 0) {
         return `
             <div class="surface result-surface">
-                <div class="summary-text">${escapeHTML(state.timestampsText)}</div>
+                <div class="summary-text">${escapeHTML(text)}</div>
+                <div class="caption">${escapeHTML(resultCaption(kind))}</div>
             </div>
         `;
     }
@@ -1714,26 +2188,28 @@ function renderTimestampsResult() {
                     </a>
                 `).join("")}
             </div>
+            <div class="caption">${escapeHTML(resultCaption(kind))}</div>
         </div>
     `;
 }
 
-function renderSummaryResult() {
-    if (state.isLoading.summary && !state.summaryText) {
-        return renderLoadingState("summary");
+function renderSummaryResult(kind = "summary") {
+    if (state.isLoading[kind] && !activeText(kind)) {
+        return renderLoadingState(kind);
     }
 
-    if (state.errors.summary && !state.summaryText) {
-        return renderErrorState("summary", state.errors.summary);
+    if (activeError(kind) && !activeText(kind)) {
+        return renderErrorState(kind, activeError(kind));
     }
 
-    if (!state.summaryText) {
-        return renderEmptyState("summary");
+    if (!activeText(kind)) {
+        return renderEmptyState(kind);
     }
 
     return `
         <div class="surface result-surface">
-            <div class="summary-rich">${renderSummaryHTML(state.summaryText)}</div>
+            <div class="summary-rich">${renderSummaryHTML(activeText(kind))}</div>
+            <div class="caption">${escapeHTML(resultCaption(kind))}</div>
         </div>
     `;
 }
@@ -1811,7 +2287,7 @@ function renderInlineSummary(value) {
 
 function renderActiveContent() {
     if (state.activeTab === "timestamps" && !canGenerateTimestamps()) {
-        return renderCodexConnectionState();
+        return renderProviderConnectionState();
     }
 
     if (state.activeTab === "summary" && !canGenerateSummary()) {
@@ -1822,7 +2298,11 @@ function renderActiveContent() {
         return renderConnectionState("Apple Intelligence is not available on this Mac.");
     }
 
-    return state.activeTab === "timestamps" ? renderTimestampsResult() : renderSummaryResult();
+    if (isTimestampTab(state.activeTab)) {
+        return renderTimestampsResult(state.activeTab);
+    }
+
+    return renderSummaryResult(state.activeTab);
 }
 
 function captureRenderScrollState(root) {
@@ -1935,14 +2415,20 @@ function render() {
 
             .tabs {
                 display: flex;
+                flex-direction: column;
                 gap: 12px;
-                overflow-x: auto;
-                scrollbar-width: none;
                 min-width: 0;
                 flex: 1 1 auto;
             }
 
-            .tabs::-webkit-scrollbar {
+            .tab-row {
+                display: flex;
+                gap: 12px;
+                overflow-x: auto;
+                scrollbar-width: none;
+            }
+
+            .tab-row::-webkit-scrollbar {
                 display: none;
             }
 
@@ -2154,20 +2640,22 @@ function render() {
             <div class="panel">
                 <div class="toolbar">
                     <div class="tabs">
-                        <button
-                            class="tab ${state.activeTab === "timestamps" ? "active" : ""}"
-                            data-tab="timestamps"
-                            aria-busy="${state.isLoading.timestamps ? "true" : "false"}"
-                        >
-                            ${escapeHTML(buttonLabel("timestamps"))}
-                        </button>
-                        <button
-                            class="tab ${state.activeTab === "summary" ? "active" : ""}"
-                            data-tab="summary"
-                            aria-busy="${state.isLoading.summary ? "true" : "false"}"
-                        >
-                            ${escapeHTML(buttonLabel("summary"))}
-                        </button>
+                        <div class="tab-row">
+                            <button
+                                class="tab ${state.activeTab === "timestamps" ? "active" : ""}"
+                                data-tab="timestamps"
+                                aria-busy="${state.isLoading.timestamps ? "true" : "false"}"
+                            >
+                                ${escapeHTML(buttonLabel("timestamps"))}
+                            </button>
+                            <button
+                                class="tab ${state.activeTab === "summary" ? "active" : ""}"
+                                data-tab="summary"
+                                aria-busy="${state.isLoading.summary ? "true" : "false"}"
+                            >
+                                ${escapeHTML(buttonLabel("summary"))}
+                            </button>
+                        </div>
                     </div>
                     <button
                         class="copy-button"
@@ -2220,6 +2708,7 @@ async function refreshStatus() {
     state.appleIntelligenceAvailable = Boolean(response?.appleIntelligence?.isConfigured ?? response?.isConfigured);
     state.codexConnected = Boolean(response?.codex?.connected);
     state.timestampsAvailable = Boolean(response?.timestampsAvailable ?? state.codexConnected);
+    state.selectedProviderConnected = Boolean(response?.settings?.providerConnected ?? state.timestampsAvailable);
     state.summaryAvailable = Boolean(response?.summaryAvailable ?? (
         state.codexConnected
         || (state.settings.summaryEngine === "appleIntelligence" && state.appleIntelligenceAvailable)
@@ -2234,10 +2723,14 @@ async function refreshStatus() {
     ));
     state.isConfigured = Boolean(response?.isConfigured);
     state.engine = response?.engine || state.engine;
-    if (state.codexConnected) {
+    if (state.selectedProviderConnected) {
+        state.providerError = "";
         state.codexLoginError = "";
+    } else if (state.settings.providerID === "xaiOAuth") {
+        state.providerError = response?.grok?.error || "";
     } else if (response?.codex?.error) {
         state.codexLoginError = response.codex.error;
+        state.providerError = response.codex.error;
     }
     if (!state.userSelectedTab) {
         state.activeTab = defaultActiveTab();
@@ -2393,6 +2886,7 @@ async function pollGenerationJob(kind, videoKey, generationID, jobID, generation
             response = {
                 ok: true,
                 text: pollResponse.text,
+                engineLabel: pollResponse.engineLabel || pollResponse.debug?.engineLabel || "",
                 debug: pollResponse.debug,
             };
             break;
@@ -2418,9 +2912,9 @@ async function pollGenerationJob(kind, videoKey, generationID, jobID, generation
 
     return response || {
         ok: false,
-        error: kind === "summary"
-            ? `Timed out waiting for ${summaryEngineLabel()} summary.`
-            : `Timed out waiting for ${modelLabel()} timestamps.`,
+        error: kind === "timestamps"
+            ? `Timed out waiting for ${modelLabel()} timestamps.`
+            : `Timed out waiting for ${summaryEngineLabel()} summary.`,
         debug: {
             layer: "content",
             step: "poll-timeout",
@@ -2430,7 +2924,7 @@ async function pollGenerationJob(kind, videoKey, generationID, jobID, generation
 }
 
 async function requestGeneration(kind) {
-    if (!state.isConfigured || state.isLoading[kind] || activeText(kind)) {
+    if (!canStartGeneration(kind) || state.isLoading[kind] || activeText(kind)) {
         return;
     }
 
@@ -2454,7 +2948,7 @@ async function requestGeneration(kind) {
 }
 
 async function generate(kind) {
-    if (!state.isConfigured || state.isLoading[kind]) {
+    if (!canStartGeneration(kind) || state.isLoading[kind]) {
         return;
     }
 
@@ -2472,6 +2966,7 @@ async function generate(kind) {
     state.debug[kind] = "";
     state.isLoading[kind] = true;
     state.generationDurationsMs[kind] = 0;
+    state.generationEngineLabels[kind] = "";
     state.generationIDs[kind] += 1;
     const generationID = state.generationIDs[kind];
     let generationStartedAt = Date.now();
@@ -2647,31 +3142,40 @@ async function generate(kind) {
     }
 
     logDebug(kind, "step: generation response received");
-    const cachedText = cachedGenerationText(videoKey, kind);
-    if (cachedText) {
-        applyGenerationText(kind, cachedText);
-        rememberGenerationDuration(kind, generationStartedAt);
+    const engineLabel = responseEngineLabel(kind, response);
+    const cachedResult = cachedGenerationResult(videoKey, kind);
+    if (cachedResult?.text) {
+        applyGenerationText(kind, cachedResult.text, cachedResult);
+        if (!cachedResult.durationMs) {
+            rememberGenerationDuration(kind, generationStartedAt);
+        }
         clearPendingGeneration(videoKey, kind, jobID);
         render();
         return;
     }
 
     if (activeText(kind)) {
+        if (!state.generationEngineLabels[kind]) {
+            rememberGenerationEngineLabel(kind, engineLabel);
+        }
         rememberGenerationDuration(kind, generationStartedAt);
         clearPendingGeneration(videoKey, kind, jobID);
         render();
         return;
     }
 
-    if (!applyGenerationText(kind, response.text)) {
+    if (!applyGenerationText(kind, response.text, { engineLabel })) {
         clearPendingGeneration(videoKey, kind, jobID);
         state.errors[kind] = unavailableMessage(kind);
         render();
         return;
     }
 
-    rememberGeneratedText(videoKey, kind, activeText(kind));
     rememberGenerationDuration(kind, generationStartedAt);
+    rememberGeneratedText(videoKey, kind, activeText(kind), {
+        engineLabel: state.generationEngineLabels[kind] || engineLabel,
+        durationMs: state.generationDurationsMs[kind],
+    });
     clearPendingGeneration(videoKey, kind, jobID);
     render();
     return;

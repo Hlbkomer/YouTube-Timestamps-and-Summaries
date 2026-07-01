@@ -12,7 +12,7 @@ These Terms of Service govern the use of Timestamps & Summaries for YT.
 
 You may use the app only in compliance with applicable laws, platform rules, and third-party service terms that apply to you.
 
-You are responsible for your own use of YouTube, Safari, macOS, Apple Intelligence, ChatGPT, and any related accounts.
+You are responsible for your own use of YouTube, Safari, macOS, Apple Intelligence, ChatGPT, Grok, and any related accounts.
 
 ## Third-Party Services
 
@@ -21,6 +21,7 @@ The app depends on third-party services and platforms, including:
 - YouTube
 - Safari, macOS, and Apple Intelligence
 - ChatGPT
+- Grok when the user signs in and selects it as a provider
 
 Those services may change, become unavailable, or impose their own restrictions.
 

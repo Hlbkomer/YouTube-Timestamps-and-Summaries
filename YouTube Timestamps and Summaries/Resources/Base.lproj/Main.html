@@ -60,6 +60,29 @@
 
         <section class="panel status-panel">
             <div>
+                <p class="section-label">Optional Grok Login</p>
+                <p id="grok-status" class="connection-status">Checking Grok…</p>
+                <p id="grok-subscription-hint" class="hint">Sign in with the Grok account that has your SuperGrok subscription.</p>
+                <div id="grok-pairing" class="pairing-panel" hidden>
+                    <p class="hint">If Safari cannot open the local callback page after you approve Grok, paste the full callback URL from Safari or the authorization code shown by xAI.</p>
+                    <label class="field compact-field">
+                        <span>Grok callback URL or code</span>
+                        <textarea id="grok-callback" rows="3" spellcheck="false" autocomplete="off"></textarea>
+                    </label>
+                    <div class="button-row">
+                        <button id="complete-grok-login" class="primary compact-button" type="button">Complete Sign-In</button>
+                        <button id="cancel-grok-login" class="secondary compact-button" type="button">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            <div class="button-stack">
+                <button id="grok-sign-in" class="primary">Sign in with Grok</button>
+                <button id="grok-sign-out" class="secondary">Sign Out</button>
+            </div>
+        </section>
+
+        <section class="panel status-panel">
+            <div>
                 <p class="section-label">Extension Status</p>
                 <p id="extension-status" class="status-line">Checking Safari extension status…</p>
             </div>

@@ -64,6 +64,46 @@ final class AppleIntelligenceService {
         let error: String?
     }
 
+    private struct SummaryGenerationResult {
+        let text: String
+        let chunkCount: Int
+        let debugPayload: [String: Any]
+    }
+
+    private struct TimestampGenerationResult {
+        let text: String
+        let chunkCount: Int
+        let debugPayload: [String: Any]
+    }
+
+    private struct SummaryChunkPlan {
+        let chunks: [String]
+        let strategy: String
+        let contextSize: Int?
+        let inputTokenBudget: Int?
+        let fallbackReason: String?
+
+        var debugPayload: [String: Any] {
+            var payload: [String: Any] = [
+                "chunkStrategy": strategy,
+            ]
+
+            if let contextSize {
+                payload["contextSize"] = contextSize
+            }
+
+            if let inputTokenBudget {
+                payload["inputTokenBudget"] = inputTokenBudget
+            }
+
+            if let fallbackReason {
+                payload["chunkFallbackReason"] = fallbackReason
+            }
+
+            return payload
+        }
+    }
+
     private struct LanguageContext {
         let code: String
         let label: String
@@ -112,13 +152,14 @@ final class AppleIntelligenceService {
     func statusPayload() -> [String: Any] {
         let model = SystemLanguageModel.default
         let availability = availabilityDescription(model.availability)
-
-        return [
+        let payload: [String: Any] = [
             "ok": true,
             "engine": "Apple Intelligence",
             "isConfigured": model.isAvailable,
             "availability": availability,
         ]
+
+        return payload
     }
 
     func generate(
@@ -147,14 +188,44 @@ final class AppleIntelligenceService {
             let analysisTranscriptText = lightlyMergedTranscript(transcriptText)
             let text: String
             let chunkCount: Int
+            var summaryChunkDebug: [String: Any] = [:]
             if kind == "videoAnalysis" {
                 let chunks = chunkTranscriptSections(analysisTranscriptText, maxCharacters: maxAnalysisChunkCharacters)
                 chunkCount = chunks.count
                 text = try await generateVideoAnalysis(from: chunks, model: model)
             } else if kind == "summaryFull" {
-                let chunks = fullSummaryChunks(from: analysisTranscriptText, languageContext: languageContext, model: model)
-                chunkCount = chunks.count
-                text = try await generateFullSummary(from: chunks, model: model, languageContext: languageContext)
+                #if compiler(>=6.4)
+                if #available(macOS 27.0, *) {
+                    let result = try await generateMacOS27FullSummary(
+                        from: analysisTranscriptText,
+                        localModel: model,
+                        languageContext: languageContext
+                    )
+                    chunkCount = result.chunkCount
+                    summaryChunkDebug = result.debugPayload
+                    text = result.text
+                } else {
+                    let plan = legacyFullSummaryChunkPlan(
+                        from: analysisTranscriptText,
+                        languageContext: languageContext,
+                        model: model,
+                        fallbackReason: nil
+                    )
+                    chunkCount = plan.chunks.count
+                    summaryChunkDebug = plan.debugPayload
+                    text = try await generateFullSummary(from: plan.chunks, model: model, languageContext: languageContext)
+                }
+                #else
+                let plan = legacyFullSummaryChunkPlan(
+                    from: analysisTranscriptText,
+                    languageContext: languageContext,
+                    model: model,
+                    fallbackReason: nil
+                )
+                chunkCount = plan.chunks.count
+                summaryChunkDebug = plan.debugPayload
+                text = try await generateFullSummary(from: plan.chunks, model: model, languageContext: languageContext)
+                #endif
             } else if kind == "summary" {
                 let chunks = chunkTranscript(transcriptText)
                 chunkCount = chunks.count
@@ -168,25 +239,28 @@ final class AppleIntelligenceService {
             print("[AppleIntelligence] Generation succeeded. kind=\(kind) chunks=\(chunkCount) textLength=\(text.count)")
             logger.log("Local generation succeeded. kind=\(kind, privacy: .public) chunks=\(chunkCount, privacy: .public) textLength=\(text.count, privacy: .public)")
 
+            var debug: [String: Any] = [
+                "layer": "native",
+                "kind": kind,
+                "model": "Apple Intelligence",
+                "guardrails": guardrailMode,
+                "inputMode": "transcript",
+                "languageCode": languageContext.code,
+                "languageLabel": languageContext.label,
+                "languageIsAppleSupported": languageContext.isAppleSupported(by: model),
+                "chunks": chunkCount,
+                "step": "completed",
+                "textLength": text.count,
+            ]
+            debug.merge(summaryChunkDebug) { _, new in new }
+
             return [
                 "ok": true,
                 "text": text,
-                "debug": [
-                    "layer": "native",
-                    "kind": kind,
-                    "model": "Apple Intelligence",
-                    "guardrails": guardrailMode,
-                    "inputMode": "transcript",
-                    "languageCode": languageContext.code,
-                    "languageLabel": languageContext.label,
-                    "languageIsAppleSupported": languageContext.isAppleSupported(by: model),
-                    "chunks": chunkCount,
-                    "step": "completed",
-                    "textLength": text.count,
-                ],
+                "debug": debug,
             ]
         } catch {
-            let message = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
+            let message = readableErrorMessage(error)
             print("[AppleIntelligence] Generation failed. kind=\(kind) message=\(message)")
             logger.error("Local generation failed. kind=\(kind, privacy: .public) message=\(message, privacy: .private(mask: .hash))")
 
@@ -275,6 +349,254 @@ final class AppleIntelligenceService {
 
         return deduped.joined(separator: "\n")
     }
+
+    #if compiler(>=6.4)
+    @available(macOS 27.0, *)
+    private func generateBetaTimestamps(
+        from transcript: String,
+        localModel: SystemLanguageModel,
+        languageContext: LanguageContext
+    ) async throws -> TimestampGenerationResult {
+        let cloudModel = PrivateCloudComputeLanguageModel()
+        guard cloudModel.isAvailable else {
+            throw AppleIntelligenceError.unavailable("T27 requires Private Cloud Compute: \(privateCloudAvailabilityDescription(cloudModel.availability))")
+        }
+
+        let outputInstruction = outputLanguageInstruction(
+            languageContext: languageContext,
+            model: localModel,
+            outputName: "timestamp titles"
+        )
+        let plan = try await privateCloudTimestampChunkPlan(
+            from: transcript,
+            cloudModel: cloudModel,
+            localModel: localModel,
+            outputInstruction: outputInstruction
+        )
+        var debug = plan.debugPayload
+        debug["betaModel"] = "Private Cloud Compute"
+        debug["privateCloudAvailable"] = true
+        debug["reasoningLevel"] = "default"
+        debug.merge(privateCloudQuotaDebugPayload(cloudModel.quotaUsage)) { _, new in new }
+        let text: String
+        do {
+            text = try await generatePrivateCloudTimestamps(
+                from: plan.chunks,
+                model: cloudModel,
+                outputInstruction: outputInstruction
+            )
+        } catch {
+            let message = readableErrorMessage(error)
+            throw AppleIntelligenceError.generationFailed(
+                """
+                T27 cloud request failed: \(message) \
+                chunks=\(plan.chunks.count), \
+                strategy=\(plan.strategy), \
+                contextSize=\(plan.contextSize.map(String.init) ?? "unknown"), \
+                inputTokenBudget=\(plan.inputTokenBudget.map(String.init) ?? "unknown"), \
+                quota=\(privateCloudQuotaStatusDescription(cloudModel.quotaUsage.status))
+                """
+            )
+        }
+
+        return TimestampGenerationResult(
+            text: text,
+            chunkCount: plan.chunks.count,
+            debugPayload: debug
+        )
+    }
+
+    @available(macOS 27.0, *)
+    private func privateCloudTimestampChunkPlan(
+        from transcript: String,
+        cloudModel: PrivateCloudComputeLanguageModel,
+        localModel: SystemLanguageModel,
+        outputInstruction: String
+    ) async throws -> SummaryChunkPlan {
+        let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let contextSize = try await cloudModel.contextSize
+        guard !transcriptText.isEmpty else {
+            return SummaryChunkPlan(
+                chunks: [],
+                strategy: "private-cloud-timestamps",
+                contextSize: contextSize,
+                inputTokenBudget: nil,
+                fallbackReason: nil
+            )
+        }
+
+        let maximumResponseTokens = 1_400
+        let inputTokenBudget = summaryInputTokenBudget(
+            contextSize: contextSize,
+            maximumResponseTokens: maximumResponseTokens
+        )
+        let fullRequestTokens = try await privateCloudRequestTokenCount(
+            model: localModel,
+            instructions: privateCloudTimestampInstructions(),
+            prompt: privateCloudTimestampPrompt(
+                for: transcriptText,
+                outputInstruction: outputInstruction,
+                index: 0,
+                totalCount: 1
+            )
+        )
+
+        if fullRequestTokens <= inputTokenBudget {
+            return SummaryChunkPlan(
+                chunks: [transcriptText],
+                strategy: "private-cloud-timestamps-single",
+                contextSize: contextSize,
+                inputTokenBudget: inputTokenBudget,
+                fallbackReason: nil
+            )
+        }
+
+        let chunks = try await privateCloudTimestampChunks(
+            transcriptText,
+            inputTokenBudget: inputTokenBudget,
+            cloudModel: cloudModel,
+            localModel: localModel,
+            outputInstruction: outputInstruction
+        )
+
+        return SummaryChunkPlan(
+            chunks: chunks,
+            strategy: "private-cloud-timestamps",
+            contextSize: contextSize,
+            inputTokenBudget: inputTokenBudget,
+            fallbackReason: nil
+        )
+    }
+
+    @available(macOS 27.0, *)
+    private func privateCloudTimestampChunks(
+        _ transcript: String,
+        inputTokenBudget: Int,
+        cloudModel: PrivateCloudComputeLanguageModel,
+        localModel: SystemLanguageModel,
+        outputInstruction: String
+    ) async throws -> [String] {
+        let lines = transcript
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map(String.init)
+        guard !lines.isEmpty else {
+            return []
+        }
+
+        var chunks: [String] = []
+        var startIndex = 0
+
+        while startIndex < lines.count {
+            var low = startIndex + 1
+            var high = lines.count
+            var bestEndIndex = startIndex + 1
+
+            while low <= high {
+                let mid = (low + high) / 2
+                let candidate = lines[startIndex..<mid].joined(separator: "\n")
+                let tokenCount = try await privateCloudRequestTokenCount(
+                    model: localModel,
+                    instructions: privateCloudTimestampInstructions(),
+                    prompt: privateCloudTimestampPrompt(
+                        for: candidate,
+                        outputInstruction: outputInstruction,
+                        index: chunks.count,
+                        totalCount: 1
+                    )
+                )
+
+                if tokenCount <= inputTokenBudget {
+                    bestEndIndex = mid
+                    low = mid + 1
+                } else {
+                    high = mid - 1
+                }
+            }
+
+            chunks.append(lines[startIndex..<bestEndIndex].joined(separator: "\n"))
+            startIndex = bestEndIndex
+        }
+
+        return chunks
+    }
+
+    @available(macOS 27.0, *)
+    private func generatePrivateCloudTimestamps(
+        from chunks: [String],
+        model: PrivateCloudComputeLanguageModel,
+        outputInstruction: String
+    ) async throws -> String {
+        guard !chunks.isEmpty else {
+            throw AppleIntelligenceError.missingTranscript
+        }
+
+        var allLines: [String] = []
+        let transcriptTimes = transcriptCueTimes(from: chunks.joined(separator: "\n"))
+
+        for (index, chunk) in chunks.enumerated() {
+            let response = try await respondPrivateCloud(
+                model: model,
+                instructions: privateCloudTimestampInstructions(),
+                prompt: privateCloudTimestampPrompt(
+                    for: chunk,
+                    outputInstruction: outputInstruction,
+                    index: index,
+                    totalCount: chunks.count
+                ),
+                maximumResponseTokens: chunks.count == 1 ? 1_400 : 900,
+                reasoningLevel: nil
+            )
+
+            allLines.append(contentsOf: timestampLines(from: response))
+        }
+
+        let validLines = transcriptAlignedTimestampLines(allLines, transcriptTimes: transcriptTimes)
+        let deduped = spacedTimestampLines(dedupeTimestampLines(validLines), videoDuration: transcriptTimes.last ?? 0)
+        guard !deduped.isEmpty else {
+            throw AppleIntelligenceError.generationFailed("Apple Intelligence Cloud 27 did not return usable timestamps.")
+        }
+
+        return deduped.joined(separator: "\n")
+    }
+
+    private func privateCloudTimestampInstructions() -> String {
+        """
+        You create concise YouTube chapter timestamps from transcript text.
+        Use the bracketed transcript timestamps as the source of truth.
+        Never invent, estimate, or shift times.
+        Return only timestamp-title lines.
+        """
+    }
+
+    private func privateCloudTimestampPrompt(
+        for transcript: String,
+        outputInstruction: String,
+        index: Int,
+        totalCount: Int
+    ) -> String {
+        let scope = totalCount == 1
+            ? "Create chronological chapter timestamps for this full transcript."
+            : "Create chronological chapter timestamps for transcript section \(index + 1) of \(totalCount)."
+
+        return """
+        \(scope)
+        \(outputInstruction)
+
+        Rules:
+        - Output one timestamp per line.
+        - Use format MM:SS Title, or H:MM:SS Title after one hour.
+        - Do not output a timestamp alone on its own line.
+        - Use only timestamps that appear in the bracketed transcript.
+        - Create only major chapter-level topic changes.
+        - Prefer the earliest timestamp where a topic begins.
+        - Keep each title short and useful.
+        - Do not quote or continue the transcript.
+
+        Transcript:
+        \(transcript)
+        """
+    }
+    #endif
 
     private func generateSummary(
         from chunks: [String],
@@ -444,6 +766,258 @@ final class AppleIntelligenceService {
         return response
     }
 
+    #if compiler(>=6.4)
+    @available(macOS 27.0, *)
+    private func generateMacOS27FullSummary(
+        from transcript: String,
+        localModel: SystemLanguageModel,
+        languageContext: LanguageContext
+    ) async throws -> SummaryGenerationResult {
+        let plan = try await tokenAwareFullSummaryChunkPlan(
+            from: transcript,
+            languageContext: languageContext,
+            model: localModel
+        )
+        let text = try await generateFullSummary(
+            from: plan.chunks,
+            model: localModel,
+            languageContext: languageContext
+        )
+        var debug = plan.debugPayload
+        debug["summaryPath"] = "macos27-on-device"
+        debug["summaryEngine"] = "Apple Intelligence (macOS 27)"
+        return SummaryGenerationResult(
+            text: text,
+            chunkCount: plan.chunks.count,
+            debugPayload: debug
+        )
+    }
+
+    @available(macOS 27.0, *)
+    private func generateBetaFullSummary(
+        from transcript: String,
+        localModel: SystemLanguageModel,
+        languageContext: LanguageContext
+    ) async throws -> SummaryGenerationResult {
+        let cloudModel = PrivateCloudComputeLanguageModel()
+        if cloudModel.isAvailable {
+            do {
+                let plan = try await privateCloudFullSummaryChunkPlan(
+                    from: transcript,
+                    cloudModel: cloudModel
+                )
+                let text = try await generatePrivateCloudFullSummary(
+                    from: plan.chunks,
+                    model: cloudModel,
+                    localModel: localModel,
+                    languageContext: languageContext
+                )
+                var debug = plan.debugPayload
+                debug["betaModel"] = "Private Cloud Compute"
+                debug["privateCloudAvailable"] = true
+                return SummaryGenerationResult(
+                    text: text,
+                    chunkCount: plan.chunks.count,
+                    debugPayload: debug
+                )
+            } catch {
+                let message = readableErrorMessage(error)
+                logger.log("Private Cloud summary failed; falling back to local token-aware summary. reason=\(message, privacy: .private(mask: .hash))")
+                return try await generateLocalBetaFullSummary(
+                    from: transcript,
+                    localModel: localModel,
+                    languageContext: languageContext,
+                    privateCloudAvailable: true,
+                    privateCloudFallbackReason: "Private Cloud Compute failed: \(message)"
+                )
+            }
+        }
+
+        let privateCloudReason = privateCloudAvailabilityDescription(cloudModel.availability)
+        return try await generateLocalBetaFullSummary(
+            from: transcript,
+            localModel: localModel,
+            languageContext: languageContext,
+            privateCloudAvailable: false,
+            privateCloudFallbackReason: privateCloudReason
+        )
+    }
+
+    @available(macOS 27.0, *)
+    private func generateLocalBetaFullSummary(
+        from transcript: String,
+        localModel: SystemLanguageModel,
+        languageContext: LanguageContext,
+        privateCloudAvailable: Bool,
+        privateCloudFallbackReason: String
+    ) async throws -> SummaryGenerationResult {
+        let plan = try await tokenAwareFullSummaryChunkPlan(
+            from: transcript,
+            languageContext: languageContext,
+            model: localModel
+        )
+        let text = try await generateFullSummary(
+            from: plan.chunks,
+            model: localModel,
+            languageContext: languageContext
+        )
+        var debug = plan.debugPayload
+        debug["betaModel"] = "Local Apple Intelligence"
+        debug["privateCloudAvailable"] = privateCloudAvailable
+        debug["privateCloudFallbackReason"] = privateCloudFallbackReason
+        return SummaryGenerationResult(
+            text: text,
+            chunkCount: plan.chunks.count,
+            debugPayload: debug
+        )
+    }
+
+    @available(macOS 27.0, *)
+    private func privateCloudFullSummaryChunkPlan(
+        from transcript: String,
+        cloudModel: PrivateCloudComputeLanguageModel
+    ) async throws -> SummaryChunkPlan {
+        let contextSize = try await cloudModel.contextSize
+        let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !transcriptText.isEmpty else {
+            return SummaryChunkPlan(
+                chunks: [],
+                strategy: "private-cloud",
+                contextSize: contextSize,
+                inputTokenBudget: nil,
+                fallbackReason: nil
+            )
+        }
+
+        let chunkLimit = max(
+            maxFullSummaryChunkCharacters,
+            min(90_000, max(12_000, (contextSize - 1_600) * 3))
+        )
+        let chunks = transcriptText.count <= chunkLimit
+            ? [transcriptText]
+            : chunkTranscript(transcriptText, maxCharacters: chunkLimit)
+
+        return SummaryChunkPlan(
+            chunks: chunks,
+            strategy: chunks.count == 1 ? "private-cloud-single" : "private-cloud",
+            contextSize: contextSize,
+            inputTokenBudget: chunkLimit,
+            fallbackReason: nil
+        )
+    }
+
+    @available(macOS 27.0, *)
+    private func generatePrivateCloudFullSummary(
+        from chunks: [String],
+        model: PrivateCloudComputeLanguageModel,
+        localModel: SystemLanguageModel,
+        languageContext: LanguageContext
+    ) async throws -> String {
+        guard !chunks.isEmpty else {
+            throw AppleIntelligenceError.missingTranscript
+        }
+
+        let outputInstruction = outputLanguageInstruction(
+            languageContext: languageContext,
+            model: localModel,
+            outputName: "summary"
+        )
+
+        if chunks.count == 1 {
+            let text = try await respondPrivateCloud(
+                model: model,
+                instructions: fullSummaryInstructions(languageContext: languageContext),
+                prompt: fullSummaryPrompt(for: chunks[0], outputInstruction: outputInstruction),
+                maximumResponseTokens: 1_100
+            )
+            return cleanedSummaryText(text)
+        }
+
+        let summaries = try await summarizePrivateCloudFullSummaryChunks(
+            chunks,
+            model: model,
+            outputInstruction: outputInstruction,
+            languageContext: languageContext
+        )
+        return cleanedSummaryText(summaries.joined(separator: "\n\n"))
+    }
+
+    @available(macOS 27.0, *)
+    private func summarizePrivateCloudFullSummaryChunks(
+        _ chunks: [String],
+        model: PrivateCloudComputeLanguageModel,
+        outputInstruction: String,
+        languageContext: LanguageContext
+    ) async throws -> [String] {
+        let results = await withTaskGroup(of: SummaryChunkResult.self) { group in
+            var results: [SummaryChunkResult] = []
+            var nextIndex = 0
+
+            func enqueueNextChunk() {
+                guard nextIndex < chunks.count else {
+                    return
+                }
+
+                let chunkIndex = nextIndex
+                let chunk = chunks[chunkIndex]
+                nextIndex += 1
+
+                group.addTask { [self] in
+                    do {
+                        let response: String
+                        if chunkIndex == 0 {
+                            response = try await respondPrivateCloud(
+                                model: model,
+                                instructions: fullSummaryInstructions(languageContext: languageContext),
+                                prompt: fullSummaryPrompt(for: chunk, outputInstruction: outputInstruction),
+                                maximumResponseTokens: 1_100
+                            )
+                        } else {
+                            response = try await respondPrivateCloud(
+                                model: model,
+                                instructions: laterSummaryInstructions(languageContext: languageContext),
+                                prompt: laterSummaryPrompt(for: chunk, outputInstruction: outputInstruction),
+                                maximumResponseTokens: 420
+                            )
+                        }
+                        return SummaryChunkResult(index: chunkIndex, text: response, error: nil)
+                    } catch {
+                        let message = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
+                        return SummaryChunkResult(index: chunkIndex, text: nil, error: message)
+                    }
+                }
+            }
+
+            for _ in 0..<min(maxParallelSummaryRequests, chunks.count) {
+                enqueueNextChunk()
+            }
+
+            while let result = await group.next() {
+                results.append(result)
+                enqueueNextChunk()
+            }
+
+            return results.sorted { first, second in
+                first.index < second.index
+            }
+        }
+
+        let successfulSummaries = results.compactMap { result -> String? in
+            guard let text = result.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+                return nil
+            }
+            return text
+        }
+
+        guard !successfulSummaries.isEmpty else {
+            let firstError = results.compactMap(\.error).first ?? "Apple Intelligence 27 did not return usable section summaries."
+            throw AppleIntelligenceError.generationFailed(firstError)
+        }
+
+        return successfulSummaries
+    }
+    #endif
+
     private func fullSummaryInstructions(languageContext: LanguageContext) -> String {
         return "You summarize YouTube transcripts clearly and concisely."
     }
@@ -453,9 +1027,23 @@ final class AppleIntelligenceService {
         languageContext: LanguageContext,
         model: SystemLanguageModel
     ) -> String {
+        fullSummaryPrompt(
+            for: chunk,
+            outputInstruction: outputLanguageInstruction(
+                languageContext: languageContext,
+                model: model,
+                outputName: "summary"
+            )
+        )
+    }
+
+    private func fullSummaryPrompt(
+        for chunk: String,
+        outputInstruction: String
+    ) -> String {
         return """
         Summarize this video transcript clearly and concisely.
-        \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "summary"))
+        \(outputInstruction)
         Start with a short overview, then include useful bullet points.
 
         Transcript:
@@ -472,9 +1060,23 @@ final class AppleIntelligenceService {
         languageContext: LanguageContext,
         model: SystemLanguageModel
     ) -> String {
+        laterSummaryPrompt(
+            for: chunk,
+            outputInstruction: outputLanguageInstruction(
+                languageContext: languageContext,
+                model: model,
+                outputName: "summary"
+            )
+        )
+    }
+
+    private func laterSummaryPrompt(
+        for chunk: String,
+        outputInstruction: String
+    ) -> String {
         return """
         Write useful bullet points for this later transcript excerpt.
-        \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "summary"))
+        \(outputInstruction)
 
         Transcript:
         \(chunk)
@@ -680,25 +1282,172 @@ final class AppleIntelligenceService {
         )
     }
 
-    private func fullSummaryChunks(
+    private func legacyFullSummaryChunkPlan(
         from transcript: String,
         languageContext: LanguageContext,
-        model: SystemLanguageModel
-    ) -> [String] {
+        model: SystemLanguageModel,
+        fallbackReason: String?
+    ) -> SummaryChunkPlan {
         let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !transcriptText.isEmpty else {
-            return []
+            return SummaryChunkPlan(
+                chunks: [],
+                strategy: "character",
+                contextSize: nil,
+                inputTokenBudget: nil,
+                fallbackReason: fallbackReason
+            )
         }
 
         let directLimit = summaryDirectCharacterLimit(languageContext: languageContext, model: model)
         let chunkLimit = summaryChunkCharacterLimit(languageContext: languageContext, model: model)
+        let chunks: [String]
 
         if transcriptText.count <= directLimit {
-            return [transcriptText]
+            chunks = [transcriptText]
+        } else {
+            chunks = chunkTranscript(transcriptText, maxCharacters: chunkLimit)
         }
 
-        return chunkTranscript(transcriptText, maxCharacters: chunkLimit)
+        return SummaryChunkPlan(
+            chunks: chunks,
+            strategy: "character",
+            contextSize: nil,
+            inputTokenBudget: nil,
+            fallbackReason: fallbackReason
+        )
     }
+
+    #if compiler(>=6.4)
+    @available(macOS 27.0, *)
+    private func tokenAwareFullSummaryChunkPlan(
+        from transcript: String,
+        languageContext: LanguageContext,
+        model: SystemLanguageModel
+    ) async throws -> SummaryChunkPlan {
+        let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !transcriptText.isEmpty else {
+            return SummaryChunkPlan(
+                chunks: [],
+                strategy: "token-aware",
+                contextSize: model.contextSize,
+                inputTokenBudget: nil,
+                fallbackReason: nil
+            )
+        }
+
+        let contextSize = model.contextSize
+        let maximumResponseTokens = 1_100
+        let inputTokenBudget = summaryInputTokenBudget(
+            contextSize: contextSize,
+            maximumResponseTokens: maximumResponseTokens
+        )
+        let fullRequestTokens = try await requestTokenCount(
+            model: model,
+            instructions: fullSummaryInstructions(languageContext: languageContext),
+            prompt: fullSummaryPrompt(for: transcriptText, languageContext: languageContext, model: model)
+        )
+
+        if fullRequestTokens <= inputTokenBudget {
+            return SummaryChunkPlan(
+                chunks: [transcriptText],
+                strategy: "token-aware-single",
+                contextSize: contextSize,
+                inputTokenBudget: inputTokenBudget,
+                fallbackReason: nil
+            )
+        }
+
+        let chunks = try await tokenAwareTranscriptChunks(
+            transcriptText,
+            inputTokenBudget: inputTokenBudget,
+            languageContext: languageContext,
+            model: model
+        )
+
+        return SummaryChunkPlan(
+            chunks: chunks,
+            strategy: "token-aware",
+            contextSize: contextSize,
+            inputTokenBudget: inputTokenBudget,
+            fallbackReason: nil
+        )
+    }
+
+    @available(macOS 27.0, *)
+    private func tokenAwareTranscriptChunks(
+        _ transcript: String,
+        inputTokenBudget: Int,
+        languageContext: LanguageContext,
+        model: SystemLanguageModel
+    ) async throws -> [String] {
+        let lines = transcript
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map(String.init)
+        guard !lines.isEmpty else {
+            return []
+        }
+
+        var chunks: [String] = []
+        var startIndex = 0
+
+        while startIndex < lines.count {
+            var low = startIndex + 1
+            var high = lines.count
+            var bestEndIndex = startIndex + 1
+
+            while low <= high {
+                let mid = (low + high) / 2
+                let candidate = lines[startIndex..<mid].joined(separator: "\n")
+                let tokenCount = try await requestTokenCount(
+                    model: model,
+                    instructions: fullSummaryInstructions(languageContext: languageContext),
+                    prompt: fullSummaryPrompt(for: candidate, languageContext: languageContext, model: model)
+                )
+
+                if tokenCount <= inputTokenBudget {
+                    bestEndIndex = mid
+                    low = mid + 1
+                } else {
+                    high = mid - 1
+                }
+            }
+
+            chunks.append(lines[startIndex..<bestEndIndex].joined(separator: "\n"))
+            startIndex = bestEndIndex
+        }
+
+        return chunks
+    }
+
+    @available(macOS 27.0, *)
+    private func requestTokenCount(
+        model: SystemLanguageModel,
+        instructions: String,
+        prompt: String
+    ) async throws -> Int {
+        let instructionTokens = try await model.tokenCount(for: Instructions(instructions))
+        let promptTokens = try await model.tokenCount(for: prompt)
+        return instructionTokens + promptTokens
+    }
+
+    @available(macOS 27.0, *)
+    private func privateCloudRequestTokenCount(
+        model: SystemLanguageModel,
+        instructions: String,
+        prompt: String
+    ) async throws -> Int {
+        let instructionTokens = try await model.tokenCount(for: Instructions(instructions))
+        let promptTokens = try await model.tokenCount(for: prompt)
+        return instructionTokens + promptTokens
+    }
+
+    @available(macOS 27.0, *)
+    private func summaryInputTokenBudget(contextSize: Int, maximumResponseTokens: Int) -> Int {
+        let safetyMargin = min(max(contextSize / 8, 256), 1_024)
+        return max(512, contextSize - maximumResponseTokens - safetyMargin)
+    }
+    #endif
 
     private func summaryDirectCharacterLimit(languageContext: LanguageContext, model: SystemLanguageModel) -> Int {
         languageContext.isAppleSupported(by: model)
@@ -743,12 +1492,24 @@ final class AppleIntelligenceService {
             tools: [],
             instructions: instructions
         )
+        #if compiler(>=6.4)
+        if #available(macOS 27.0, *) {
+            session.prewarm(promptPrefix: Prompt(prewarmPrefix(from: prompt)))
+        }
+        #endif
+
         let options = GenerationOptions(
-            sampling: .greedy,
+            samplingMode: .greedy,
             temperature: nil,
             maximumResponseTokens: maximumResponseTokens
         )
         let response = try await session.respond(to: prompt, options: options)
+        #if compiler(>=6.4)
+        if #available(macOS 27.0, *) {
+            logTokenUsage(response.usage)
+        }
+        #endif
+
         let text = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !text.isEmpty else {
@@ -756,6 +1517,185 @@ final class AppleIntelligenceService {
         }
 
         return text
+    }
+
+    #if compiler(>=6.4)
+    @available(macOS 27.0, *)
+    private func respondPrivateCloud(
+        model: PrivateCloudComputeLanguageModel,
+        instructions: String,
+        prompt: String,
+        maximumResponseTokens: Int,
+        reasoningLevel: ContextOptions.ReasoningLevel? = nil
+    ) async throws -> String {
+        let session = LanguageModelSession(
+            model: model,
+            tools: [],
+            instructions: instructions
+        )
+
+        let options = GenerationOptions(
+            samplingMode: .greedy,
+            temperature: nil,
+            maximumResponseTokens: maximumResponseTokens
+        )
+        let response: LanguageModelSession.Response<String>
+        if let reasoningLevel {
+            let contextOptions = ContextOptions(reasoningLevel: reasoningLevel)
+            response = try await session.respond(to: prompt, options: options, contextOptions: contextOptions)
+        } else {
+            response = try await session.respond(to: prompt, options: options)
+        }
+        logTokenUsage(response.usage)
+
+        let text = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !text.isEmpty else {
+            throw AppleIntelligenceError.generationFailed("Apple Intelligence 27 returned an empty response.")
+        }
+
+        return text
+    }
+    #endif
+
+    private func prewarmPrefix(from prompt: String) -> String {
+        if let transcriptRange = prompt.range(of: "Transcript:") {
+            return String(prompt[..<transcriptRange.upperBound])
+        }
+
+        return String(prompt.prefix(500))
+    }
+
+    #if compiler(>=6.4)
+    @available(macOS 27.0, *)
+    private func logTokenUsage(_ usage: LanguageModelSession.Usage) {
+        logger.log(
+            """
+            Local generation token usage. \
+            input=\(usage.input.totalTokenCount, privacy: .public) \
+            cached=\(usage.input.cachedTokenCount, privacy: .public) \
+            output=\(usage.output.totalTokenCount, privacy: .public) \
+            reasoning=\(usage.output.reasoningTokenCount, privacy: .public) \
+            total=\(usage.totalTokenCount, privacy: .public)
+            """
+        )
+    }
+
+    @available(macOS 27.0, *)
+    private func privateCloudAvailabilityDescription(_ availability: PrivateCloudComputeLanguageModel.Availability) -> String {
+        switch availability {
+        case .available:
+            return "Private Cloud Compute is available."
+        case .unavailable(let reason):
+            return "Private Cloud Compute is not available: \(String(describing: reason))."
+        @unknown default:
+            return "Private Cloud Compute is not available."
+        }
+    }
+
+    @available(macOS 27.0, *)
+    private func privateCloudStatusPayload() -> [String: Any] {
+        let model = PrivateCloudComputeLanguageModel()
+        var payload: [String: Any] = [
+            "isConfigured": model.isAvailable,
+            "availability": privateCloudAvailabilityDescription(model.availability),
+        ]
+
+        payload.merge(privateCloudQuotaDebugPayload(model.quotaUsage)) { _, new in new }
+        return payload
+    }
+
+    @available(macOS 27.0, *)
+    private func privateCloudQuotaDebugPayload(_ quotaUsage: PrivateCloudComputeLanguageModel.QuotaUsage) -> [String: Any] {
+        var payload: [String: Any] = [
+            "quotaLimitReached": quotaUsage.isLimitReached,
+            "quotaStatus": privateCloudQuotaStatusDescription(quotaUsage.status),
+        ]
+
+        if let resetDate = quotaUsage.resetDate {
+            payload["quotaResetDate"] = ISO8601DateFormatter().string(from: resetDate)
+        }
+
+        return payload
+    }
+
+    @available(macOS 27.0, *)
+    private func privateCloudQuotaStatusDescription(_ status: PrivateCloudComputeLanguageModel.QuotaUsage.Status) -> String {
+        switch status {
+        case .belowLimit(let info):
+            return info.isApproachingLimit ? "approaching limit" : "below limit"
+        case .limitReached:
+            return "limit reached"
+        @unknown default:
+            return "unknown"
+        }
+    }
+    #endif
+
+    private func readableErrorMessage(_ error: Error) -> String {
+        #if compiler(>=6.4)
+        if #available(macOS 27.0, *) {
+            if let languageModelError = error as? LanguageModelError {
+                return readableErrorMessage(
+                    primary: languageModelError.debugDescription,
+                    error: error
+                )
+            }
+
+            if let privateCloudError = error as? PrivateCloudComputeLanguageModel.Error {
+                return readableErrorMessage(
+                    primary: privateCloudError.debugDescription,
+                    error: error
+                )
+            }
+        }
+        #endif
+
+        return readableErrorMessage(
+            primary: error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription,
+            error: error
+        )
+    }
+
+    private func readableErrorMessage(primary: String, error: Error) -> String {
+        let trimmedPrimary = primary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseMessage = trimmedPrimary.isEmpty ? String(describing: error) : trimmedPrimary
+        let underlying = underlyingErrorSummary(from: error)
+
+        guard let underlying, !baseMessage.contains(underlying) else {
+            return baseMessage
+        }
+
+        return "\(baseMessage) Underlying error: \(underlying)."
+    }
+
+    private func underlyingErrorSummary(from error: Error) -> String? {
+        let nsError = error as NSError
+        var summaries: [String] = []
+        collectUnderlyingErrorSummaries(from: nsError, into: &summaries)
+        return summaries.first
+    }
+
+    private func collectUnderlyingErrorSummaries(from error: NSError, into summaries: inout [String]) {
+        if isUsefulUnderlyingErrorDomain(error.domain) {
+            summaries.append("\(error.domain) code \(error.code)")
+        }
+
+        if let underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError {
+            collectUnderlyingErrorSummaries(from: underlying, into: &summaries)
+        }
+
+        if let underlyingErrors = error.userInfo[NSMultipleUnderlyingErrorsKey] as? [NSError] {
+            for underlying in underlyingErrors {
+                collectUnderlyingErrorSummaries(from: underlying, into: &summaries)
+            }
+        }
+    }
+
+    private func isUsefulUnderlyingErrorDomain(_ domain: String) -> Bool {
+        domain != NSCocoaErrorDomain
+            && domain != "FoundationModels.LanguageModelError"
+            && !domain.hasSuffix(".AppleIntelligenceError")
     }
 
     private func cleanedSummaryText(_ text: String) -> String {

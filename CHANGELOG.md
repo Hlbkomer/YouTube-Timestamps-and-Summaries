@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Add optional Grok browser OAuth, shared between the sandboxed companion app and Safari extension, with direct xAI Responses requests and no command-line client, Login Item, background helper, or developer backend.
+- Add a manual Grok OAuth callback fallback: when Safari cannot connect to the temporary `127.0.0.1` callback after approval, the companion app accepts the complete callback URL or the one-time authorization code and finishes the same PKCE sign-in attempt.
+- Keep the unresolved automatic loopback-callback issue visible in the Grok integration notes; the manual fallback is a tested workaround, not a claim that the underlying Safari/macOS 27 beta behavior is fixed.
+- Offer only Grok 4.3 for Grok timestamps and selected-provider summaries. Existing saved Grok Build 0.1 choices automatically normalize to Grok 4.3.
+- Let Timestamps and Summary choose different models from the selected provider, while retaining Apple Intelligence as the local summary option.
+- Keep Apple Intelligence as the independent local summary option when the selected provider is unavailable.
+- Remove the experimental `T27` and `S27` sidebar tabs and defer all Private Cloud Compute use until the managed entitlement is approved.
+- Keep the established character-based Apple Intelligence Summary path frozen for macOS 26.
+- Route the ordinary Apple Intelligence Summary tab to the macOS 27 on-device token-aware path on macOS 27, while preserving selected-provider summaries and exposing the active Apple path in Summary diagnostics.
+- Move successful generation timing from the Timestamps/Summary tab titles into the small result caption, alongside the active model or macOS 27 Apple Intelligence path.
+- Prewarm Apple Intelligence summary requests and log macOS 27 token usage metrics when the Xcode 27 SDK/runtime exposes them.
+
 ## v1.0.4 - 2026-05-10
 
 - Refresh the app and extension icon set to replace the previous YouTube-derived branding with original artwork.

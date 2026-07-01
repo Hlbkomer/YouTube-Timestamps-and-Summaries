@@ -14,6 +14,7 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
     private let service = AppleIntelligenceService()
     private let codexService = CodexGenerationService()
     private let codexAuthService = CodexAuthService()
+    private let grokGenerationService = GrokGenerationService()
     private let companionAppURL = URL(string: "youtube-timestamps-summaries://open")!
     private let logger = Logger(subsystem: "Matuko.YouTube-Timestamps-and-Summaries", category: "NativeBridge")
 
@@ -107,6 +108,30 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 languageLabel: languageLabel
             )
 
+        case "generateGrokTimestamps":
+            let transcript = payload["transcript"] as? String ?? ""
+            let model = payload["model"] as? String ?? GenerationSettings.defaultModelID(for: GenerationSettings.grokProviderID)
+            let languageCode = payload["languageCode"] as? String ?? ""
+            let languageLabel = payload["languageLabel"] as? String ?? ""
+            return await grokGenerationService.generateTimestamps(
+                transcript: transcript,
+                model: model,
+                languageCode: languageCode,
+                languageLabel: languageLabel
+            )
+
+        case "generateGrokSummary":
+            let transcript = payload["transcript"] as? String ?? ""
+            let model = payload["model"] as? String ?? GenerationSettings.defaultModelID(for: GenerationSettings.grokProviderID)
+            let languageCode = payload["languageCode"] as? String ?? ""
+            let languageLabel = payload["languageLabel"] as? String ?? ""
+            return await grokGenerationService.generateSummary(
+                transcript: transcript,
+                model: model,
+                languageCode: languageCode,
+                languageLabel: languageLabel
+            )
+
         default:
             return [
                 "ok": false,
@@ -171,37 +196,68 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
 
     private func statusPayload() async -> [String: Any] {
         let appleStatus = service.statusPayload()
-        let codexStatus = await codexAuthService.statusPayload(refresh: true)
         let settings = GenerationSettings.load()
+        let codexStatus = await codexAuthService.statusPayload(refresh: true)
+        let grokStatus: [String: Any]
+        if settings.providerID == GenerationSettings.grokProviderID {
+            grokStatus = await grokGenerationService.statusPayload()
+        } else {
+            grokStatus = [
+                "connected": false,
+                "error": "",
+            ]
+        }
         let appleConfigured = (appleStatus["isConfigured"] as? Bool) == true
         let codexConnected = (codexStatus["connected"] as? Bool) == true
-        let effectiveSummaryEngine: String
-        if !codexConnected, appleConfigured {
-            effectiveSummaryEngine = "appleIntelligence"
-        } else if settings.summaryEngine == "appleIntelligence", !appleConfigured {
-            effectiveSummaryEngine = "selectedModel"
+        let grokConnected = (grokStatus["connected"] as? Bool) == true
+        let selectedProviderConnected = settings.providerID == GenerationSettings.grokProviderID
+            ? grokConnected
+            : codexConnected
+        let effectiveSummaryModelID: String
+        if !selectedProviderConnected, appleConfigured {
+            effectiveSummaryModelID = GenerationSettings.appleIntelligenceModelID
+        } else if settings.summaryModelID == GenerationSettings.appleIntelligenceModelID, !appleConfigured {
+            effectiveSummaryModelID = settings.modelID
         } else {
-            effectiveSummaryEngine = settings.summaryEngine
+            effectiveSummaryModelID = settings.summaryModelID
         }
-        let summaryUsesApple = effectiveSummaryEngine == "appleIntelligence"
-        let summaryAvailable = summaryUsesApple ? appleConfigured : codexConnected
-        let modelLabel = GenerationSettings.modelLabel(for: settings.modelID)
-        let summaryEngineLabel = summaryUsesApple ? "Apple Intelligence" : modelLabel
+        let summaryUsesApple = effectiveSummaryModelID == GenerationSettings.appleIntelligenceModelID
+        let summaryAvailable = summaryUsesApple ? appleConfigured : selectedProviderConnected
+        let modelLabel = GenerationSettings.modelLabel(for: settings.modelID, providerID: settings.providerID)
+        let summaryModelLabel = summaryUsesApple
+            ? appleSummaryModelLabel()
+            : GenerationSettings.modelLabel(for: effectiveSummaryModelID, providerID: settings.providerID)
         var settingsPayload = settings.payload
-        settingsPayload["summaryEngine"] = effectiveSummaryEngine
+        settingsPayload["summaryModelID"] = effectiveSummaryModelID
+        settingsPayload["summaryEngine"] = summaryUsesApple ? "appleIntelligence" : "selectedModel"
         settingsPayload["modelLabel"] = modelLabel
-        settingsPayload["summaryEngineLabel"] = summaryEngineLabel
+        settingsPayload["summaryModelLabel"] = summaryModelLabel
+        settingsPayload["summaryEngineLabel"] = summaryModelLabel
+        settingsPayload["providerLabel"] = settings.providerID == GenerationSettings.grokProviderID
+            ? "Grok (SuperGrok)"
+            : "ChatGPT / Codex"
+        settingsPayload["providerConnected"] = selectedProviderConnected
 
         return [
             "ok": true,
             "engine": summaryUsesApple ? "\(modelLabel) + Apple Intelligence" : modelLabel,
             "generationMode": "selectedProvider",
-            "isConfigured": codexConnected || summaryAvailable,
-            "timestampsAvailable": codexConnected,
+            "isConfigured": selectedProviderConnected || summaryAvailable,
+            "timestampsAvailable": selectedProviderConnected,
             "summaryAvailable": summaryAvailable,
             "appleIntelligence": appleStatus,
             "codex": codexStatus,
+            "grok": grokStatus,
             "settings": settingsPayload,
         ]
+    }
+
+    private func appleSummaryModelLabel() -> String {
+        #if compiler(>=6.4)
+        if #available(macOS 27.0, *) {
+            return "Apple Intelligence (macOS 27)"
+        }
+        #endif
+        return "Apple Intelligence"
     }
 }

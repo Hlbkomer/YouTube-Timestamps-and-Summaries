@@ -98,7 +98,8 @@ final class CodexGenerationService {
                 ],
             ]
         } catch {
-            let message = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
+            let rawMessage = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
+            let message = userFacingErrorMessage(rawMessage)
             logger.error("Codex timestamp generation failed. model=\(safeModel, privacy: .public) message=\(message, privacy: .private(mask: .hash))")
             return [
                 "ok": false,
@@ -171,7 +172,8 @@ final class CodexGenerationService {
                 ],
             ]
         } catch {
-            let message = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
+            let rawMessage = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
+            let message = userFacingErrorMessage(rawMessage)
             logger.error("Codex summary generation failed. model=\(safeModel, privacy: .public) message=\(message, privacy: .private(mask: .hash))")
             return [
                 "ok": false,
@@ -227,6 +229,29 @@ final class CodexGenerationService {
         }
 
         return "The detected caption language is \(languageContext.displayName). Write the \(outputName) in \(languageContext.displayName)."
+    }
+
+    private func userFacingErrorMessage(_ message: String) -> String {
+        guard isAuthenticationInvalidationMessage(message) else {
+            return message
+        }
+
+        authService.signOut()
+        return "ChatGPT sign-in expired. Open the companion app and sign in again."
+    }
+
+    private func isAuthenticationInvalidationMessage(_ message: String) -> Bool {
+        let lowercasedMessage = message.lowercased()
+        return (
+            lowercasedMessage.contains("authentication token")
+            && lowercasedMessage.contains("invalidated")
+        ) || (
+            lowercasedMessage.contains("invalid_grant")
+            || (
+                lowercasedMessage.contains("refresh token")
+                && lowercasedMessage.contains("invalid")
+            )
+        )
     }
 
     private func requestCodexText(

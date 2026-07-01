@@ -2,6 +2,8 @@
 
 This document captures the current App Store readiness state for the macOS app that contains the Safari web extension.
 
+The App Store build must use Xcode's ordinary `Release` configuration. `scripts/build-release.sh` is for Developer ID signing and notarization. Both builds use the same sandboxed Grok browser-OAuth integration; neither bundles or registers a helper.
+
 For paste-ready App Store Connect fields and privacy answers, see:
 
 - [APP_STORE_CONNECT_COPY.md](APP_STORE_CONNECT_COPY.md)

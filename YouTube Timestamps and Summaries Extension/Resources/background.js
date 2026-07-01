@@ -5,7 +5,7 @@ const MIN_NATIVE_TIMEOUT_MS = 6 * 60 * 1000;
 const MAX_NATIVE_TIMEOUT_MS = 20 * 60 * 1000;
 const JOB_RETENTION_MS = 30 * 60 * 1000;
 const JOB_MESSAGE_LIMIT = 80;
-const CODEX_DEFAULT_MODEL = "gpt-5.5";
+const DEFAULT_SELECTED_MODEL = "gpt-5.5";
 const ENABLE_APPLE_SUMMARY_SELECTED_MODEL_FALLBACK = false;
 const ENABLE_APPLE_SUMMARY_TRANSCRIPT_REDACTION = true;
 const APPLE_SUMMARY_CHUNK_CHARACTER_LIMIT = 10000;
@@ -15,6 +15,7 @@ const APPLE_SUPPORTED_LANGUAGE_CODES = new Set([
     "da", "de", "en", "es", "fr", "it", "ja", "ko", "nl", "no", "pt", "sv", "tr", "vi", "zh",
 ]);
 const APPLE_SUMMARY_REDACTION_PATTERNS = [
+    /\[\s*_+\s*\]/g,
     /\b(?:fuck(?:er|ing)?|fucking|fucked|shit(?:ty)?|bullshit|bitch(?:es)?|asshole|dick|pussy|cunt)\b/gi,
     /\b(?:nigg(?:a|er)s?|fag(?:got)?s?|retard(?:ed)?|whore(?:s)?|slut(?:s)?)\b/gi,
 ];
@@ -157,11 +158,11 @@ function appleSummaryChunkLimit(metadata = {}) {
 }
 
 function generationLabel(kind) {
-    if (kind === "codexTimestamps") {
+    if (kind === "selectedProviderTimestamps") {
         return "timestamps";
     }
 
-    if (kind === "codexSummary") {
+    if (kind === "selectedProviderSummary") {
         return "summary";
     }
 
@@ -179,10 +180,12 @@ function jobResponse(job) {
         status: job.status,
         text: job.text || "",
         error: job.error || "",
+        engineLabel: job.engineLabel || "",
         debug: {
             layer: "background",
             kind: job.kind,
             durationMs: Date.now() - job.startedAt,
+            engineLabel: job.engineLabel || "",
             messages: (job.messages || []).join("\n"),
             native: job.nativeDebug || null,
         },
@@ -193,17 +196,31 @@ async function statusPayload() {
     return await sendNative("getStatus");
 }
 
-async function generateCodexTimestamps(job, transcriptText, nativeTimeoutMs, metadata = {}) {
+function selectedProviderAction(providerID, kind) {
+    if (providerID === "xaiOAuth") {
+        return kind === "timestamps"
+            ? "generateGrokTimestamps"
+            : "generateGrokSummary";
+    }
+
+    return kind === "timestamps"
+        ? "generateCodexTimestamps"
+        : "generateCodexSummary";
+}
+
+async function generateSelectedProviderTimestamps(job, transcriptText, nativeTimeoutMs, metadata = {}) {
     const status = await statusPayload();
     const settings = status?.settings || {};
-    const model = settings.modelID || CODEX_DEFAULT_MODEL;
+    const providerID = settings.providerID || "openaiCodex";
+    const model = settings.modelID || DEFAULT_SELECTED_MODEL;
     const modelLabel = settings.modelLabel || model;
+    job.engineLabel = modelLabel;
 
     if (metadata.languageCode || metadata.languageLabel) {
         appendJobMessage(job, `caption language: ${metadata.languageLabel || metadata.languageCode}${metadata.languageCode ? ` (${metadata.languageCode})` : ""}`);
     }
     appendJobMessage(job, `asking ${modelLabel} to create timestamps`);
-    const response = await sendNative("generateCodexTimestamps", {
+    const response = await sendNative(selectedProviderAction(providerID, "timestamps"), {
         transcript: transcriptText,
         model,
         languageCode: metadata.languageCode || "",
@@ -222,19 +239,22 @@ async function generateCodexTimestamps(job, transcriptText, nativeTimeoutMs, met
 async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, metadata = {}) {
     const status = await statusPayload();
     const settings = status?.settings || {};
-    const model = settings.modelID || CODEX_DEFAULT_MODEL;
-    const modelLabel = settings.modelLabel || model;
+    const providerID = settings.providerID || "openaiCodex";
+    const timestampModel = settings.modelID || DEFAULT_SELECTED_MODEL;
+    const summaryModel = settings.summaryModelID || timestampModel;
+    const summaryModelLabel = settings.summaryModelLabel || settings.summaryEngineLabel || summaryModel;
     const summaryEngine = settings.summaryEngine || "selectedModel";
-    const summaryEngineLabel = settings.summaryEngineLabel || (summaryEngine === "selectedModel" ? modelLabel : "Apple Intelligence");
+    const summaryEngineLabel = summaryEngine === "selectedModel" ? summaryModelLabel : "Apple Intelligence";
+    job.engineLabel = summaryEngineLabel;
 
     if (summaryEngine === "selectedModel") {
         if (metadata.languageCode || metadata.languageLabel) {
             appendJobMessage(job, `caption language: ${metadata.languageLabel || metadata.languageCode}${metadata.languageCode ? ` (${metadata.languageCode})` : ""}`);
         }
         appendJobMessage(job, `asking ${summaryEngineLabel} to create summary`);
-        const response = await sendNative("generateCodexSummary", {
+        const response = await sendNative(selectedProviderAction(providerID, "summary"), {
             transcript: transcriptText,
-            model,
+            model: summaryModel,
             languageCode: metadata.languageCode || "",
             languageLabel: metadata.languageLabel || "",
         }, nativeTimeoutMs);
@@ -284,18 +304,19 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, m
         return appleResponse;
     }
 
-    appendJobMessage(job, `falling back to ${modelLabel} for summary`);
-    const fallbackResponse = await sendNative("generateCodexSummary", {
+    appendJobMessage(job, `falling back to ${summaryModelLabel} for summary`);
+    job.engineLabel = summaryModelLabel;
+    const fallbackResponse = await sendNative(selectedProviderAction(providerID, "summary"), {
         transcript: transcriptText,
-        model,
+        model: summaryModel,
         languageCode: metadata.languageCode || "",
         languageLabel: metadata.languageLabel || "",
     }, nativeTimeoutMs);
 
     if (fallbackResponse?.ok) {
-        appendJobMessage(job, `${modelLabel} fallback returned summary (${(fallbackResponse.text || "").length} chars)`);
+        appendJobMessage(job, `${summaryModelLabel} fallback returned summary (${(fallbackResponse.text || "").length} chars)`);
     } else {
-        appendJobMessage(job, `${modelLabel} fallback failed: ${fallbackResponse?.error || "unknown error"}`);
+        appendJobMessage(job, `${summaryModelLabel} fallback failed: ${fallbackResponse?.error || "unknown error"}`);
     }
 
     return fallbackResponse;
@@ -317,6 +338,7 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
         error: "",
         messages: [],
         nativeDebug: null,
+        engineLabel: "",
     };
     appendJobMessage(job, `${label} request started`);
     appendJobMessage(job, transcriptText ? `input: transcript (${transcriptText.length} chars)` : "input: transcript unavailable");
@@ -325,11 +347,12 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
 
     void (async () => {
         let response;
-        if (kind === "codexTimestamps") {
-            response = await generateCodexTimestamps(job, transcriptText, nativeTimeoutMs, metadata);
-        } else if (kind === "codexSummary") {
+        if (kind === "selectedProviderTimestamps") {
+            response = await generateSelectedProviderTimestamps(job, transcriptText, nativeTimeoutMs, metadata);
+        } else if (kind === "selectedProviderSummary") {
             response = await generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, metadata);
         } else {
+            job.engineLabel = "Apple Intelligence";
             appendJobMessage(job, "asking the app to use Apple Intelligence");
             response = await sendNative("generateContent", {
                 kind,
@@ -343,6 +366,15 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
         if (response?.ok) {
             job.status = "completed";
             job.text = response.text || "";
+            if (response.debug?.betaModel) {
+                appendJobMessage(job, `engine: ${response.debug.betaModel}`);
+            }
+            if (response.debug?.chunkStrategy) {
+                appendJobMessage(job, `chunk strategy: ${response.debug.chunkStrategy}`);
+            }
+            if (response.debug?.quotaStatus) {
+                appendJobMessage(job, `quota: ${response.debug.quotaStatus}`);
+            }
             appendJobMessage(job, `${label} completed with ${job.text.length} chars`);
         } else {
             job.status = "failed";

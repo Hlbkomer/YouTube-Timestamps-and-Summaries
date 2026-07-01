@@ -2,6 +2,8 @@
 
 This project can be distributed outside the Mac App Store as a signed and notarized macOS app.
 
+The same sandboxed build is used for Developer ID and App Store distribution. Optional Grok access uses an explicit browser OAuth sign-in; it does not bundle or register a helper.
+
 ## Prerequisites
 
 Before running the release script, make sure this Mac has:
@@ -97,6 +99,7 @@ Before attaching a release build:
 
 - open the exported app on a clean machine or user account
 - confirm Apple Intelligence is available on the test Mac only if it is selected for summaries
+- confirm Apple Intelligence Summary follows the documented macOS 26 or macOS 27 path and does not expose Private Cloud Compute experiments
 - confirm Safari can enable the extension
 - confirm ChatGPT sign-in works from the companion app
 - confirm the selected model and summary engine settings are shared with the Safari sidebar

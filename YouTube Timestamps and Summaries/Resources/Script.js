@@ -12,6 +12,14 @@ const generationSetupHint = document.getElementById("generation-setup-hint");
 const codexSignInButton = document.getElementById("codex-sign-in");
 const codexSignOutButton = document.getElementById("codex-sign-out");
 const copyCodexCodeButton = document.getElementById("copy-codex-code");
+const grokStatus = document.getElementById("grok-status");
+const grokSubscriptionHint = document.getElementById("grok-subscription-hint");
+const grokSignInButton = document.getElementById("grok-sign-in");
+const grokSignOutButton = document.getElementById("grok-sign-out");
+const grokPairing = document.getElementById("grok-pairing");
+const grokCallback = document.getElementById("grok-callback");
+const completeGrokLoginButton = document.getElementById("complete-grok-login");
+const cancelGrokLoginButton = document.getElementById("cancel-grok-login");
 
 function post(action, extra = {}) {
     webkit.messageHandlers.controller.postMessage({ action, ...extra });
@@ -23,11 +31,11 @@ function settingsLabel(useSettingsLabel) {
 
 function renderChecklist() {
     const items = [
-        "Optional: Sign in with ChatGPT for Timestamps and GPT Summaries.",
+        "Optional: Connect ChatGPT or Grok for Timestamps and model-powered Summaries.",
         "Choose the models used for Timestamps and Summary.",
         "Enable the Safari extension.",
         "Open a YouTube video with captions or a transcript.",
-        "<strong>Summary</strong> appears automatically. <strong>Timestamps</strong> appear when ChatGPT is connected.",
+        "<strong>Summary</strong> appears automatically. <strong>Timestamps</strong> appear when the selected provider is ready.",
     ];
     checklist.innerHTML = items.map((item) => `<li>${item}</li>`).join("");
 }
@@ -40,23 +48,12 @@ function renderOptions(select, options, selectedID) {
     select.value = selectedID || currentValue;
 }
 
-function selectedModelLabel() {
-    const selectedOption = modelSelect.options[modelSelect.selectedIndex];
-    return selectedOption?.textContent || "Selected model";
-}
-
-function syncSummaryModelLabel() {
-    const option = Array.from(summarySelect.options).find((item) => item.value === "selectedModel");
-    if (option) {
-        option.textContent = selectedModelLabel();
-    }
-}
-
 function saveGenerationSettings() {
     post("saveGenerationSettings", {
         providerID: providerSelect.value,
         modelID: modelSelect.value,
-        summaryEngine: summarySelect.value,
+        summaryEngine: summarySelect.value === "appleIntelligence" ? "appleIntelligence" : "selectedModel",
+        summaryModelID: summarySelect.value,
     });
 }
 
@@ -68,15 +65,15 @@ window.renderAppState = function renderAppState(state) {
 
     renderOptions(providerSelect, state.providerOptions || [], settings.providerID || "openaiCodex");
     renderOptions(modelSelect, state.modelOptions || [], settings.modelID || "gpt-5.5");
-    renderOptions(summarySelect, state.summaryOptions || [], settings.summaryEngine || "selectedModel");
-    syncSummaryModelLabel();
+    renderOptions(summarySelect, state.summaryOptions || [], settings.summaryModelID || settings.modelID || "appleIntelligence");
 
     const chatGPTConnected = Boolean(state.codex?.connected);
-    providerSelect.disabled = !chatGPTConnected;
-    modelSelect.disabled = !chatGPTConnected;
-    generationSetupHint.textContent = chatGPTConnected
+    const selectedProviderConnected = Boolean(state.selectedProviderConnected);
+    providerSelect.disabled = false;
+    modelSelect.disabled = !selectedProviderConnected;
+    generationSetupHint.textContent = selectedProviderConnected
         ? ""
-        : "Connect ChatGPT to enable timestamp model settings.";
+        : "Connect the selected provider to enable its timestamp model settings.";
 
     if (chatGPTConnected) {
         codexStatus.textContent = "ChatGPT is connected.";
@@ -90,6 +87,38 @@ window.renderAppState = function renderAppState(state) {
         codexStatus.dataset.state = "missing";
         codexSignInButton.hidden = false;
         codexSignOutButton.hidden = true;
+    }
+
+    const grokConnected = Boolean(state.grok?.connected);
+    const grokLoginInProgress = Boolean(state.grokLogin);
+    grokSubscriptionHint.hidden = grokConnected;
+    if (grokConnected) {
+        grokStatus.textContent = "Grok is connected.";
+        grokStatus.dataset.state = "connected";
+        grokSignInButton.hidden = true;
+        grokSignOutButton.hidden = false;
+    } else {
+        grokStatus.textContent = state.grok?.error
+            ? `Grok is not connected: ${state.grok.error}`
+            : "Grok is not connected.";
+        grokStatus.dataset.state = "missing";
+        grokSignInButton.hidden = false;
+        grokSignOutButton.hidden = true;
+    }
+
+    if (grokLoginInProgress) {
+        grokPairing.hidden = false;
+        grokSignInButton.textContent = "Signing in...";
+        grokSignInButton.disabled = true;
+        completeGrokLoginButton.disabled = false;
+        cancelGrokLoginButton.disabled = false;
+    } else {
+        grokPairing.hidden = true;
+        grokCallback.value = "";
+        grokSignInButton.textContent = "Sign in with Grok";
+        grokSignInButton.disabled = false;
+        completeGrokLoginButton.disabled = false;
+        cancelGrokLoginButton.disabled = false;
     }
 
     if (state.codexLogin) {
@@ -130,7 +159,6 @@ openPreferencesButton.addEventListener("click", () => {
 providerSelect.addEventListener("change", saveGenerationSettings);
 
 modelSelect.addEventListener("change", () => {
-    syncSummaryModelLabel();
     saveGenerationSettings();
 });
 
@@ -142,6 +170,22 @@ codexSignInButton.addEventListener("click", () => {
 
 codexSignOutButton.addEventListener("click", () => {
     post("signOutCodex");
+});
+
+grokSignInButton.addEventListener("click", () => {
+    post("startGrokLogin");
+});
+
+grokSignOutButton.addEventListener("click", () => {
+    post("signOutGrok");
+});
+
+completeGrokLoginButton.addEventListener("click", () => {
+    post("completeGrokLogin", { callback: grokCallback.value });
+});
+
+cancelGrokLoginButton.addEventListener("click", () => {
+    post("cancelGrokLogin");
 });
 
 copyCodexCodeButton.addEventListener("click", () => {

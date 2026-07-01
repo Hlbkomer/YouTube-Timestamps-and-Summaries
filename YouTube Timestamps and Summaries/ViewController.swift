@@ -19,10 +19,13 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
 
     private let safariBundleIdentifier = "com.apple.Safari"
     private let codexAuthService = CodexAuthService()
+    private let xaiAuthService = XAIAuthService()
     private var hasSizedWindow = false
     private var statusMessage: String?
     private var codexLoginSession: CodexDeviceLoginSession?
     private var codexLoginError: String?
+    private var grokLoginSession: XAIOAuthLoginSession?
+    private var grokLoginTask: Task<Void, Never>?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -97,6 +100,18 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         case "copyCodexCode":
             copyCodexCode()
 
+        case "startGrokLogin":
+            startGrokLogin()
+
+        case "completeGrokLogin":
+            completeGrokLogin(body)
+
+        case "cancelGrokLogin":
+            cancelGrokLogin()
+
+        case "signOutGrok":
+            signOutGrok()
+
         default:
             break
         }
@@ -106,7 +121,8 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         let settings = GenerationSettings(
             providerID: body["providerID"] as? String ?? GenerationSettings.defaultProviderID,
             modelID: body["modelID"] as? String ?? GenerationSettings.defaultModelID,
-            summaryEngine: body["summaryEngine"] as? String ?? GenerationSettings.defaultSummaryEngine
+            summaryEngine: body["summaryEngine"] as? String ?? GenerationSettings.defaultSummaryEngine,
+            summaryModelID: body["summaryModelID"] as? String
         )
         settings.save()
         Task { @MainActor in
@@ -155,6 +171,114 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         Task { @MainActor in
             await pushState(message: "Sign-in code copied.")
         }
+    }
+
+    private func startGrokLogin() {
+        guard grokLoginSession == nil else {
+            Task { @MainActor in
+                await pushState(message: "A Grok sign-in is already in progress.")
+            }
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let session = try await self.xaiAuthService.beginSignIn()
+                self.grokLoginSession = session
+                guard NSWorkspace.shared.open(session.authorizationURL) else {
+                    session.stop()
+                    self.grokLoginSession = nil
+                    await self.pushState(message: "Could not open the Grok sign-in page.")
+                    return
+                }
+
+                self.grokLoginTask = Task { @MainActor [weak self] in
+                    await self?.waitForGrokLoopback(session)
+                }
+                let message = session.loopbackAvailable
+                    ? "Grok sign-in opened in your browser. If Safari cannot connect to 127.0.0.1 after approval, paste the callback URL or code here."
+                    : "Grok sign-in opened in your browser. Paste the callback URL or code here after approval."
+                await self.pushState(message: message)
+            } catch {
+                await self.pushState(message: "Grok sign-in could not start: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func completeGrokLogin(_ body: [String: Any]) {
+        guard let session = grokLoginSession else {
+            Task { @MainActor in
+                await pushState(message: "Start a Grok sign-in first.")
+            }
+            return
+        }
+
+        let pastedCallback = (body["callback"] as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pastedCallback.isEmpty else {
+            Task { @MainActor in
+                await pushState(message: "Paste the callback URL or the authorization code from the Grok page.")
+            }
+            return
+        }
+
+        grokLoginTask?.cancel()
+        grokLoginTask = nil
+        session.stop()
+
+        Task { @MainActor in
+            do {
+                try await xaiAuthService.completeManualSignIn(session, pastedCallback: pastedCallback)
+                await finishGrokLogin(session, message: "Grok is connected.")
+            } catch {
+                guard grokLoginSession?.id == session.id else { return }
+                await pushState(message: "Grok sign-in could not be completed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func cancelGrokLogin() {
+        stopGrokLogin()
+        Task { @MainActor in
+            await pushState(message: "Grok sign-in cancelled.")
+        }
+    }
+
+    private func stopGrokLogin() {
+        guard let session = grokLoginSession else { return }
+        grokLoginTask?.cancel()
+        grokLoginTask = nil
+        session.stop()
+        grokLoginSession = nil
+    }
+
+    private func signOutGrok() {
+        stopGrokLogin()
+        xaiAuthService.signOut()
+        Task { @MainActor in
+            await pushState(message: "Signed out of Grok.")
+        }
+    }
+
+    private func waitForGrokLoopback(_ session: XAIOAuthLoginSession) async {
+        do {
+            try await xaiAuthService.completeLoopbackSignIn(session)
+            await finishGrokLogin(session, message: "Grok is connected.")
+        } catch {
+            guard !Task.isCancelled else { return }
+            guard grokLoginSession?.id == session.id else { return }
+            await pushState(message: "Grok is still waiting. If Safari cannot connect to 127.0.0.1, paste the callback URL or authorization code here.")
+        }
+    }
+
+    private func finishGrokLogin(_ session: XAIOAuthLoginSession, message: String) async {
+        guard grokLoginSession?.id == session.id else { return }
+        grokLoginTask?.cancel()
+        grokLoginTask = nil
+        session.stop()
+        grokLoginSession = nil
+        await pushState(message: message)
     }
 
     private func pollCodexLogin(_ session: CodexDeviceLoginSession) async {
@@ -338,26 +462,34 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         let appleIntelligenceState = appleIntelligenceState()
         let settings = GenerationSettings.load()
         let codexStatus = await codexAuthService.statusPayload(refresh: true)
+        let grokStatus = await xaiAuthService.statusPayload(refresh: true)
         let codexConnected = (codexStatus["connected"] as? Bool) == true
+        let grokConnected = (grokStatus["connected"] as? Bool) == true
+        let selectedProviderConnected = settings.providerID == GenerationSettings.grokProviderID
+            ? grokConnected
+            : codexConnected
         let effectiveSettings = effectiveGenerationSettings(
             settings,
             appleIntelligenceAvailable: appleIntelligenceState.available,
-            codexConnected: codexConnected
+            selectedProviderConnected: selectedProviderConnected
         )
 
         return [
             "appleIntelligenceAvailable": appleIntelligenceState.available,
             "appleIntelligenceAvailability": appleIntelligenceState.availability,
             "codex": mergedCodexStatus(codexStatus),
+            "grok": grokStatus,
             "codexLogin": codexLoginSession?.payload ?? NSNull(),
+            "grokLogin": grokLoginSession?.payload ?? NSNull(),
             "settings": effectiveSettings.payload,
             "providerOptions": GenerationSettings.providerOptions,
-            "modelOptions": GenerationSettings.modelOptions,
+            "modelOptions": GenerationSettings.modelOptions(for: effectiveSettings.providerID),
             "summaryOptions": summaryOptions(
-                modelID: effectiveSettings.modelID,
+                providerID: effectiveSettings.providerID,
                 appleIntelligenceAvailable: appleIntelligenceState.available,
-                codexConnected: codexConnected
+                selectedProviderConnected: selectedProviderConnected
             ),
+            "selectedProviderConnected": selectedProviderConnected,
             "extensionEnabled": extensionEnabled as Any,
             "usesSettingsLabel": ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 13,
             "message": (message ?? statusMessage) ?? NSNull(),
@@ -367,41 +499,35 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
     private func effectiveGenerationSettings(
         _ settings: GenerationSettings,
         appleIntelligenceAvailable: Bool,
-        codexConnected: Bool
+        selectedProviderConnected: Bool
     ) -> GenerationSettings {
-        if !codexConnected, appleIntelligenceAvailable {
+        if !selectedProviderConnected, appleIntelligenceAvailable {
             return GenerationSettings(
                 providerID: settings.providerID,
                 modelID: settings.modelID,
-                summaryEngine: "appleIntelligence"
+                summaryEngine: "appleIntelligence",
+                summaryModelID: GenerationSettings.appleIntelligenceModelID
             )
         }
 
-        guard settings.summaryEngine == "appleIntelligence", !appleIntelligenceAvailable else {
+        guard settings.summaryModelID == GenerationSettings.appleIntelligenceModelID, !appleIntelligenceAvailable else {
             return settings
         }
 
         return GenerationSettings(
             providerID: settings.providerID,
             modelID: settings.modelID,
-            summaryEngine: "selectedModel"
+            summaryEngine: "selectedModel",
+            summaryModelID: settings.modelID
         )
     }
 
     private func summaryOptions(
-        modelID: String,
+        providerID: String,
         appleIntelligenceAvailable: Bool,
-        codexConnected: Bool
+        selectedProviderConnected: Bool
     ) -> [[String: String]] {
-        let modelLabel = GenerationSettings.modelOptions
-            .first { $0["id"] == modelID }?["label"]
-            ?? "Selected model"
-        let modelOption = [
-            "id": "selectedModel",
-            "label": modelLabel,
-        ]
-
-        if !codexConnected {
+        if !selectedProviderConnected {
             return appleIntelligenceAvailable
                 ? [
                     [
@@ -412,17 +538,15 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
                 : []
         }
 
-        guard appleIntelligenceAvailable else {
-            return [modelOption]
-        }
+        let providerModels = GenerationSettings.modelOptions(for: providerID)
+        guard appleIntelligenceAvailable else { return providerModels }
 
         return [
             [
                 "id": "appleIntelligence",
                 "label": "Apple Intelligence",
             ],
-            modelOption,
-        ]
+        ] + providerModels
     }
 
     private func mergedCodexStatus(_ codexStatus: [String: Any]) -> [String: Any] {
