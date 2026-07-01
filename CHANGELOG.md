@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v1.0.5 - 2026-07-01
+
 - Add optional Grok browser OAuth, shared between the sandboxed companion app and Safari extension, with direct xAI Responses requests and no command-line client, Login Item, background helper, or developer backend.
 - Add a manual Grok OAuth callback fallback: when Safari cannot connect to the temporary `127.0.0.1` callback after approval, the companion app accepts the complete callback URL or the one-time authorization code and finishes the same PKCE sign-in attempt.
 - Keep the unresolved automatic loopback-callback issue visible in the Grok integration notes; the manual fallback is a tested workaround, not a claim that the underlying Safari/macOS 27 beta behavior is fixed.
