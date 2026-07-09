@@ -142,7 +142,9 @@ final class CodexGenerationService {
                 prompt: """
                 Summarize this video transcript clearly and concisely.
                 \(outputLanguageInstruction(languageContext: languageContext, outputName: "summary"))
-                Start with a short overview, then include useful bullet points.
+                Start with a short overview paragraph.
+                Then use bold section labels like **Main Topic** with useful bullet points.
+                Use one nested bullet level only when it adds helpful detail.
 
                 Transcript:
                 \(transcriptText)

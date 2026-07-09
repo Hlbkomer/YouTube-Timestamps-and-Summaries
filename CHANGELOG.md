@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Integrate results into YouTube's native `In this video` panel when available, with injected `Chapters` and `Summary` tabs plus the existing standalone sidebar fallback.
+- Use native YouTube chapters when present and skip generated timestamp creation for those videos.
+- Add a chapter source setting in the companion app: prefer YouTube chapters by default, or always generate extension chapters.
+- Add a Safari popup `Show generated chapters (Override native chapters)` checkbox so weak YouTube-provided chapters can be replaced with generated chapters, or restored, for the current video session.
+- Remove the Safari popup's custom `Extension enabled` toggle; extension enablement now stays in Safari's own extension settings.
+- Keep the Safari popup's generated-chapter override checkbox in sync after the popup closes and reopens.
+- Keep Safari popup chapter controls enabled on active YouTube video tabs by using `activeTab` permission and a resilient active-tab lookup.
+- Generate transcript-based chapters inside the native panel when YouTube does not provide chapters.
+- Share transcript fetching across timestamp generation, summary generation, and native transcript copy so one in-flight transcript request is reused per video.
+- Add native-panel copy controls for generated chapters, summaries, and transcripts.
+- Stabilize native panel tab order, sizing, scrolling, and Timeline/Transcript tab switching, including a non-destructive native-tab handoff.
+- Respect YouTube's native `Timeline` surface after it is selected instead of forcing the `In this video` panel back open during resync.
+- Highlight the active generated chapter during playback and seeking.
+- Render summary bold text, bold section labels, and one nested bullet level in the native panel and sidebar fallback.
+- Restore YouTube-owned sibling engagement panels before handing off to native tabs such as `Timeline`.
+- Extract native YouTube panel mounting, tab, visibility, sizing, and header-copy behavior into `native-panel.js`.
+- Document the native panel implementation in `docs/native-panel-integration.md`.
+- Default Grok to Grok 4.5, keep Grok 4.3 as a fallback, and refresh connected xAI text model options from the account-scoped catalog when available.
+- Filter old Grok 4.20 models out of the dynamic Grok model catalog.
+- Add a remote ChatGPT/Codex model catalog so new `gpt-*` picker options can be added from the repository without a binary update.
+- Add GPT-5.6 Sol, Terra, and Luna to the remote ChatGPT/Codex model catalog.
+- Document Grok catalog filtering and the ChatGPT/Codex remote catalog format, cache behavior, and publication process.
+
 ## v1.0.5 - 2026-07-01
 
 - Add optional Grok browser OAuth, shared between the sandboxed companion app and Safari extension, with direct xAI Responses requests and no command-line client, Login Item, background helper, or developer backend.

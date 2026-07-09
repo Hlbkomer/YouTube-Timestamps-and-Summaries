@@ -9,11 +9,11 @@ Timestamps & Summaries for YT is a Safari extension and macOS companion app that
 - chronological timestamps for YouTube videos
 - short summaries for YouTube videos
 
-The extension adds a right-side sidebar on supported YouTube video pages. It reads the available YouTube transcript, creates summaries with Apple Intelligence on the Mac or the selected provider, and creates timestamps when the selected provider is ready. No API key or developer backend is required.
+The extension integrates with YouTube's native `In this video` panel when available, with a standalone sidebar fallback. It reads the available YouTube transcript, creates summaries with Apple Intelligence on the Mac or the selected provider, and creates chapters/timestamps when the selected provider is ready. No API key or developer backend is required.
 
 ![Companion app screenshot](readme-assets/companion-app.png)
 
-![YouTube sidebar screenshot](readme-assets/youtube-sidebar.png)
+![YouTube integration screenshot](readme-assets/youtube-sidebar.png)
 
 ## How It Works
 
@@ -22,9 +22,11 @@ The extension adds a right-side sidebar on supported YouTube video pages. It rea
 3. Apple Intelligence can create summaries locally without a provider.
 4. If the selected provider is ready, it creates timestamp candidates from the transcript.
 5. The selected provider or Apple Intelligence creates the summary, depending on the user's setting.
-6. The extension validates timestamp candidates against real transcript cue times before showing clickable timestamps.
+6. The extension validates timestamp candidates against real transcript cue times before showing clickable generated chapters.
 
-Successful results include a small caption with the active model or Apple Intelligence plus elapsed generation time, for example `Generated with Grok 4.3 in 8 seconds.` or `Generated with Apple Intelligence in 150 seconds.` The tab labels remain simply `Timestamps` and `Summary`.
+When YouTube already provides native chapters, the extension uses those chapters and skips generated timestamp creation for that video by default. The companion app and Safari popup can switch the default to always generate extension chapters, and the Safari popup can override the current video between YouTube chapters and generated chapters. When generated chapters are shown, the currently playing generated chapter is highlighted during playback.
+
+Successful results include a small caption with the active model or Apple Intelligence plus elapsed generation time, for example `Generated with Grok 4.5 in 8 seconds.` or `Generated with Apple Intelligence in 150 seconds.` In the native panel, generated timestamps are presented as `Chapters`; in the standalone fallback they remain `Timestamps`.
 
 ## Requirements
 
@@ -41,6 +43,10 @@ Successful results include a small caption with the active model or Apple Intell
 - When Apple Intelligence is selected, the single Summary tab uses the established path on macOS 26 and the on-device token-aware path on macOS 27. Private Cloud Compute is deferred while its managed entitlement is pending.
 - Grok uses an explicit browser OAuth sign-in, then the sandboxed extension sends direct HTTPS requests to xAI. It does not use a command-line client or a helper process. If Safari cannot reach the temporary local callback page after approval, the companion app can complete that same sign-in from a pasted callback URL or one-time authorization code.
 - The app does not require API keys or a developer-operated backend for generation.
+
+The native YouTube panel implementation notes are documented in [native-panel-integration.md](native-panel-integration.md).
+
+The Grok and ChatGPT/Codex picker catalog behavior, model exclusions, and remote catalog maintenance process are documented in [model-catalog.md](model-catalog.md).
 
 ## Download And Support
 

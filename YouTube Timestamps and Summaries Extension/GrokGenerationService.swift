@@ -112,7 +112,9 @@ final class GrokGenerationService {
                 """
                 Summarize this video transcript clearly and concisely.
                 \(Self.outputLanguageInstruction(languageContext: languageContext, outputName: "summary"))
-                Start with a short overview, then include useful bullet points.
+                Start with a short overview paragraph.
+                Then use bold section labels like **Main Topic** with useful bullet points.
+                Use one nested bullet level only when it adds helpful detail.
 
                 Transcript:
                 \(transcript)
@@ -148,7 +150,7 @@ final class GrokGenerationService {
             guard !transcriptText.isEmpty else {
                 throw GrokGenerationError.missingTranscript
             }
-            guard GenerationSettings.supportedModelIDs(for: Self.providerID).contains(safeModel) else {
+            guard GenerationSettings.isUsableModelID(safeModel, providerID: Self.providerID) else {
                 throw GrokGenerationError.unsupportedModel
             }
 

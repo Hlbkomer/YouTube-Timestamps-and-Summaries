@@ -2,12 +2,12 @@
 
 Safari extension and macOS companion app that generates YouTube summaries with Apple Intelligence or a selected provider, and timestamps with ChatGPT/Codex or Grok.
 
-It adds a right-side sidebar to YouTube with:
+It integrates with YouTube's native `In this video` panel when available, with a standalone sidebar fallback, and shows:
 
-- automatic video timestamps when the selected provider is ready
+- automatic video chapters/timestamps when the selected provider is ready
 - automatic video summaries
 
-The extension reads the available YouTube transcript, creates summaries with Apple Intelligence on the Mac or the selected provider, and creates timestamps when the selected provider is ready. No API key or developer backend is required.
+The extension reads the available YouTube transcript, creates summaries with Apple Intelligence on the Mac or the selected provider, and creates chapters/timestamps when the selected provider is ready. No API key or developer backend is required.
 
 Under the hood, the extension keeps transcript timing deterministic, validates generated timestamps against real transcript cue times, and keeps Apple Intelligence available as an optional local summary engine. See [ARCHITECTURE.md](ARCHITECTURE.md) for the current generation pipeline and guardrails.
 
@@ -29,18 +29,21 @@ After unzipping, move the app to `Applications`, open it and enable the Safari e
 
 ![Companion app screenshot](docs/readme-assets/companion-app.png)
 
-### YouTube Sidebar
+### YouTube Integration
 
-![YouTube sidebar screenshot](docs/readme-assets/youtube-sidebar.png)
+![YouTube integration screenshot](docs/readme-assets/youtube-sidebar.png)
 
 ## Features
 
-- right-side YouTube sidebar with `Timestamps` and `Summary`
+- YouTube-native `In this video` integration with generated `Chapters` and `Summary`, plus standalone sidebar fallback
 - transcript-based generation for better timestamp accuracy
+- native YouTube chapters are reused by default when available
+- chapter source controls to prefer native YouTube chapters, always generate extension chapters, or override the current video from the Safari popup
+- generated chapters can highlight the currently playing chapter
 - configurable provider/model for timestamp generation and optional model summaries
 - optional ChatGPT/Codex or Grok sign-in
 - summaries can use Apple Intelligence without a provider, or the selected provider model when available
-- result captions show the model/path used and the generation time, while the `Timestamps` and `Summary` tab labels stay stable
+- result captions show the model/path used and the generation time, while extension tab labels stay stable
 - no API key or developer backend
 
 ## Project Structure
@@ -50,11 +53,11 @@ After unzipping, move the app to `Applications`, open it and enable the Safari e
 
 ## Extension Routing Notes
 
-The Safari extension intentionally keeps the sidebar script scoped to supported YouTube video pages only:
+The Safari extension intentionally keeps the YouTube content script scoped to supported YouTube video pages only:
 
-- `content.js` should run on YouTube watch/live pages, where the timestamps and summary sidebar is mounted.
+- `content.js` should run on YouTube watch/live pages, where the native-panel integration or standalone sidebar fallback is mounted.
 - `route-guard.js` can run on broader YouTube pages, but only to turn watch/live single-page navigations into full navigations so Safari injects `content.js`.
-- Do not broaden `content.js` to all YouTube pages. Running the sidebar script on Shorts, feeds, subscriptions, or the homepage can disturb YouTube's own layout.
+- Do not broaden `content.js` to all YouTube pages. Running the full integration script on Shorts, feeds, subscriptions, or the homepage can disturb YouTube's own layout.
 
 The `tests/js/manifest-routing.test.cjs` test protects this split.
 
@@ -76,7 +79,9 @@ For Developer ID signing, notarization, and release packaging, see [RELEASING.md
 
 Choose **Sign in with Grok** in the companion app to use a SuperGrok subscription. The app opens the xAI browser sign-in flow and uses the resulting OAuth session directly from the sandboxed app and Safari extension. No command-line client, Login Item, background helper, or developer backend is involved.
 
-The app currently exposes **Grok 4.3** for both timestamps and selected-provider summaries. If Safari cannot open the temporary `127.0.0.1` callback page after you approve the xAI request, copy the complete callback URL from Safari (or the one-time authorization code shown by xAI), paste it into the companion app's Grok sign-in panel, and choose **Complete Sign-In**. This is a working fallback for an automatic-callback issue still being investigated; see [docs/grok-integration.md](docs/grok-integration.md).
+The app defaults Grok to **Grok 4.5**, keeps **Grok 4.3** available as a fallback, and refreshes the connected account's text-capable Grok model catalog from xAI when possible. If Safari cannot open the temporary `127.0.0.1` callback page after you approve the xAI request, copy the complete callback URL from Safari (or the one-time authorization code shown by xAI), paste it into the companion app's Grok sign-in panel, and choose **Complete Sign-In**. This is a working fallback for an automatic-callback issue still being investigated; see [docs/grok-integration.md](docs/grok-integration.md).
+
+ChatGPT/Codex begins with tested local choices and can receive new `gpt-*` picker options from the repository's remote catalog without a binary update. The catalog maintenance and provider model policy are documented in [docs/model-catalog.md](docs/model-catalog.md).
 
 ## Apple Intelligence Summary By macOS Version
 
@@ -89,7 +94,7 @@ This applies only when Apple Intelligence is selected for summaries. ChatGPT and
 
 For release notes, see [CHANGELOG.md](CHANGELOG.md).
 
-For the transcript-analysis design, see [ARCHITECTURE.md](ARCHITECTURE.md).
+For the transcript-analysis design, see [ARCHITECTURE.md](ARCHITECTURE.md). For the native YouTube panel implementation notes, see [docs/native-panel-integration.md](docs/native-panel-integration.md).
 
 ## Limitations
 
@@ -109,7 +114,7 @@ For the transcript-analysis design, see [ARCHITECTURE.md](ARCHITECTURE.md).
 - Enable Apple Intelligence in macOS Settings.
 - Wait for the on-device model to finish downloading if macOS says it is not ready yet.
 
-### The Safari sidebar does not appear on YouTube
+### The Safari panel does not appear on YouTube
 
 - Open the companion app and make sure the Safari extension is enabled.
 - In Safari, verify the extension has access to YouTube.
@@ -129,6 +134,7 @@ For the transcript-analysis design, see [ARCHITECTURE.md](ARCHITECTURE.md).
 - ChatGPT sign-in tokens are stored locally in the app group container so the app and extension can use the user's own signed-in account.
 - Grok OAuth tokens are stored locally in the app group container so the app and extension can use the user's signed-in account. The app does not use a command-line client or a separate helper.
 - Transcript text is sent to the selected provider for timestamp generation and, if selected, summary generation.
+- The companion app can fetch a small model catalog JSON file from this repository on GitHub to keep ChatGPT/Codex picker options current; this request does not include transcripts or sign-in tokens.
 - When Apple Intelligence is selected for summaries, transcript text is processed locally by the app extension on the user's Mac.
 - The WebExtension requests host access only for YouTube pages.
 

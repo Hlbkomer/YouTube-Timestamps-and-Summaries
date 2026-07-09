@@ -23,6 +23,7 @@ When a user uses the app, the following information may be processed:
 - ChatGPT sign-in tokens after the user signs in
 - Grok OAuth tokens after the user signs in
 - local app settings
+- a small model catalog fetched from this project's GitHub repository
 
 ## How Information Is Used
 
@@ -32,6 +33,7 @@ This information is used only to:
 - keep the user's ChatGPT sign-in active for generation
 - keep the user's Grok sign-in active for generation
 - remember local app preferences
+- keep the provider model picker current
 
 ## Local Storage
 
@@ -47,7 +49,7 @@ The app does not use a separate developer-operated backend server for generation
 
 The app does not sell personal data.
 
-The app does not intentionally share user data with a developer-operated server.
+The app does not intentionally share user data with a developer-operated server. The companion app may fetch a static model catalog JSON file from this project's GitHub repository; that request does not include YouTube transcripts, video URLs, or provider sign-in tokens.
 
 For timestamp generation, transcript text is sent through the selected provider: the user's signed-in ChatGPT or Grok account. For summary generation, transcript text is sent to the selected provider or processed locally with Apple Intelligence on the user's Mac, depending on the user's app setting.
 

@@ -307,6 +307,7 @@ final class XAIOAuthLoginSession {
 final class XAIAuthService {
     private static let clientID = "b1a00492-073a-47ea-816f-4c329264a828"
     private static let discoveryURL = URL(string: "https://auth.x.ai/.well-known/openid-configuration")!
+    private static let languageModelsURL = URL(string: "https://api.x.ai/v1/language-models")!
     private static let redirectURL = "http://127.0.0.1:\(XAILoopbackCallbackServer.port)/callback"
     private static let scope = "openid profile email offline_access grok-cli:access api:access"
     private static let refreshSkew: TimeInterval = 60 * 60
@@ -340,6 +341,42 @@ final class XAIAuthService {
             return [
                 "connected": false,
                 "error": refresh ? error.localizedDescription : "",
+            ]
+        }
+    }
+
+    func modelOptions() async throws -> [[String: String]] {
+        let accessToken = try await tokens(refresh: true).accessToken
+        let (data, response) = try await get(url: Self.languageModelsURL, bearerToken: accessToken)
+        if response.statusCode == 401 {
+            signOut()
+            throw XAIAuthError.requestFailed("Grok sign-in expired. Sign in again from the companion app.")
+        }
+        guard response.statusCode == 200 else {
+            throw XAIAuthError.requestFailed(errorMessage(from: data) ?? "Grok model catalog could not be loaded.")
+        }
+        guard
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let models = json["models"] as? [[String: Any]]
+        else {
+            throw XAIAuthError.invalidResponse("Grok model catalog returned an invalid response.")
+        }
+
+        var seen = Set<String>()
+        return models.compactMap { model -> [String: String]? in
+            guard
+                let id = model["id"] as? String,
+                GenerationSettings.isUsableModelID(id, providerID: GenerationSettings.grokProviderID),
+                hasModality("text", in: model["input_modalities"]),
+                hasModality("text", in: model["output_modalities"]),
+                !seen.contains(id)
+            else {
+                return nil
+            }
+            seen.insert(id)
+            return [
+                "id": id,
+                "label": GenerationSettings.modelLabel(for: id, providerID: GenerationSettings.grokProviderID),
             ]
         }
     }
@@ -626,6 +663,28 @@ final class XAIAuthService {
             throw XAIAuthError.invalidResponse("xAI returned an invalid network response.")
         }
         return (data, httpResponse)
+    }
+
+    private func get(url: URL, bearerToken: String) async throws -> (Data, HTTPURLResponse) {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 20
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("TimestampsSummariesForYT/1.0", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw XAIAuthError.invalidResponse("xAI returned an invalid network response.")
+        }
+        return (data, httpResponse)
+    }
+
+    private func hasModality(_ modality: String, in value: Any?) -> Bool {
+        guard let modalities = value as? [String] else {
+            return false
+        }
+        return modalities.contains(modality)
     }
 
     private func formBody(_ values: [String: String]) -> Data {

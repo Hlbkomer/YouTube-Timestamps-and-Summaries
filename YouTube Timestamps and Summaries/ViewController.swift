@@ -20,6 +20,7 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
     private let safariBundleIdentifier = "com.apple.Safari"
     private let codexAuthService = CodexAuthService()
     private let xaiAuthService = XAIAuthService()
+    private let remoteModelCatalogService = RemoteModelCatalogService()
     private var hasSizedWindow = false
     private var statusMessage: String?
     private var codexLoginSession: CodexDeviceLoginSession?
@@ -122,7 +123,8 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             providerID: body["providerID"] as? String ?? GenerationSettings.defaultProviderID,
             modelID: body["modelID"] as? String ?? GenerationSettings.defaultModelID,
             summaryEngine: body["summaryEngine"] as? String ?? GenerationSettings.defaultSummaryEngine,
-            summaryModelID: body["summaryModelID"] as? String
+            summaryModelID: body["summaryModelID"] as? String,
+            chapterPreference: body["chapterPreference"] as? String ?? GenerationSettings.defaultChapterPreference
         )
         settings.save()
         Task { @MainActor in
@@ -473,6 +475,11 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             appleIntelligenceAvailable: appleIntelligenceState.available,
             selectedProviderConnected: selectedProviderConnected
         )
+        let modelOptions = await modelOptions(
+            providerID: effectiveSettings.providerID,
+            settings: effectiveSettings,
+            selectedProviderConnected: selectedProviderConnected
+        )
 
         return [
             "appleIntelligenceAvailable": appleIntelligenceState.available,
@@ -483,9 +490,10 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             "grokLogin": grokLoginSession?.payload ?? NSNull(),
             "settings": effectiveSettings.payload,
             "providerOptions": GenerationSettings.providerOptions,
-            "modelOptions": GenerationSettings.modelOptions(for: effectiveSettings.providerID),
+            "modelOptions": modelOptions,
+            "chapterPreferenceOptions": GenerationSettings.chapterPreferenceOptions,
             "summaryOptions": summaryOptions(
-                providerID: effectiveSettings.providerID,
+                providerModels: modelOptions,
                 appleIntelligenceAvailable: appleIntelligenceState.available,
                 selectedProviderConnected: selectedProviderConnected
             ),
@@ -506,7 +514,8 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
                 providerID: settings.providerID,
                 modelID: settings.modelID,
                 summaryEngine: "appleIntelligence",
-                summaryModelID: GenerationSettings.appleIntelligenceModelID
+                summaryModelID: GenerationSettings.appleIntelligenceModelID,
+                chapterPreference: settings.chapterPreference
             )
         }
 
@@ -518,12 +527,13 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             providerID: settings.providerID,
             modelID: settings.modelID,
             summaryEngine: "selectedModel",
-            summaryModelID: settings.modelID
+            summaryModelID: settings.modelID,
+            chapterPreference: settings.chapterPreference
         )
     }
 
     private func summaryOptions(
-        providerID: String,
+        providerModels: [[String: String]],
         appleIntelligenceAvailable: Bool,
         selectedProviderConnected: Bool
     ) -> [[String: String]] {
@@ -538,7 +548,6 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
                 : []
         }
 
-        let providerModels = GenerationSettings.modelOptions(for: providerID)
         guard appleIntelligenceAvailable else { return providerModels }
 
         return [
@@ -547,6 +556,72 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
                 "label": "Apple Intelligence",
             ],
         ] + providerModels
+    }
+
+    private func modelOptions(
+        providerID: String,
+        settings: GenerationSettings,
+        selectedProviderConnected: Bool
+    ) async -> [[String: String]] {
+        var options = GenerationSettings.modelOptions(for: providerID)
+
+        if providerID == GenerationSettings.chatGPTProviderID {
+            if let remoteCatalog = await remoteModelCatalogService.modelCatalog(for: providerID) {
+                options = mergedModelOptions(
+                    primary: remoteCatalog.modelOptions,
+                    fallback: options.filter { option in
+                        guard let id = option["id"] else { return false }
+                        return !remoteCatalog.excludes(id)
+                    }
+                )
+            }
+        } else if providerID == GenerationSettings.grokProviderID, selectedProviderConnected {
+            do {
+                let remoteOptions = try await xaiAuthService.modelOptions()
+                if !remoteOptions.isEmpty {
+                    options = mergedModelOptions(primary: remoteOptions, fallback: options)
+                }
+            } catch {
+                // The static model list remains usable if xAI's account-scoped catalog is unavailable.
+            }
+        }
+
+        options = addingModelOptionIfNeeded(settings.modelID, providerID: providerID, to: options)
+        if settings.summaryModelID != GenerationSettings.appleIntelligenceModelID {
+            options = addingModelOptionIfNeeded(settings.summaryModelID, providerID: providerID, to: options)
+        }
+        return options
+    }
+
+    private func mergedModelOptions(
+        primary: [[String: String]],
+        fallback: [[String: String]]
+    ) -> [[String: String]] {
+        var seen = Set<String>()
+        var merged: [[String: String]] = []
+        for option in primary + fallback {
+            guard let id = option["id"], !seen.contains(id) else { continue }
+            seen.insert(id)
+            merged.append(option)
+        }
+        return merged
+    }
+
+    private func addingModelOptionIfNeeded(
+        _ modelID: String,
+        providerID: String,
+        to options: [[String: String]]
+    ) -> [[String: String]] {
+        guard
+            GenerationSettings.isUsableModelID(modelID, providerID: providerID),
+            !options.contains(where: { $0["id"] == modelID })
+        else {
+            return options
+        }
+        return [[
+            "id": modelID,
+            "label": GenerationSettings.modelLabel(for: modelID, providerID: providerID),
+        ]] + options
     }
 
     private func mergedCodexStatus(_ codexStatus: [String: Any]) -> [String: Any] {

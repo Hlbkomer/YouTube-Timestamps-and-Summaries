@@ -63,6 +63,179 @@ test("parseTimestamps parses common timestamp formats", () => {
     ]);
 });
 
+test("parseNativeYouTubeChapters reads macro marker engagement panels", () => {
+    const parsed = helpers.parseNativeYouTubeChapters({
+        engagementPanels: [
+            {
+                engagementPanelSectionListRenderer: {
+                    targetId: "engagement-panel-macro-markers-description-chapters",
+                    content: {
+                        macroMarkersListRenderer: {
+                            contents: [
+                                {
+                                    macroMarkersInfoItemRenderer: {
+                                        infoText: { simpleText: "Chapters" },
+                                    },
+                                },
+                                {
+                                    macroMarkersListItemRenderer: {
+                                        title: { simpleText: "Show Open" },
+                                        timeDescription: { simpleText: "0:00" },
+                                        onTap: {
+                                            watchEndpoint: {
+                                                startTimeSeconds: 0,
+                                            },
+                                        },
+                                        repeatButton: {
+                                            toggleButtonRenderer: {
+                                                defaultServiceEndpoint: {
+                                                    repeatChapterCommand: {
+                                                        startTimeMs: "0",
+                                                        endTimeMs: "300000",
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                                {
+                                    macroMarkersListItemRenderer: {
+                                        title: { runs: [{ text: "Headlines" }] },
+                                        timeDescription: { simpleText: "5:00" },
+                                        onTap: {
+                                            watchEndpoint: {
+                                                startTimeSeconds: 300,
+                                            },
+                                        },
+                                        repeatButton: {
+                                            toggleButtonRenderer: {
+                                                defaultServiceEndpoint: {
+                                                    repeatChapterCommand: {
+                                                        startTimeMs: "300000",
+                                                        endTimeMs: "900000",
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            },
+        ],
+    });
+
+    assert.deepEqual(parsed, [
+        { time: "0:00", label: "Show Open", seconds: 0 },
+        { time: "5:00", label: "Headlines", seconds: 300 },
+    ]);
+});
+
+test("parseNativeYouTubeChapters falls back to player bar chapters", () => {
+    const parsed = helpers.parseNativeYouTubeChapters({
+        playerOverlays: {
+            playerOverlayRenderer: {
+                decoratedPlayerBarRenderer: {
+                    decoratedPlayerBarRenderer: {
+                        playerBar: {
+                            multiMarkersPlayerBarRenderer: {
+                                markersMap: [
+                                    {
+                                        value: {
+                                            chapters: [
+                                                {
+                                                    chapterRenderer: {
+                                                        title: { simpleText: "Intro" },
+                                                        timeRangeStartMillis: 0,
+                                                    },
+                                                },
+                                                {
+                                                    chapterRenderer: {
+                                                        title: { simpleText: "Manual Overwrite" },
+                                                        timeRangeStartMillis: 107000,
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    assert.deepEqual(parsed, [
+        { time: "0:00", label: "Intro", seconds: 0 },
+        { time: "1:47", label: "Manual Overwrite", seconds: 107 },
+    ]);
+});
+
+test("parseNativeYouTubeChapters deduplicates repeated native chapter entries", () => {
+    const parsed = helpers.parseNativeYouTubeChapters({
+        engagementPanels: [
+            {
+                engagementPanelSectionListRenderer: {
+                    content: {
+                        macroMarkersListRenderer: {
+                            contents: [
+                                {
+                                    macroMarkersListItemRenderer: {
+                                        title: { simpleText: "Intro" },
+                                        timeDescription: { simpleText: "0:00" },
+                                    },
+                                },
+                                {
+                                    macroMarkersListItemRenderer: {
+                                        title: { simpleText: "Intro" },
+                                        timeDescription: { simpleText: "0:00" },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            },
+        ],
+    });
+
+    assert.deepEqual(parsed, [
+        { time: "0:00", label: "Intro", seconds: 0 },
+    ]);
+});
+
+test("hasNativeYouTubeChapters reports absent native chapters", () => {
+    assert.equal(helpers.parseNativeYouTubeChapters({ engagementPanels: [] }).length, 0);
+    assert.equal(helpers.hasNativeYouTubeChapters({ engagementPanels: [] }), false);
+});
+
+test("renderSummaryHTML preserves bold sections and one nested bullet level", () => {
+    const html = helpers.renderSummaryHTML([
+        "Quick overview with **important** detail and <unsafe>.",
+        "",
+        "**Main Topic**",
+        "- First **key** point",
+        "  - Nested detail with [link](https://example.com) and `code`",
+        "- Second *emphasis* point",
+        "",
+        "__Next Topic__:",
+        "* Star bullet",
+    ].join("\n"));
+
+    assert.equal(
+        html,
+        '<p>Quick overview with <strong>important</strong> detail and &lt;unsafe&gt;.</p>'
+            + '<div class="summary-section-title"><strong>Main Topic</strong></div>'
+            + '<ul><li>First <strong>key</strong> point<ul><li>Nested detail with link and code</li></ul></li><li>Second emphasis point</li></ul>'
+            + '<div class="summary-section-title"><strong>Next Topic</strong>:</div>'
+            + '<ul><li>Star bullet</li></ul>',
+    );
+});
+
 test("generation availability defaults to Summary when ChatGPT is disconnected and Apple Intelligence can summarize", () => {
     const status = {
         codexConnected: false,

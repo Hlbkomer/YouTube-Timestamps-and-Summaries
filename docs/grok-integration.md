@@ -36,23 +36,26 @@ When sign-in starts, the companion app now shows a field for the complete callba
 
 For a full callback URL, the app verifies the original OAuth `state` value before exchanging the code. A bare one-time code is bound to the same in-memory PKCE verifier. The code is not saved and can be used only during that short-lived sign-in session.
 
-This fallback was successfully tested: the pasted callback completed sign-in and Grok 4.3 generated YouTube timestamps. It is a workaround; the automatic local callback remains a follow-up issue.
+This fallback was successfully tested: the pasted callback completed sign-in and Grok generated YouTube timestamps. It is a workaround; the automatic local callback remains a follow-up issue.
 
 ## Model Policy
 
-xAI describes `grok-build-0.1` as a coding model. This app is generating transcript timestamps and summaries, so it exposes only `grok-4.3` for both choices. Former saved `grok-build-0.1` settings automatically fall back to `grok-4.3` when the app or extension loads settings.
+xAI describes `grok-4.5` as its current frontier model for coding, agentic tasks, and knowledge work. This app defaults Grok timestamps and selected-provider summaries to `grok-4.5`, keeps `grok-4.3` available as a fallback, and refreshes the connected account's text-input/text-output Grok model list from `https://api.x.ai/v1/language-models` when possible.
+
+The runtime catalog is filtered to provider-shaped `grok-*` language models with text output. Grok 4.20, Grok Build, Imagine, and voice models are not valid timestamp/summary choices. Former saved 4.20 or `grok-build-0.1` settings automatically fall back to `grok-4.5` when the app or extension loads settings.
 
 For xAI's current model catalog and pricing, consult the official [models page](https://docs.x.ai/developers/models) and [pricing page](https://docs.x.ai/developers/pricing).
 
-## xAI Catalog Check — 2026-06-24
+## xAI Catalog Check — 2026-07-09
 
 xAI's catalog can change, so its official pages above are the source of truth. At the time of this check, the official models page presented these primary offerings:
 
-- text/chat: `grok-4.3` and `grok-build-0.1`
+- text/chat: `grok-4.5` and `grok-4.3`
+- code-specific pricing still lists `grok-build-0.1`
 - image and video: `grok-imagine-image-quality`, `grok-imagine-image`, `grok-imagine-video-1.5`, and `grok-imagine-video`
 - voice: realtime agent, realtime text input, text-to-speech, and speech-to-text (REST and streaming)
 
-The official pricing page also listed three text model identifiers not yet described on the main models page: `grok-4.20-multi-agent-0309`, `grok-4.20-0309-reasoning`, and `grok-4.20-0309-non-reasoning`. None of the image, video, voice, or 4.20 offerings are integrated in this Safari extension. We deliberately keep the app's selectable text model to the tested `grok-4.3`.
+The official pricing page also listed three old 4.20 text model identifiers: `grok-4.20-multi-agent-0309`, `grok-4.20-0309-reasoning`, and `grok-4.20-0309-non-reasoning`. Image, video, voice, Build, and 4.20 offerings are not integrated in this Safari extension. Account-scoped text-output Grok models can appear in the companion app when xAI returns them from `/v1/language-models`.
 
 ## Follow-Up
 

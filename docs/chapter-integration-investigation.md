@@ -4,6 +4,8 @@ Date: 2026-07-01
 
 This note captures the investigation before changing the current sidebar implementation. It is intended as a checkpoint for the planned move from an extension-owned sidebar toward the native YouTube `In this video` surface.
 
+Implementation follow-up: the native panel work is now documented in [native-panel-integration.md](native-panel-integration.md). This file remains as the original investigation and design checkpoint.
+
 ## Current App Baseline
 
 The current Safari WebExtension injects one shadow-root sidebar on supported YouTube watch and live pages.

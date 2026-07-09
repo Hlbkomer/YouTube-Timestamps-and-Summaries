@@ -7,6 +7,7 @@ const checklist = document.getElementById("checklist");
 const openPreferencesButton = document.getElementById("open-preferences");
 const providerSelect = document.getElementById("provider-select");
 const modelSelect = document.getElementById("model-select");
+const chapterPreferenceSelect = document.getElementById("chapter-preference-select");
 const summarySelect = document.getElementById("summary-select");
 const generationSetupHint = document.getElementById("generation-setup-hint");
 const codexSignInButton = document.getElementById("codex-sign-in");
@@ -52,6 +53,7 @@ function saveGenerationSettings() {
     post("saveGenerationSettings", {
         providerID: providerSelect.value,
         modelID: modelSelect.value,
+        chapterPreference: chapterPreferenceSelect.value || "preferNative",
         summaryEngine: summarySelect.value === "appleIntelligence" ? "appleIntelligence" : "selectedModel",
         summaryModelID: summarySelect.value,
     });
@@ -65,6 +67,7 @@ window.renderAppState = function renderAppState(state) {
 
     renderOptions(providerSelect, state.providerOptions || [], settings.providerID || "openaiCodex");
     renderOptions(modelSelect, state.modelOptions || [], settings.modelID || "gpt-5.5");
+    renderOptions(chapterPreferenceSelect, state.chapterPreferenceOptions || [], settings.chapterPreference || "preferNative");
     renderOptions(summarySelect, state.summaryOptions || [], settings.summaryModelID || settings.modelID || "appleIntelligence");
 
     const chatGPTConnected = Boolean(state.codex?.connected);
@@ -161,6 +164,8 @@ providerSelect.addEventListener("change", saveGenerationSettings);
 modelSelect.addEventListener("change", () => {
     saveGenerationSettings();
 });
+
+chapterPreferenceSelect.addEventListener("change", saveGenerationSettings);
 
 summarySelect.addEventListener("change", saveGenerationSettings);
 

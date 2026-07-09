@@ -610,6 +610,9 @@ final class AppleIntelligenceService {
                 prompt: """
                 Summarize this video transcript.
                 \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "summary"))
+                Start with a short overview paragraph.
+                Then use bold section labels like **Main Topic** with useful bullet points.
+                Use one nested bullet level only when it adds helpful detail.
 
                 Transcript:
                 \(chunks[0])
@@ -642,6 +645,9 @@ final class AppleIntelligenceService {
             Create one clear summary of the full video from these section summaries.
             \(outputLanguageInstruction(languageContext: languageContext, model: model, outputName: "summary"))
             Avoid repeating the section labels.
+            Start with a short overview paragraph.
+            Then use bold section labels like **Main Topic** with useful bullet points.
+            Use one nested bullet level only when it adds helpful detail.
 
             Section summaries:
             \(sectionSummaries.joined(separator: "\n\n"))
@@ -1044,7 +1050,9 @@ final class AppleIntelligenceService {
         return """
         Summarize this video transcript clearly and concisely.
         \(outputInstruction)
-        Start with a short overview, then include useful bullet points.
+        Start with a short overview paragraph.
+        Then use bold section labels like **Main Topic** with useful bullet points.
+        Use one nested bullet level only when it adds helpful detail.
 
         Transcript:
         \(chunk)
@@ -1274,6 +1282,9 @@ final class AppleIntelligenceService {
             prompt: """
             Create a concise summary of the full video from these timestamped section summaries.
             Avoid repeating section labels.
+            Start with a short overview paragraph.
+            Then use bold section labels like **Main Topic** with useful bullet points.
+            Use one nested bullet level only when it adds helpful detail.
 
             Section summaries:
             \(joinedSummaries)

@@ -27,8 +27,8 @@
         }
     },
     "permissions": [
-        "nativeMessaging",
-        "storage"
+        "activeTab",
+        "nativeMessaging"
     ],
     "host_permissions": [
         "*://www.youtube.com/*",
@@ -54,7 +54,7 @@
             "run_at": "document_start"
         },
         {
-            "js": [ "youtube-helpers.js", "content.js" ],
+            "js": [ "youtube-helpers.js", "native-panel.js", "content.js" ],
             "matches": [
                 "*://www.youtube.com/watch*",
                 "*://youtube.com/watch*",
