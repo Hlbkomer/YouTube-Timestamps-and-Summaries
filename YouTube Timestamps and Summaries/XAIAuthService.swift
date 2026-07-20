@@ -7,46 +7,50 @@ import AppKit
 import CryptoKit
 import Foundation
 import Network
+import os.log
 import Security
-
-enum XAIAuthError: LocalizedError {
-    case missingRefreshToken
-    case invalidResponse(String)
-    case requestFailed(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .missingRefreshToken:
-            return "Grok is not connected. Sign in from the companion app."
-        case .invalidResponse(let message), .requestFailed(let message):
-            return message
-        }
-    }
-}
 
 /// A short-lived HTTP listener for the OAuth redirect. It is bound only to
 /// loopback and exists only while the person is actively signing in.
-nonisolated fileprivate final class XAILoopbackCallbackServer: @unchecked Sendable {
+nonisolated final class XAILoopbackCallbackServer: @unchecked Sendable {
     static let port: UInt16 = 56_121
+    private static let maximumRequestBytes = 16_384
 
     private let listener: NWListener
+    private let requestedPort: UInt16?
+    private let expectedState: String?
     private let queue = DispatchQueue(label: "app.timestamps-summaries.xai-oauth-callback")
     private let lock = NSLock()
+    private let logger = Logger(subsystem: "Matuko.YouTube-Timestamps-and-Summaries", category: "GrokOAuthCallback")
     private var callbackContinuation: CheckedContinuation<URLComponents, Error>?
+    private var callbackResult: Result<URLComponents, Error>?
     private var timeoutWorkItem: DispatchWorkItem?
     private var startSemaphore: DispatchSemaphore?
     private var startResult: Result<Void, Error>?
+    private var activeConnections: [ObjectIdentifier: NWConnection] = [:]
     private var didCompleteCallback = false
     private var isStopped = false
 
-    init() throws {
-        guard let port = NWEndpoint.Port(rawValue: Self.port) else {
-            throw XAIAuthError.requestFailed("Could not start the local Grok sign-in callback.")
-        }
+    var listeningPort: UInt16? {
+        listener.port?.rawValue
+    }
+
+    init(
+        port requestedPort: UInt16? = XAILoopbackCallbackServer.port,
+        expectedState: String? = nil
+    ) throws {
+        self.requestedPort = requestedPort
+        self.expectedState = expectedState
         let parameters = NWParameters.tcp
-        parameters.allowLocalEndpointReuse = true
         parameters.requiredInterfaceType = .loopback
-        listener = try NWListener(using: parameters, on: port)
+        if let requestedPort {
+            guard let port = NWEndpoint.Port(rawValue: requestedPort) else {
+                throw XAIAuthError.requestFailed("Could not start the local Grok sign-in callback.")
+            }
+            listener = try NWListener(using: parameters, on: port)
+        } else {
+            listener = try NWListener(using: parameters)
+        }
         listener.newConnectionHandler = { [weak self] connection in
             self?.receiveCallback(from: connection)
         }
@@ -81,10 +85,15 @@ nonisolated fileprivate final class XAILoopbackCallbackServer: @unchecked Sendab
         if case .failure(let error) = result {
             throw error
         }
-        guard listener.port?.rawValue == Self.port else {
+        guard let listeningPort else {
             stop()
-            throw XAIAuthError.requestFailed("The local Grok sign-in callback did not start on port \(Self.port). Please try again.")
+            throw XAIAuthError.requestFailed("The local Grok sign-in callback did not receive a port. Please try again.")
         }
+        if let requestedPort, listeningPort != requestedPort {
+            stop()
+            throw XAIAuthError.requestFailed("The local Grok sign-in callback did not start on port \(requestedPort). Please try again.")
+        }
+        logger.debug("Grok OAuth callback listener is ready on loopback")
     }
 
     func stop() {
@@ -98,11 +107,17 @@ nonisolated fileprivate final class XAILoopbackCallbackServer: @unchecked Sendab
         let start = startSemaphore
         startSemaphore = nil
         startResult = .failure(XAIAuthError.requestFailed("The local Grok sign-in callback stopped unexpectedly."))
+        let connections = Array(activeConnections.values)
+        activeConnections.removeAll()
         lock.unlock()
 
         timeout?.cancel()
         if shouldStop {
             listener.cancel()
+        }
+        for connection in connections {
+            connection.stateUpdateHandler = nil
+            connection.cancel()
         }
         start?.signal()
         callback?.resume(throwing: XAIAuthError.requestFailed("The local Grok sign-in callback stopped unexpectedly."))
@@ -116,6 +131,13 @@ nonisolated fileprivate final class XAILoopbackCallbackServer: @unchecked Sendab
                 }
 
                 lock.lock()
+                if let result = callbackResult {
+                    callbackResult = nil
+                    lock.unlock()
+                    timeout.cancel()
+                    continuation.resume(with: result)
+                    return
+                }
                 guard callbackContinuation == nil, !didCompleteCallback else {
                     lock.unlock()
                     timeout.cancel()
@@ -171,6 +193,9 @@ nonisolated fileprivate final class XAILoopbackCallbackServer: @unchecked Sendab
         didCompleteCallback = true
         let continuation = callbackContinuation
         callbackContinuation = nil
+        if continuation == nil {
+            callbackResult = result
+        }
         let timeout = timeoutWorkItem
         timeoutWorkItem = nil
         lock.unlock()
@@ -181,42 +206,89 @@ nonisolated fileprivate final class XAILoopbackCallbackServer: @unchecked Sendab
 
     private func receiveCallback(from connection: NWConnection) {
         lock.lock()
-        let alreadyCompleted = didCompleteCallback
+        let shouldAccept = !didCompleteCallback && !isStopped
+        if shouldAccept {
+            activeConnections[ObjectIdentifier(connection)] = connection
+        }
         lock.unlock()
-        guard !alreadyCompleted else {
+        guard shouldAccept else {
             connection.cancel()
             return
         }
 
-        connection.stateUpdateHandler = { state in
-            if case .failed = state {
+        logger.debug("Accepted a Grok OAuth loopback connection")
+        connection.stateUpdateHandler = { [weak self, weak connection] state in
+            guard let self, let connection else { return }
+            switch state {
+            case .failed(let error):
+                self.logger.debug("Ignoring a failed Grok OAuth probe connection: \(error.localizedDescription, privacy: .public)")
+                self.removeConnection(connection)
                 connection.cancel()
+            case .cancelled:
+                self.removeConnection(connection)
+            default:
+                break
             }
         }
         connection.start(queue: queue)
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 8_192) { [weak self] data, _, _, error in
+        receiveHTTPRequest(from: connection, accumulated: Data())
+    }
+
+    private func receiveHTTPRequest(from connection: NWConnection, accumulated: Data) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 4_096) { [weak self] data, _, isComplete, error in
             guard let self else {
                 connection.cancel()
                 return
             }
             if let error {
-                self.finishCallback(.failure(XAIAuthError.requestFailed("The local Grok sign-in callback could not read Safari's response: \(error.localizedDescription)")))
-                connection.cancel()
-                return
-            }
-            guard let data, !data.isEmpty else {
-                self.finishCallback(.failure(XAIAuthError.requestFailed("The local Grok sign-in callback received an empty browser response.")))
+                self.logger.debug("Ignoring a Grok OAuth probe read failure: \(error.localizedDescription, privacy: .public)")
+                self.removeConnection(connection)
                 connection.cancel()
                 return
             }
 
+            var request = accumulated
+            if let data {
+                request.append(data)
+            }
+            if request.count > Self.maximumRequestBytes {
+                self.logger.debug("Rejected an oversized Grok OAuth loopback request")
+                self.sendBrowserResponse(on: connection, success: false) { _ in
+                    // An invalid connection must not consume the one valid
+                    // OAuth callback that Safari may send immediately after it.
+                }
+                return
+            }
+
+            let headerTerminator = Data("\r\n\r\n".utf8)
+            guard request.range(of: headerTerminator) != nil else {
+                if isComplete {
+                    self.logger.debug("Ignored a Grok OAuth probe without a complete HTTP request")
+                    self.removeConnection(connection)
+                    connection.cancel()
+                } else {
+                    self.receiveHTTPRequest(from: connection, accumulated: request)
+                }
+                return
+            }
+
+            self.logger.debug("Received a complete Grok OAuth loopback HTTP header")
             do {
-                let components = try self.parseCallbackRequest(data)
-                self.sendBrowserResponse(on: connection, success: true)
-                self.finishCallback(.success(components))
+                let components = try self.parseCallbackRequest(request)
+                self.sendBrowserResponse(on: connection, success: true) { result in
+                    switch result {
+                    case .success:
+                        self.finishCallback(.success(components))
+                    case .failure(let error):
+                        self.finishCallback(.failure(error))
+                    }
+                }
             } catch {
-                self.sendBrowserResponse(on: connection, success: false)
-                self.finishCallback(.failure(error))
+                self.logger.debug("Rejected a non-matching Grok OAuth loopback request")
+                self.sendBrowserResponse(on: connection, success: false) { _ in
+                    // Keep listening. Safari can create speculative or retry
+                    // connections before sending the actual callback.
+                }
             }
         }
     }
@@ -226,26 +298,74 @@ nonisolated fileprivate final class XAILoopbackCallbackServer: @unchecked Sendab
         let requestLine = request.split(separator: "\r\n", maxSplits: 1).first ?? ""
         let parts = requestLine.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
         let target = parts.count > 1 ? String(parts[1]) : ""
-        let callbackURL = URL(string: "http://127.0.0.1:\(Self.port)\(target)")
+        guard let listeningPort else {
+            throw XAIAuthError.requestFailed("The local Grok sign-in callback is no longer listening.")
+        }
+        let callbackURL = URL(string: "http://127.0.0.1:\(listeningPort)\(target)")
         let components = callbackURL.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
 
-        let isValidCallback = parts.first == "GET" && components?.path == "/callback"
-
-        guard isValidCallback, let components else {
+        guard parts.first == "GET", let components, components.path == "/callback" else {
             throw XAIAuthError.requestFailed("Grok sign-in returned an unexpected local callback.")
+        }
+        let queryItems = components.queryItems ?? []
+        let callbackState = queryItems.first(where: { $0.name == "state" })?.value
+        if let expectedState, callbackState != expectedState {
+            throw XAIAuthError.requestFailed("Grok sign-in returned a callback for a different sign-in attempt.")
+        }
+        let hasAuthorizationResult = queryItems.contains { item in
+            (item.name == "code" || item.name == "error") && !(item.value ?? "").isEmpty
+        }
+        guard hasAuthorizationResult else {
+            throw XAIAuthError.requestFailed("Grok sign-in returned an incomplete local callback.")
         }
         return components
     }
 
-    private func sendBrowserResponse(on connection: NWConnection, success: Bool) {
+    private func sendBrowserResponse(
+        on connection: NWConnection,
+        success: Bool,
+        completion: @escaping @Sendable (Result<Void, Error>) -> Void
+    ) {
         let body = success
-            ? "<html><body><p>Grok sign-in is complete. You can return to Timestamps &amp; Summaries for YT.</p></body></html>"
-            : "<html><body><p>This was not a valid Grok sign-in callback. You can close this page.</p></body></html>"
-        let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(body.lengthOfBytes(using: .utf8))\r\nConnection: close\r\n\r\n\(body)"
+            ? "<!doctype html><html><head><meta charset=\"utf-8\"><title>Grok sign-in complete</title></head><body><p>Grok sign-in is complete. You can return to Timestamps &amp; Summaries for YT.</p></body></html>"
+            : "<!doctype html><html><head><meta charset=\"utf-8\"><title>Invalid Grok callback</title></head><body><p>This was not a valid Grok sign-in callback. You can close this page.</p></body></html>"
+        let status = success ? "200 OK" : "400 Bad Request"
+        let response = "HTTP/1.1 \(status)\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(body.lengthOfBytes(using: .utf8))\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n\(body)"
         let data = Data(response.utf8)
-        connection.send(content: data, completion: .contentProcessed { _ in
-            connection.cancel()
-        })
+        connection.send(
+            content: data,
+            contentContext: .finalMessage,
+            isComplete: true,
+            completion: .contentProcessed { [weak self] error in
+                guard let self else {
+                    connection.cancel()
+                    return
+                }
+                self.removeConnection(connection)
+                if let error {
+                    self.logger.error("Could not flush the Grok OAuth browser response: \(error.localizedDescription, privacy: .public)")
+                    connection.cancel()
+                    completion(.failure(XAIAuthError.requestFailed("The local Grok sign-in callback could not respond to Safari: \(error.localizedDescription)")))
+                    return
+                }
+
+                self.logger.debug("Flushed the Grok OAuth browser response")
+                // Keep the accepted connection alive briefly after the TCP
+                // write-close so Safari can consume the complete response,
+                // even if OAuth token exchange and listener teardown are fast.
+                self.queue.asyncAfter(deadline: .now() + 1) {
+                    connection.stateUpdateHandler = nil
+                    connection.cancel()
+                }
+                completion(.success(()))
+            }
+        )
+    }
+
+    private func removeConnection(_ connection: NWConnection) {
+        lock.lock()
+        activeConnections.removeValue(forKey: ObjectIdentifier(connection))
+        lock.unlock()
     }
 
 }
@@ -305,55 +425,24 @@ final class XAIOAuthLoginSession {
 /// Owns the shared xAI OAuth session. The extension reads the same session but
 /// cannot start the browser flow itself.
 final class XAIAuthService {
-    private static let clientID = "b1a00492-073a-47ea-816f-4c329264a828"
-    private static let discoveryURL = URL(string: "https://auth.x.ai/.well-known/openid-configuration")!
     private static let languageModelsURL = URL(string: "https://api.x.ai/v1/language-models")!
     private static let redirectURL = "http://127.0.0.1:\(XAILoopbackCallbackServer.port)/callback"
     private static let scope = "openid profile email offline_access grok-cli:access api:access"
-    private static let refreshSkew: TimeInterval = 60 * 60
-    private static let defaultExpiry: TimeInterval = 6 * 60 * 60
-
-    private enum Keys {
-        static let accessToken = "xaiOAuth.accessToken"
-        static let refreshToken = "xaiOAuth.refreshToken"
-        static let expiresAt = "xaiOAuth.expiresAt"
-        static let updatedAt = "xaiOAuth.updatedAt"
-    }
-
-    private struct Discovery: Decodable {
-        let authorizationEndpoint: URL
-        let tokenEndpoint: URL
-
-        enum CodingKeys: String, CodingKey {
-            case authorizationEndpoint = "authorization_endpoint"
-            case tokenEndpoint = "token_endpoint"
-        }
-    }
+    private let tokenSession = XAITokenSession()
 
     func statusPayload(refresh: Bool = false) async -> [String: Any] {
-        do {
-            let tokens = try await tokens(refresh: refresh)
-            return [
-                "connected": true,
-                "expiresAt": Int(tokens.expiresAt.timeIntervalSince1970 * 1_000),
-            ]
-        } catch {
-            return [
-                "connected": false,
-                "error": refresh ? error.localizedDescription : "",
-            ]
-        }
+        await tokenSession.statusPayload(refresh: refresh)
     }
 
     func modelOptions() async throws -> [[String: String]] {
-        let accessToken = try await tokens(refresh: true).accessToken
-        let (data, response) = try await get(url: Self.languageModelsURL, bearerToken: accessToken)
+        let accessToken = try await tokenSession.accessToken()
+        let (data, response) = try await tokenSession.get(url: Self.languageModelsURL, bearerToken: accessToken)
         if response.statusCode == 401 {
             signOut()
             throw XAIAuthError.requestFailed("Grok sign-in expired. Sign in again from the companion app.")
         }
         guard response.statusCode == 200 else {
-            throw XAIAuthError.requestFailed(errorMessage(from: data) ?? "Grok model catalog could not be loaded.")
+            throw XAIAuthError.requestFailed(XAITokenResponseParser.errorMessage(from: data) ?? "Grok model catalog could not be loaded.")
         }
         guard
             let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -382,14 +471,14 @@ final class XAIAuthService {
     }
 
     func beginSignIn() async throws -> XAIOAuthLoginSession {
-        let discovery = try await fetchDiscovery()
+        let discovery = try await tokenSession.fetchDiscovery(requireAuthorizationEndpoint: true)
         let verifier = try randomURLSafeString(byteCount: 48)
         let state = try randomURLSafeString(byteCount: 24)
         let nonce = try randomURLSafeString(byteCount: 24)
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URLEncodedString()
         let callbackServer: XAILoopbackCallbackServer?
         do {
-            let server = try XAILoopbackCallbackServer()
+            let server = try XAILoopbackCallbackServer(expectedState: state)
             try server.start()
             callbackServer = server
         } catch {
@@ -398,13 +487,16 @@ final class XAIAuthService {
             callbackServer = nil
         }
 
-        guard var components = URLComponents(url: discovery.authorizationEndpoint, resolvingAgainstBaseURL: false) else {
+        guard
+            let authorizationEndpoint = discovery.authorizationEndpoint,
+            var components = URLComponents(url: authorizationEndpoint, resolvingAgainstBaseURL: false)
+        else {
             throw XAIAuthError.invalidResponse("xAI sign-in configuration is invalid.")
         }
         var queryItems = components.queryItems ?? []
         queryItems += [
             URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "client_id", value: Self.clientID),
+            URLQueryItem(name: "client_id", value: XAITokenSession.clientID),
             URLQueryItem(name: "redirect_uri", value: Self.redirectURL),
             URLQueryItem(name: "scope", value: Self.scope),
             URLQueryItem(name: "code_challenge", value: challenge),
@@ -537,30 +629,7 @@ final class XAIAuthService {
     }
 
     func signOut() {
-        let defaults = GenerationSettings.sharedDefaults
-        defaults.removeObject(forKey: Keys.accessToken)
-        defaults.removeObject(forKey: Keys.refreshToken)
-        defaults.removeObject(forKey: Keys.expiresAt)
-        defaults.removeObject(forKey: Keys.updatedAt)
-    }
-
-    private func tokens(refresh: Bool) async throws -> (accessToken: String, refreshToken: String, expiresAt: Date) {
-        let defaults = GenerationSettings.sharedDefaults
-        guard
-            let accessToken = defaults.string(forKey: Keys.accessToken),
-            let refreshToken = defaults.string(forKey: Keys.refreshToken),
-            !accessToken.isEmpty,
-            !refreshToken.isEmpty
-        else {
-            throw XAIAuthError.missingRefreshToken
-        }
-
-        let expiresAt = Date(timeIntervalSince1970: defaults.double(forKey: Keys.expiresAt))
-        if refresh && expiresAt.timeIntervalSinceNow <= Self.refreshSkew {
-            try await refreshTokens(refreshToken: refreshToken)
-            return try await tokens(refresh: false)
-        }
-        return (accessToken, refreshToken, expiresAt)
+        tokenSession.signOut()
     }
 
     private func exchangeAuthorizationCode(
@@ -570,114 +639,24 @@ final class XAIAuthService {
         redirectURL: String,
         tokenEndpoint: URL
     ) async throws {
-        let body = formBody([
+        let body = tokenSession.formBody([
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirectURL,
-            "client_id": Self.clientID,
+            "client_id": XAITokenSession.clientID,
             "code_verifier": verifier,
             "code_challenge": challenge,
             "code_challenge_method": "S256",
         ])
-        let (data, response) = try await post(
+        let (data, response) = try await tokenSession.post(
             url: tokenEndpoint,
             body: body,
             contentType: "application/x-www-form-urlencoded"
         )
         guard response.statusCode == 200 else {
-            throw XAIAuthError.requestFailed(errorMessage(from: data) ?? "Grok sign-in could not be completed.")
+            throw XAIAuthError.requestFailed(XAITokenResponseParser.errorMessage(from: data) ?? "Grok sign-in could not be completed.")
         }
-        try saveTokens(from: data)
-    }
-
-    private func refreshTokens(refreshToken: String) async throws {
-        let discovery = try await fetchDiscovery()
-        let body = formBody([
-            "grant_type": "refresh_token",
-            "refresh_token": refreshToken,
-            "client_id": Self.clientID,
-        ])
-        let (data, response) = try await post(
-            url: discovery.tokenEndpoint,
-            body: body,
-            contentType: "application/x-www-form-urlencoded"
-        )
-        guard response.statusCode == 200 else {
-            signOut()
-            throw XAIAuthError.requestFailed(errorMessage(from: data) ?? "Grok sign-in expired. Sign in again from the companion app.")
-        }
-        try saveTokens(from: data, existingRefreshToken: refreshToken)
-    }
-
-    private func fetchDiscovery() async throws -> Discovery {
-        let (data, response) = try await URLSession.shared.data(from: Self.discoveryURL)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw XAIAuthError.requestFailed("xAI sign-in configuration could not be loaded.")
-        }
-        guard let discovery = try? JSONDecoder().decode(Discovery.self, from: data),
-              isTrustedXAIURL(discovery.authorizationEndpoint),
-              isTrustedXAIURL(discovery.tokenEndpoint)
-        else {
-            throw XAIAuthError.invalidResponse("xAI sign-in configuration is invalid.")
-        }
-        return discovery
-    }
-
-    private func isTrustedXAIURL(_ url: URL) -> Bool {
-        url.scheme == "https" && (url.host == "x.ai" || url.host?.hasSuffix(".x.ai") == true)
-    }
-
-    private func saveTokens(from data: Data, existingRefreshToken: String? = nil) throws {
-        guard
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let accessToken = json["access_token"] as? String,
-            !accessToken.isEmpty
-        else {
-            throw XAIAuthError.invalidResponse("xAI sign-in did not return an access token.")
-        }
-
-        let refreshToken = (json["refresh_token"] as? String) ?? existingRefreshToken
-        guard let refreshToken, !refreshToken.isEmpty else {
-            throw XAIAuthError.invalidResponse("xAI sign-in did not return a refresh token.")
-        }
-
-        let expiresIn = (json["expires_in"] as? NSNumber)?.doubleValue ?? Self.defaultExpiry
-        let expiresAt = accessTokenExpiry(accessToken) ?? Date().addingTimeInterval(expiresIn)
-        let defaults = GenerationSettings.sharedDefaults
-        defaults.set(accessToken, forKey: Keys.accessToken)
-        defaults.set(refreshToken, forKey: Keys.refreshToken)
-        defaults.set(expiresAt.timeIntervalSince1970, forKey: Keys.expiresAt)
-        defaults.set(Date().timeIntervalSince1970, forKey: Keys.updatedAt)
-    }
-
-    private func post(url: URL, body: Data, contentType: String) async throws -> (Data, HTTPURLResponse) {
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 20
-        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.httpBody = body
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw XAIAuthError.invalidResponse("xAI returned an invalid network response.")
-        }
-        return (data, httpResponse)
-    }
-
-    private func get(url: URL, bearerToken: String) async throws -> (Data, HTTPURLResponse) {
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 20
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("TimestampsSummariesForYT/1.0", forHTTPHeaderField: "User-Agent")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw XAIAuthError.invalidResponse("xAI returned an invalid network response.")
-        }
-        return (data, httpResponse)
+        try tokenSession.saveTokens(from: data)
     }
 
     private func hasModality(_ modality: String, in value: Any?) -> Bool {
@@ -685,12 +664,6 @@ final class XAIAuthService {
             return false
         }
         return modalities.contains(modality)
-    }
-
-    private func formBody(_ values: [String: String]) -> Data {
-        var components = URLComponents()
-        components.queryItems = values.map { URLQueryItem(name: $0.key, value: $0.value) }
-        return Data((components.percentEncodedQuery ?? "").utf8)
     }
 
     private func randomURLSafeString(byteCount: Int) throws -> String {
@@ -701,34 +674,6 @@ final class XAIAuthService {
         return Data(bytes).base64URLEncodedString()
     }
 
-    private func accessTokenExpiry(_ accessToken: String) -> Date? {
-        let parts = accessToken.split(separator: ".")
-        guard parts.count >= 2 else { return nil }
-        var payload = String(parts[1])
-            .replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-        while payload.count % 4 != 0 { payload.append("=") }
-        guard
-            let data = Data(base64Encoded: payload),
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let expiry = (json["exp"] as? NSNumber)?.doubleValue
-        else { return nil }
-        return Date(timeIntervalSince1970: expiry)
-    }
-
-    private func errorMessage(from data: Data) -> String? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return String(data: data, encoding: .utf8)
-        }
-        if let error = json["error"] as? [String: Any] {
-            return (error["message"] as? String)
-                ?? (error["error_description"] as? String)
-                ?? (error["code"] as? String)
-        }
-        return (json["error_description"] as? String)
-            ?? (json["message"] as? String)
-            ?? (json["error"] as? String)
-    }
 }
 
 private extension Data {

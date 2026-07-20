@@ -4,13 +4,27 @@ const {
     canGenerateTimestampsFromStatus,
     defaultGenerationTab,
     extractVideoKey,
+    getNavigationResponse,
+    getNavigationResponseVideoKey,
     getNavigationURL,
     isShortsURL,
-    isWatchURL,
     parseNativeYouTubeChapters,
+    parseNativeYouTubeChaptersFromDOM,
     parseTimestamps: parseTimestampLines,
     renderSummaryHTML: renderFormattedSummaryHTML,
 } = globalThis.YouTubeTimestampsHelpers;
+const chapterState = globalThis.YouTubeTimestampsChapterState;
+const contentState = globalThis.YouTubeTimestampsContentState;
+const transcriptOrchestration = globalThis.YouTubeTimestampsTranscriptOrchestrator;
+const generationOrchestration = globalThis.YouTubeTimestampsGenerationOrchestrator;
+const {
+    automaticGenerationKinds,
+    generationRequestIsCurrent,
+    generationKindForTab,
+    generationTimeoutForTranscript,
+    invalidateGenerationIDs,
+    transcriptForGeneration,
+} = generationOrchestration;
 
 const SIDEBAR_HOST_ID = "youtube-timestamps-sidebar-root";
 const SIDEBAR_HOST_IDS = [SIDEBAR_HOST_ID];
@@ -34,16 +48,23 @@ if (!supportedPath) {
 let panelHost = null;
 let currentVideoKey = null;
 let lastObservedURL = window.location.href;
-let lastPageActionsNotification = "";
+let nativePanelObserver = null;
+let nativePanelRefreshFrame = null;
+let panelReconciliationInProgress = false;
+let panelReconciliationQueued = false;
+let nativePanelDiscoveryDeadline = 0;
+let videoDiscoveryTimeouts = [];
+let navigationReconcileTimeouts = [];
 const DEBUG_LINE_LIMIT = 80;
+const NATIVE_DISCOVERY_GRACE_MS = chapterState.NATIVE_CHAPTER_DISCOVERY_GRACE_MS;
+const NATIVE_PANEL_DISCOVERY_GRACE_MS = 5 * 1000;
 const MIN_GENERATION_TIMEOUT_MS = 6 * 60 * 1000;
-const MAX_GENERATION_TIMEOUT_MS = 20 * 60 * 1000;
-const GENERATION_TIMEOUT_FREE_CHARACTERS = 30000;
-const GENERATION_TIMEOUT_CHARACTER_BLOCK = 10000;
-const GENERATION_TIMEOUT_EXTRA_MS_PER_BLOCK = 45 * 1000;
 const PENDING_GENERATION_START_GRACE_MS = 30000;
-const TRANSCRIPT_CACHE_LIMIT = 5;
+const VIDEO_SESSION_CACHE_LIMIT = 8;
 const TRANSCRIPT_TRACK_WAIT_ATTEMPTS = 16;
+const NAVIGATION_URL_CHECK_INTERVAL_MS = 500;
+const NAVIGATION_TRANSITION_GRACE_MS = 3 * 1000;
+const NAVIGATION_RECONCILE_DELAYS_MS = [100, 300, 700, 1500, 3000, 5000];
 // Show successful generation time in the small result caption instead of the tab title.
 const SHOW_GENERATION_TIMING_IN_RESULT_CAPTIONS = true;
 const NATIVE_TRANSCRIPT_PANEL_SELECTORS = [
@@ -80,6 +101,7 @@ const transcriptRequestCache = new Map();
 const timedTextTrackCache = new Map();
 const innertubePlayerTrackCache = new Map();
 const nativeChapterCache = new Map();
+const nativeChapterDetectionByVideoKey = new Map();
 const generationRequestKeys = new Set();
 const generationResultCache = new Map();
 const chapterSourceOverrideByVideoKey = new Map();
@@ -91,22 +113,27 @@ let initialDataCache = {
     videoKey: "",
     response: null,
 };
+let navigationDataCache = {
+    videoKey: "",
+    response: null,
+};
+const navigationTransition = contentState.createNavigationTransitionCoordinator(
+    NAVIGATION_TRANSITION_GRACE_MS
+);
 let ytcfgCache = null;
 let state = {
     ready: false,
-    isConfigured: false,
     generationMode: "selectedProvider",
-    engine: "",
     appleIntelligenceAvailable: false,
     codexConnected: false,
     selectedProviderConnected: false,
     providerError: "",
+    statusError: "",
     timestampsAvailable: false,
     summaryAvailable: false,
-    codexLoginError: "",
     settings: {
         providerID: "openaiCodex",
-        modelID: "gpt-5.5",
+        modelID: "gpt-5.6-terra",
         summaryEngine: "selectedModel",
         chapterPreference: "preferNative",
     },
@@ -116,7 +143,6 @@ let state = {
     nativePanelDismissed: false,
     userSelectedTab: false,
     nativeChaptersOverridden: false,
-    chapterSourceOverride: "",
     timestampsText: "",
     timestampsSource: "",
     summaryText: "",
@@ -149,12 +175,48 @@ let state = {
         summary: false,
         transcript: false,
     },
-    didAutogenerateAnalysis: false,
+    copyErrors: {
+        timestamps: "",
+        summary: "",
+        transcript: "",
+    },
+    autogenerationAttempted: {
+        timestamps: false,
+        summary: false,
+    },
 };
+const videoRetention = contentState.createVideoRetention(
+    VIDEO_SESSION_CACHE_LIMIT,
+    evictVideoSession
+);
+const transcriptOrchestrator = transcriptOrchestration.createTranscriptOrchestrator({
+    completedCache: transcriptCache,
+    requestCache: transcriptRequestCache,
+    resolveTranscript,
+    onCacheHit: (kind, transcript) => {
+        logTranscriptDebug(kind, `transcript: using cached captions (${transcript.lineCount} lines)`);
+        if (transcript.languageCode || transcript.languageLabel) {
+            logTranscriptDebug(kind, `transcript: language ${transcript.languageLabel || transcript.languageCode}${transcript.languageCode ? ` (${transcript.languageCode})` : ""}`);
+        }
+    },
+    onSharedRequest: (kind) => logTranscriptDebug(kind, "transcript: waiting for shared transcript fetch"),
+    onPassiveFailure: (kind, error) => {
+        logTranscriptDebug(kind, `transcript: shared passive fetch failed (${error?.message || String(error)})`);
+    },
+});
+const generationRequestDeduplicator = generationOrchestration.createRequestDeduplicator(generationRequestKeys);
+const generationJobPoller = generationOrchestration.createJobPoller({
+    request: (jobID) => sendMessageWithTimeout({
+        type: "ai:getGenerateJob",
+        jobId: jobID,
+    }, 20000),
+});
 
 let copyFeedbackTimeout = null;
 let activeChapterVideoElement = null;
 let activeChapterSyncFrame = null;
+let chapterSourceFooterRefreshFrame = null;
+const wiredPanelRoots = new WeakSet();
 
 const nativePanel = globalThis.YouTubeTimestampsNativePanel.createNativePanelController({
     document,
@@ -173,10 +235,34 @@ const nativePanel = globalThis.YouTubeTimestampsNativePanel.createNativePanelCon
     transcriptCopyText,
     prefetchTranscriptForCopy,
     copyHeaderResult,
+    isTimestampChapterDiscoveryPending,
     render,
     maybeGenerateTimestamps,
     maybeGenerateSummary,
 });
+
+const handlePanelControlClick = globalThis.YouTubeTimestampsPageControls.createPageControlHandler({
+    selectNativeTab: (kind) => { void nativePanel.selectExtensionTab(kind); },
+    copyNativeResult: () => { void copyHeaderResult(); },
+    selectSidebarTab: (kind) => { void handleTabSelection(kind); },
+    copySidebarResult: () => { void copyActiveResult(); },
+    switchChapterSource: (source) => { void switchVideoChapterSource(source); },
+    openApp: () => { void openCompanionApp(); },
+    jumpToTime: (seconds) => jumpToTime(seconds),
+});
+
+// YouTube frequently replaces the native panel's header and chip row. Capture
+// extension-owned controls at stable page boundaries so a replacement cannot
+// create a window where Summary, Chapters, or Copy has no listener. The first
+// listener finalizes Close for the shell the extension made visible; the next
+// redirects the description's separate Show transcript command through the
+// integrated native Transcript chip. Window runs before YouTube's document-level
+// delegation; document and Shadow Root remain fallbacks for browser-specific
+// event retargeting.
+window.addEventListener("click", nativePanel.handlePagePanelCloseClick, true);
+window.addEventListener("click", nativePanel.handlePageTranscriptOpenClick, true);
+window.addEventListener("click", handlePanelControlClick, true);
+document.addEventListener("click", handlePanelControlClick, true);
 
 function logDebug(kind, message, extra) {
     const prefix = `[Apple Intelligence content:${kind}]`;
@@ -245,69 +331,6 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function listenForPopupMessages() {
-    try {
-        browser.runtime.onMessage.addListener((message) => {
-            if (message?.type === "content:getPageActions") {
-                return pageActionsResponse();
-            }
-
-            if (message?.type === "content:setVideoChapterSource") {
-                return setVideoChapterSourceFromPopup(message.source);
-            }
-
-            if (message?.type === "content:refreshStatus") {
-                return (async () => {
-                    await refreshStatus();
-                    void maybeAutogenerateAnalysis();
-                    return pageActionsResponse();
-                })();
-            }
-
-            return null;
-        });
-    } catch (_) {
-        // Popup actions are optional; the in-panel controls still work if messaging is unavailable.
-    }
-}
-
-function notifyPageActionsChanged() {
-    try {
-        const response = pageActionsResponse();
-        const payload = {
-            ok: Boolean(response.ok),
-            canSetVideoChapterSource: Boolean(response.canSetVideoChapterSource),
-            nativeChaptersAvailable: Boolean(response.nativeChaptersAvailable),
-            chapterSourceOverride: response.chapterSourceOverride || "default",
-            effectiveChapterSource: response.effectiveChapterSource || "",
-        };
-        const snapshot = JSON.stringify(payload);
-        if (snapshot === lastPageActionsNotification) {
-            return;
-        }
-
-        lastPageActionsNotification = snapshot;
-        const result = browser.runtime.sendMessage({
-            type: "content:pageActionsChanged",
-            pageActions: payload,
-        });
-        if (result && typeof result.catch === "function") {
-            result.catch(() => {});
-        }
-    } catch (_) {
-        // Page action hints are best-effort; popup requests can still ask directly.
-    }
-}
-
-function generationTimeoutForTranscript(transcriptText) {
-    const characterCount = typeof transcriptText === "string" ? transcriptText.length : 0;
-    const extraCharacters = Math.max(0, characterCount - GENERATION_TIMEOUT_FREE_CHARACTERS);
-    const extraBlocks = Math.ceil(extraCharacters / GENERATION_TIMEOUT_CHARACTER_BLOCK);
-    const timeoutMs = MIN_GENERATION_TIMEOUT_MS + (extraBlocks * GENERATION_TIMEOUT_EXTRA_MS_PER_BLOCK);
-
-    return Math.min(MAX_GENERATION_TIMEOUT_MS, Math.max(MIN_GENERATION_TIMEOUT_MS, timeoutMs));
-}
-
 function modelLabel() {
     return state.settings.modelLabel || state.settings.modelID || "selected model";
 }
@@ -352,7 +375,13 @@ function canGenerateSummary() {
 }
 
 function canStartGeneration(kind) {
-    return state.isConfigured;
+    if (kind === "timestamps") {
+        return canGenerateTimestamps();
+    }
+    if (kind === "summary") {
+        return canGenerateSummary();
+    }
+    return false;
 }
 
 function defaultActiveTab() {
@@ -361,14 +390,6 @@ function defaultActiveTab() {
     }
 
     return defaultGenerationTab(currentGenerationStatus());
-}
-
-function generationKindForTab(kind, usesSelectedProvider) {
-    if (!usesSelectedProvider) {
-        return kind === "summary" ? "summaryFull" : "timestamps";
-    }
-
-    return kind === "summary" ? "selectedProviderSummary" : "selectedProviderTimestamps";
 }
 
 function generationResultCacheKey(videoKey, kind) {
@@ -388,6 +409,64 @@ function generationResultCacheKey(videoKey, kind) {
         modelID,
         summaryEngine,
     ].join(":");
+}
+
+function videoGenerationCachePrefix(videoKey) {
+    return `youtube-timestamps-generation:${videoKey || ""}:`;
+}
+
+function protectedVideoSessionKeys() {
+    const protectedKeys = new Set();
+    if (currentVideoKey) {
+        protectedKeys.add(currentVideoKey);
+    }
+    for (const videoKey of transcriptRequestCache.keys()) {
+        protectedKeys.add(videoKey);
+    }
+    for (const requestKey of generationRequestKeys) {
+        const separatorIndex = requestKey.lastIndexOf(":");
+        const videoKey = separatorIndex >= 0 ? requestKey.slice(0, separatorIndex) : requestKey;
+        if (videoKey) {
+            protectedKeys.add(videoKey);
+        }
+    }
+    return protectedKeys;
+}
+
+function evictVideoSession(videoKey) {
+    transcriptCache.delete(videoKey);
+    transcriptOrchestrator.forget(videoKey);
+    timedTextTrackCache.delete(videoKey);
+    innertubePlayerTrackCache.delete(videoKey);
+    nativeChapterCache.delete(videoKey);
+    nativeChapterDetectionByVideoKey.delete(videoKey);
+    chapterSourceOverrideByVideoKey.delete(videoKey);
+
+    const generationPrefix = videoGenerationCachePrefix(videoKey);
+    for (const key of Array.from(generationResultCache.keys())) {
+        if (key.startsWith(generationPrefix)) {
+            generationResultCache.delete(key);
+        }
+    }
+
+    try {
+        const storedKeys = [];
+        for (let index = 0; index < (window.sessionStorage?.length || 0); index += 1) {
+            const key = window.sessionStorage?.key(index) || "";
+            if (key.startsWith(generationPrefix)) {
+                storedKeys.push(key);
+            }
+        }
+        for (const key of storedKeys) {
+            window.sessionStorage?.removeItem(key);
+        }
+    } catch (_) {
+        // The in-memory state has still been evicted.
+    }
+}
+
+function touchVideoSession(videoKey) {
+    videoRetention.touch(videoKey, protectedVideoSessionKeys());
 }
 
 function pendingGenerationCacheKey(videoKey, kind) {
@@ -610,35 +689,13 @@ function generationWaitDescription(kind, usesSelectedProvider) {
         : `step: waiting for ${modelLabel()} timestamps`;
 }
 
-function stripTranscriptTimestamps(transcriptText) {
-    return String(transcriptText || "")
-        .split(/\r?\n/)
-        .map((line) => line.replace(/^\s*\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/, "").trim())
-        .filter(Boolean)
-        .join("\n");
-}
-
-function transcriptForGeneration(kind, transcriptText) {
-    if (kind !== "summary") {
-        return transcriptText || "";
-    }
-
-    return stripTranscriptTimestamps(transcriptText);
-}
-
 function isCurrentGeneration(videoKey, kind, generationID) {
-    return currentVideoKey === videoKey && state.generationIDs[kind] === generationID;
-}
-
-function stopLoadingForStaleGeneration(videoKey, kind, generationID) {
-    if (state.generationIDs[kind] !== generationID) {
-        return;
-    }
-
-    state.isLoading[kind] = false;
-    if (currentVideoKey === videoKey) {
-        render();
-    }
+    return generationRequestIsCurrent({
+        currentVideoKey,
+        requestVideoKey: videoKey,
+        currentGenerationID: state.generationIDs[kind],
+        requestGenerationID: generationID,
+    });
 }
 
 async function sendMessageWithTimeout(message, timeoutMs = MIN_GENERATION_TIMEOUT_MS) {
@@ -778,15 +835,16 @@ function getInitialData(videoKey) {
         return initialDataCache.response;
     }
 
-    const response = parseScriptAssignmentObject("ytInitialData");
-    const responseVideoKey = extractVideoKey({
-        currentUrl: window.location.href,
-        canonicalHref: document.querySelector("link[rel='canonical']")?.href || "",
-        ogUrl: document.querySelector("meta[property='og:url']")?.content || "",
-        pathname: window.location.pathname,
-    });
+    if (navigationDataCache.videoKey === videoKey && navigationDataCache.response) {
+        initialDataCache = navigationDataCache;
+        return initialDataCache.response;
+    }
 
-    const usableResponse = !responseVideoKey || responseVideoKey === videoKey ? response : null;
+    const response = parseScriptAssignmentObject("ytInitialData");
+    const initialPlayerResponse = parseScriptAssignmentObject("ytInitialPlayerResponse");
+    const responseVideoKey = initialPlayerResponse?.videoDetails?.videoId || "";
+
+    const usableResponse = responseVideoKey === videoKey ? response : null;
     if (usableResponse) {
         initialDataCache = {
             videoKey,
@@ -815,6 +873,88 @@ function chapterSourceOverride(videoKey = currentVideoKey || getVideoKey() || ""
     return normalizedChapterSourceOverride(videoKey ? chapterSourceOverrideByVideoKey.get(videoKey) : "");
 }
 
+function nativeChapterDetection(videoKey = currentVideoKey || getVideoKey() || "") {
+    if (!videoKey) {
+        return null;
+    }
+
+    let detection = nativeChapterDetectionByVideoKey.get(videoKey);
+    if (!detection) {
+        detection = {
+            status: "pending",
+            deadline: Date.now() + NATIVE_DISCOVERY_GRACE_MS,
+        };
+        nativeChapterDetectionByVideoKey.set(videoKey, detection);
+    }
+
+    return detection;
+}
+
+function setNativeChapterDetection(videoKey, status) {
+    const detection = nativeChapterDetection(videoKey);
+    if (!detection) {
+        return;
+    }
+
+    const nextStatus = chapterState.mergeDetectionStatus(
+        detection.status,
+        status,
+        status === "available"
+    );
+    if (detection.status === nextStatus) {
+        return;
+    }
+
+    detection.status = nextStatus;
+    scheduleChapterSourceFooterRefresh(videoKey);
+}
+
+function scheduleChapterSourceFooterRefresh(videoKey) {
+    if (chapterSourceFooterRefreshFrame !== null) {
+        return;
+    }
+
+    chapterSourceFooterRefreshFrame = requestAnimationFrame(() => {
+        chapterSourceFooterRefreshFrame = null;
+        if (videoKey === (currentVideoKey || getVideoKey() || "") && panelHost) {
+            render();
+        }
+    });
+}
+
+function playerResponseForVideo(videoKey) {
+    const response = getPlayerResponse();
+    return response?.videoDetails?.videoId === videoKey ? response : null;
+}
+
+function liveNativeChapters(videoKey) {
+    const playerResponse = playerResponseForVideo(videoKey);
+    const chapterItems = querySelectorAllSafe(
+        document,
+        "ytd-engagement-panel-section-list-renderer ytd-macro-markers-list-item-renderer"
+    ).filter((item) => {
+        const endpointHref = item.querySelector?.("a#endpoint[href]")?.href || "";
+        const itemVideoKey = extractVideoKey({ currentUrl: endpointHref });
+        return itemVideoKey
+            ? itemVideoKey === videoKey
+            : Boolean(playerResponse);
+    });
+
+    return parseNativeYouTubeChaptersFromDOM({
+        querySelectorAll: () => chapterItems,
+    });
+}
+
+function nativeChapterSurfaceAvailable() {
+    if (nativePanel.hasNativeChapterSurface()) {
+        return true;
+    }
+
+    // The player renders one hover container per native scrubber segment.
+    // Generated extension chapters never alter this player-owned structure.
+    return querySelectorAllSafe(document, "#movie_player .ytp-chapter-hover-container").length > 1;
+}
+
 function nativeChaptersForVideo(videoKey = currentVideoKey || getVideoKey() || "") {
     if (!videoKey) {
         return [];
@@ -822,15 +962,63 @@ function nativeChaptersForVideo(videoKey = currentVideoKey || getVideoKey() || "
 
     const cachedChapters = nativeChapterCache.get(videoKey);
     if (cachedChapters) {
+        setNativeChapterDetection(videoKey, "available");
         return cachedChapters;
     }
 
-    const chapters = parseNativeYouTubeChapters(getInitialData(videoKey));
-    if (chapters.length > 0) {
-        nativeChapterCache.set(videoKey, chapters);
+    const detection = nativeChapterDetection(videoKey);
+    if (detection?.status === "unavailable") {
+        return [];
     }
 
-    return chapters;
+    const initialData = getInitialData(videoKey);
+    const chapters = parseNativeYouTubeChapters(initialData);
+    if (chapters.length > 0) {
+        nativeChapterCache.set(videoKey, chapters);
+        setNativeChapterDetection(videoKey, "available");
+        return chapters;
+    }
+
+    const domChapters = liveNativeChapters(videoKey);
+    if (domChapters.length > 0) {
+        nativeChapterCache.set(videoKey, domChapters);
+        setNativeChapterDetection(videoKey, "available");
+        return domChapters;
+    }
+
+    const playerChapters = parseNativeYouTubeChapters(playerResponseForVideo(videoKey));
+    if (playerChapters.length > 0) {
+        nativeChapterCache.set(videoKey, playerChapters);
+        setNativeChapterDetection(videoKey, "available");
+        return playerChapters;
+    }
+
+    // A current, fully parsed ytInitialData response is authoritative for
+    // absence unless YouTube is visibly advertising a lazy Chapters/Key
+    // moments surface. In that case, keep waiting for its list until the
+    // deadline. Availability means we have displayable chapter rows, not only
+    // a tab or segmented scrubber that our compact view cannot migrate.
+    if (
+        (initialData && !nativeChapterSurfaceAvailable())
+        || Date.now() >= (detection?.deadline || 0)
+    ) {
+        setNativeChapterDetection(videoKey, "unavailable");
+    }
+
+    return [];
+}
+
+function nativeChapterDetectionStatus(videoKey = currentVideoKey || getVideoKey() || "") {
+    if (!videoKey) {
+        return "unknown";
+    }
+
+    if (videoKey === (currentVideoKey || getVideoKey() || "") && state.timestampsSource === "youtubeChapters") {
+        setNativeChapterDetection(videoKey, "available");
+    }
+
+    nativeChaptersForVideo(videoKey);
+    return nativeChapterDetection(videoKey)?.status || "pending";
 }
 
 function hasNativeYouTubeChapters(videoKey = currentVideoKey || getVideoKey() || "") {
@@ -842,7 +1030,7 @@ function hasNativeYouTubeChapters(videoKey = currentVideoKey || getVideoKey() ||
         return true;
     }
 
-    return nativeChaptersForVideo(videoKey).length > 0;
+    return nativeChapterDetectionStatus(videoKey) === "available";
 }
 
 function shouldGenerateChaptersInsteadOfNative(videoKey = currentVideoKey || getVideoKey() || "") {
@@ -858,18 +1046,20 @@ function shouldGenerateChaptersInsteadOfNative(videoKey = currentVideoKey || get
     return normalizedChapterPreference(state.settings.chapterPreference) === "alwaysGenerate";
 }
 
-function syncGeneratedChapterOverrideState(videoKey = currentVideoKey || getVideoKey() || "") {
-    state.chapterSourceOverride = chapterSourceOverride(videoKey);
-    state.nativeChaptersOverridden = shouldGenerateChaptersInsteadOfNative(videoKey);
+function shouldWaitForNativeChapterDetection(videoKey = currentVideoKey || getVideoKey() || "") {
+    return !shouldGenerateChaptersInsteadOfNative(videoKey)
+        && nativeChapterDetectionStatus(videoKey) === "pending";
 }
 
-function effectiveChapterSource(videoKey = currentVideoKey || getVideoKey() || "") {
-    syncGeneratedChapterOverrideState(videoKey);
-    if (!hasNativeYouTubeChapters(videoKey)) {
-        return "generated";
-    }
+function isTimestampChapterDiscoveryPending(videoKey = currentVideoKey || getVideoKey() || "") {
+    return !state.timestampsText
+        && !state.errors.timestamps
+        && !state.isLoading.timestamps
+        && shouldWaitForNativeChapterDetection(videoKey);
+}
 
-    return state.nativeChaptersOverridden ? "generated" : "native";
+function syncGeneratedChapterOverrideState(videoKey = currentVideoKey || getVideoKey() || "") {
+    state.nativeChaptersOverridden = shouldGenerateChaptersInsteadOfNative(videoKey);
 }
 
 function applyNativeChaptersIfAvailable(videoKey = currentVideoKey || getVideoKey() || "") {
@@ -878,8 +1068,15 @@ function applyNativeChaptersIfAvailable(videoKey = currentVideoKey || getVideoKe
         return false;
     }
 
-    if (!videoKey || state.timestampsSource === "youtubeChapters") {
-        return state.timestampsSource === "youtubeChapters";
+    // A resolved result is stable for this video. YouTube can expose its
+    // chapter payload late (for example after returning from fullscreen), but
+    // it must not replace generated chapters or trigger a new render loop.
+    if (
+        !videoKey
+        || state.timestampsSource === "youtubeChapters"
+        || state.timestampsSource === "generated"
+    ) {
+        return false;
     }
 
     const chapters = nativeChaptersForVideo(videoKey);
@@ -906,7 +1103,10 @@ function applyNativeChaptersIfAvailable(videoKey = currentVideoKey || getVideoKe
         state.generationIDs.timestamps += 1;
     }
     clearPendingGeneration(videoKey, "timestamps");
-    logDebug("timestamps", `chapters: using ${chapters.length} YouTube chapter${chapters.length === 1 ? "" : "s"}`);
+    logDebug(
+        "timestamps",
+        `chapters: using ${chapters.length} YouTube chapter${chapters.length === 1 ? "" : "s"}`
+    );
 
     return true;
 }
@@ -1087,10 +1287,6 @@ function trackLanguageLabel(track) {
     } catch (_) {
         return label || languageCode;
     }
-}
-
-function selectCaptionTrack(tracks) {
-    return rankCaptionTracks(tracks)[0] || null;
 }
 
 function rankCaptionTracks(tracks) {
@@ -1763,7 +1959,12 @@ function descriptionExpandButtons() {
 
 async function openNativeTranscriptPanel(kind) {
     let buttons = nativeTranscriptOpenButtons();
-    if (buttons.length === 0) {
+    const transcriptSection = document.querySelector("ytd-video-description-transcript-section-renderer");
+    if (buttons.length === 0 && transcriptSection) {
+        // Expanding a generic description just to look for a transcript has a
+        // visible side effect on transcript-free videos: current YouTube builds
+        // open the full Description engagement panel. Expand only when YouTube
+        // has already supplied positive transcript-section evidence.
         const expanders = descriptionExpandButtons();
         if (expanders.length > 0) {
             logTranscriptDebug(kind, "transcript: expanding YouTube description");
@@ -1829,10 +2030,8 @@ function rememberTranscript(videoKey, transcript) {
 
     transcriptCache.delete(videoKey);
     transcriptCache.set(videoKey, transcript);
-
-    while (transcriptCache.size > TRANSCRIPT_CACHE_LIMIT) {
-        const oldestKey = transcriptCache.keys().next().value;
-        transcriptCache.delete(oldestKey);
+    if (videoKey === (currentVideoKey || getVideoKey() || "")) {
+        scheduleNativePanelRefresh();
     }
 }
 
@@ -2002,51 +2201,6 @@ async function resolveTranscript(videoKey, kind, { allowNativePanelOpen = true }
     return null;
 }
 
-async function getTranscript(videoKey, kind, { allowNativePanelOpen = true } = {}) {
-    if (transcriptCache.has(videoKey)) {
-        const cachedTranscript = transcriptCache.get(videoKey);
-        logTranscriptDebug(kind, `transcript: using cached captions (${cachedTranscript.lineCount} lines)`);
-        if (cachedTranscript.languageCode || cachedTranscript.languageLabel) {
-            logTranscriptDebug(kind, `transcript: language ${cachedTranscript.languageLabel || cachedTranscript.languageCode}${cachedTranscript.languageCode ? ` (${cachedTranscript.languageCode})` : ""}`);
-        }
-        return cachedTranscript;
-    }
-
-    const existingRequest = transcriptRequestCache.get(videoKey);
-    if (existingRequest) {
-        logTranscriptDebug(kind, "transcript: waiting for shared transcript fetch");
-        if (!allowNativePanelOpen || existingRequest.allowNativePanelOpen) {
-            return existingRequest.promise;
-        }
-
-        const sharedTranscript = await existingRequest.promise.catch((error) => {
-            logTranscriptDebug(kind, `transcript: shared passive fetch failed (${error?.message || String(error)})`);
-            return null;
-        });
-        if (sharedTranscript?.text) {
-            return sharedTranscript;
-        }
-
-        if (transcriptCache.has(videoKey)) {
-            return transcriptCache.get(videoKey);
-        }
-    }
-
-    const request = resolveTranscript(videoKey, kind, { allowNativePanelOpen });
-    transcriptRequestCache.set(videoKey, {
-        promise: request,
-        allowNativePanelOpen,
-    });
-
-    try {
-        return await request;
-    } finally {
-        if (transcriptRequestCache.get(videoKey)?.promise === request) {
-            transcriptRequestCache.delete(videoKey);
-        }
-    }
-}
-
 function needsTranscriptForTimestamps() {
     return state.timestampsSource !== "youtubeChapters"
         && canGenerateTimestamps()
@@ -2090,11 +2244,26 @@ function prefetchTranscript(videoKey = watchVideoKey(), {
         return null;
     }
 
-    const request = getTranscript(videoKey, kind || preferredTranscriptDebugKind(), { allowNativePanelOpen });
+    const existingRequest = transcriptRequestCache.get(videoKey);
+    if (
+        existingRequest
+        && (!allowNativePanelOpen || existingRequest.allowNativePanelOpen)
+    ) {
+        // Reconciliation and status refresh can request the same passive
+        // prefetch many times while YouTube is still exposing captions. The
+        // first prefetch already owns completion refresh/error handling, so do
+        // not register duplicate consumers or duplicate diagnostic messages.
+        return existingRequest.promise;
+    }
+
+    const request = transcriptOrchestrator.get(videoKey, kind || preferredTranscriptDebugKind(), { allowNativePanelOpen });
     request
         .then((transcript) => {
-            if (currentVideoKey === videoKey && transcript?.text) {
-                syncNativeHeaderCopyButton();
+            if (currentVideoKey === videoKey) {
+                if (transcript?.text) {
+                    syncNativeHeaderCopyButton();
+                }
+                scheduleNativePanelRefresh();
             }
         })
         .catch((error) => {
@@ -2152,9 +2321,70 @@ function dedupePanelHosts(preferredHost = panelHost) {
     return keeper;
 }
 
+function clearVideoDiscoveryTimeouts() {
+    for (const timeoutID of videoDiscoveryTimeouts) {
+        window.clearTimeout(timeoutID);
+    }
+    videoDiscoveryTimeouts = [];
+}
+
+function clearNavigationReconcileTimeouts() {
+    for (const timeoutID of navigationReconcileTimeouts) {
+        window.clearTimeout(timeoutID);
+    }
+    navigationReconcileTimeouts = [];
+}
+
+function scheduleNavigationReconciliation(expectedURL = window.location.href) {
+    clearNavigationReconcileTimeouts();
+    for (const delay of NAVIGATION_RECONCILE_DELAYS_MS) {
+        const timeoutID = window.setTimeout(() => {
+            navigationReconcileTimeouts = navigationReconcileTimeouts.filter((id) => id !== timeoutID);
+            if (window.location.href === expectedURL && isWatchPage()) {
+                void ensurePanel();
+            }
+        }, delay);
+        navigationReconcileTimeouts.push(timeoutID);
+    }
+}
+
+function beginVideoDiscovery(videoKey) {
+    clearVideoDiscoveryTimeouts();
+    touchVideoSession(videoKey);
+    nativePanelDiscoveryDeadline = Date.now() + NATIVE_PANEL_DISCOVERY_GRACE_MS;
+    prefetchTranscript(videoKey, {
+        allowNativePanelOpen: false,
+        force: true,
+    });
+    const detection = nativeChapterDetection(videoKey);
+    if (detection?.status === "pending") {
+        detection.deadline = Date.now() + NATIVE_DISCOVERY_GRACE_MS;
+    }
+
+    const panelTimeoutID = window.setTimeout(() => {
+        videoDiscoveryTimeouts = videoDiscoveryTimeouts.filter((id) => id !== panelTimeoutID);
+        scheduleNativePanelRefresh();
+    }, NATIVE_PANEL_DISCOVERY_GRACE_MS);
+    videoDiscoveryTimeouts.push(panelTimeoutID);
+
+    const chapterTimeoutID = window.setTimeout(() => {
+        videoDiscoveryTimeouts = videoDiscoveryTimeouts.filter((id) => id !== chapterTimeoutID);
+        nativeChapterDetectionStatus(videoKey);
+        scheduleNativePanelRefresh();
+    }, NATIVE_DISCOVERY_GRACE_MS);
+    videoDiscoveryTimeouts.push(chapterTimeoutID);
+}
+
+function nativePanelDiscoveryPending() {
+    return Boolean(currentVideoKey) && Date.now() < nativePanelDiscoveryDeadline;
+}
+
 function getPanelMount() {
     const nativeMount = nativePanel.getMount();
     if (nativeMount) {
+        // Placement and chapter-source discovery are independent. Mount the
+        // unified surface as soon as YouTube's shell exists; Chapters can keep
+        // resolving without blocking Summary or the surrounding panel.
         if (nativePanel.open(nativeMount)) {
             return {
                 type: "native",
@@ -2166,7 +2396,37 @@ function getPanelMount() {
         return null;
     }
 
+    if (state.nativePanelDismissed) {
+        return null;
+    }
+
     if (panelHost?.dataset.ytsPlacement === "native" && currentVideoKey && currentVideoKey === getVideoKey()) {
+        return null;
+    }
+
+    // Engagement panels can be absent for the duration of a pre-roll ad and
+    // then appear all at once. Hold the fallback during that bounded discovery
+    // window so the page does not flash a standalone sidebar and later move it.
+    if (nativePanelDiscoveryPending()) {
+        return null;
+    }
+
+    // The standalone surface exists only to present transcript-backed
+    // generation. If YouTube has no native In this video shell, wait for the
+    // one shared transcript detector and mount only after it succeeds. A
+    // terminal miss leaves the page untouched instead of showing an error-only
+    // extension sidebar.
+    const videoKey = watchVideoKey();
+    if (transcriptOrchestrator.status(videoKey) === "unknown") {
+        // Initial discovery can be skipped while Safari keeps a background tab
+        // hidden. Start the same passive detector when fallback placement is
+        // first evaluated in the foreground; do not create a second probe.
+        prefetchTranscript(videoKey, {
+            allowNativePanelOpen: false,
+            force: true,
+        });
+    }
+    if (!transcriptOrchestrator.hasAvailableTranscript(videoKey)) {
         return null;
     }
 
@@ -2229,18 +2489,31 @@ function placePanelHost(mount) {
     mount.target.prepend(panelHost);
 }
 
-function removePanel() {
-    detachActiveGeneratedChapterTracker();
+function removePanel({ preserveNativeControls = false } = {}) {
+    detachActiveChapterTracker();
     nativePanel.clearTabSwitch();
     nativePanel.clearResync();
     panelHost?.remove();
     for (const host of getPanelHosts()) {
         host.remove();
     }
-    nativePanel.cleanupTabs();
-    nativePanel.cleanupHeaderActions();
+    if (!preserveNativeControls) {
+        nativePanel.cleanupTabs();
+        nativePanel.cleanupHeaderActions();
+    }
     nativePanel.syncContentVisibility(null);
     panelHost = null;
+}
+
+function removeStandalonePanels() {
+    if (panelHost && panelHost.dataset.ytsPlacement !== "native") {
+        removePanel({ preserveNativeControls: true });
+    }
+    for (const host of getPanelHosts()) {
+        if (host.dataset.ytsPlacement !== "native") {
+            host.remove();
+        }
+    }
 }
 
 function resetPanelState() {
@@ -2268,10 +2541,10 @@ function resetPanelState() {
         timestamps: false,
         summary: false,
     };
-    state.generationIDs = {
-        timestamps: 0,
-        summary: 0,
-    };
+    // Invalidate old async work without recycling IDs. A stale request from a
+    // previous video must never match a new video's first request and clear or
+    // overwrite its loading state when it eventually settles.
+    state.generationIDs = invalidateGenerationIDs(state.generationIDs);
     state.generationDurationsMs = {
         timestamps: 0,
         summary: 0,
@@ -2285,10 +2558,26 @@ function resetPanelState() {
         summary: false,
         transcript: false,
     };
-    state.didAutogenerateAnalysis = false;
+    state.copyErrors = {
+        timestamps: "",
+        summary: "",
+        transcript: "",
+    };
+    state.autogenerationAttempted = {
+        timestamps: false,
+        summary: false,
+    };
 }
 
 function cleanupNonWatchPage() {
+    stopNativePanelObserver();
+    clearVideoDiscoveryTimeouts();
+    clearNavigationReconcileTimeouts();
+    nativePanelDiscoveryDeadline = 0;
+    navigationDataCache = {
+        videoKey: "",
+        response: null,
+    };
     currentVideoKey = null;
     resetPanelState();
     removePanel();
@@ -2315,7 +2604,10 @@ function isTimestampTab(kind) {
 }
 
 function buttonLabel(kind) {
-    if (state.isLoading[kind]) {
+    if (
+        state.isLoading[kind]
+        || (kind === "timestamps" && isTimestampChapterDiscoveryPending())
+    ) {
         return kind === "timestamps" ? "Timestamps..." : "Summary...";
     }
 
@@ -2366,6 +2658,10 @@ function hasCopyText(kind) {
 }
 
 function copyButtonLabel(kind) {
+    if (state.copyErrors[kind]) {
+        return "Copy failed. Try again";
+    }
+
     if (state.copyFeedback[kind]) {
         if (kind === "transcript") {
             return "Copied transcript";
@@ -2389,7 +2685,15 @@ function copyButtonLabel(kind) {
     return state.timestampsSource === "youtubeChapters" ? "Copy chapters" : "Copy timestamps";
 }
 
-function copyIcon() {
+function copyIcon(copied = false) {
+    if (copied) {
+        return `
+            <svg class="copy-confirmation-icon" aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
+                <path d="m9.55 17.6-4.7-4.7 1.4-1.4 3.3 3.3 8.2-8.2 1.4 1.4-9.6 9.6Z"></path>
+            </svg>
+        `;
+    }
+
     return `
         <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
             <path d="M8 7.5A2.5 2.5 0 0 1 10.5 5H17a2.5 2.5 0 0 1 2.5 2.5V14a2.5 2.5 0 0 1-2.5 2.5h-6.5A2.5 2.5 0 0 1 8 14V7.5Zm2.5-.5A.5.5 0 0 0 10 7.5V14a.5.5 0 0 0 .5.5H17a.5.5 0 0 0 .5-.5V7.5A.5.5 0 0 0 17 7h-6.5Z"></path>
@@ -2432,7 +2736,7 @@ function copyTextForKind(kind) {
 
 function resultCaption(kind) {
     if (isTimestampTab(kind) && state.timestampsSource === "youtubeChapters") {
-        return "Using chapters already available on YouTube.";
+        return "Chapters provided by YouTube.";
     }
 
     const durationMs = state.generationDurationsMs[kind];
@@ -2441,34 +2745,107 @@ function resultCaption(kind) {
         : "";
     const engineLabel = state.generationEngineLabels[kind] || currentResultEngineLabel(kind);
 
-    return `Generated with ${engineLabel}${durationSuffix}.`;
+    return isTimestampTab(kind)
+        ? `Chapters generated with ${engineLabel}${durationSuffix}.`
+        : `Generated with ${engineLabel}${durationSuffix}.`;
+}
+
+function chapterSourceSwitch(kind) {
+    if (!isTimestampTab(kind)) {
+        return null;
+    }
+
+    if (state.timestampsSource === "youtubeChapters" && canGenerateTimestamps()) {
+        const hasCachedGeneratedChapters = Boolean(
+            cachedGenerationResult(watchVideoKey(), "timestamps")?.text
+        );
+        return {
+            source: "generated",
+            label: hasCachedGeneratedChapters
+                ? "View generated chapters"
+                : "Generate chapters from transcript",
+            title: hasCachedGeneratedChapters
+                ? "View the cached generated chapters for this video"
+                : "Generate alternative chapters from this video's transcript",
+        };
+    }
+
+    if (state.timestampsSource === "generated" && hasNativeYouTubeChapters()) {
+        return {
+            source: "native",
+            label: "View YouTube chapters",
+            title: "View the chapters provided by YouTube for this video",
+        };
+    }
+
+    return null;
+}
+
+function renderResultCaption(kind) {
+    const sourceSwitch = chapterSourceSwitch(kind);
+    const sourceActionHTML = sourceSwitch
+        ? ` <button class="caption-link" type="button" data-chapter-source-switch="${escapeHTML(sourceSwitch.source)}" title="${escapeHTML(sourceSwitch.title)}">${escapeHTML(sourceSwitch.label)}</button>.`
+        : "";
+    return `<div class="caption">${escapeHTML(resultCaption(kind))}${sourceActionHTML}</div>`;
+}
+
+function writeToClipboardWithSelection(text) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.setAttribute("aria-hidden", "true");
+    textarea.style.position = "fixed";
+    textarea.style.top = "-1000px";
+    textarea.style.left = "-1000px";
+    textarea.style.opacity = "0";
+    (document.body || document.documentElement).append(textarea);
+
+    let didCopy = false;
+    try {
+        textarea.focus({ preventScroll: true });
+        textarea.select();
+        textarea.setSelectionRange(0, textarea.value.length);
+        didCopy = document.execCommand("copy");
+    } catch (error) {
+        console.debug("[Apple Intelligence content:copy] Selection copy failed", error);
+    } finally {
+        textarea.remove();
+    }
+
+    return didCopy;
 }
 
 async function writeToClipboard(text) {
+    // Run Safari's selection-based path before the first await so it retains the
+    // transient user activation from the click. The manifest's clipboardWrite
+    // permission authorizes both this path and the async Clipboard API fallback.
+    if (writeToClipboardWithSelection(text)) {
+        return;
+    }
+
+    let pageClipboardError = null;
     if (navigator.clipboard?.writeText) {
         try {
             await navigator.clipboard.writeText(text);
             return;
         } catch (error) {
-            console.debug("[Apple Intelligence content:copy] Clipboard API failed, trying fallback", error);
+            pageClipboardError = error;
+            console.debug("[Apple Intelligence content:copy] Page Clipboard API failed", error);
         }
     }
 
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.top = "-1000px";
-    textarea.style.left = "-1000px";
-    document.documentElement.append(textarea);
-    textarea.focus();
-    textarea.select();
-    const didCopy = document.execCommand("copy");
-    textarea.remove();
-
-    if (!didCopy) {
-        throw new Error("Clipboard copy failed.");
+    const extensionResponse = await sendMessageWithTimeout({
+        type: "ai:copyText",
+        text,
+    }, 3000).catch((error) => ({
+        ok: false,
+        error: error?.message || String(error),
+    }));
+    if (extensionResponse?.ok) {
+        return;
     }
+
+    throw new Error(extensionResponse?.error || pageClipboardError?.message || "Clipboard copy failed.");
 }
 
 async function copyResult(kind) {
@@ -2482,6 +2859,10 @@ async function copyResult(kind) {
 
     try {
         await writeToClipboard(text);
+        state.copyErrors = {
+            ...state.copyErrors,
+            [kind]: "",
+        };
         state.copyFeedback = {
             ...state.copyFeedback,
             [kind]: true,
@@ -2502,6 +2883,12 @@ async function copyResult(kind) {
         }, 1400);
     } catch (error) {
         console.debug("[Apple Intelligence content:copy] Clipboard copy failed", error);
+        state.copyErrors = {
+            ...state.copyErrors,
+            [kind]: "Couldn’t access the clipboard. Try again after reloading the extension.",
+        };
+        render();
+        nativePanel.syncTabs();
     }
 }
 
@@ -2518,21 +2905,24 @@ async function copyHeaderResult() {
     await copyResult(kind);
 }
 
-function renderConnectionState(message) {
+function renderConnectionState(message, error = state.statusError) {
     return `
         <div class="surface state-surface">
             <div class="state-copy">${escapeHTML(message)}</div>
             <button class="soft-button" data-open-app>Open Companion App</button>
+            ${error ? `<div class="error-copy">${escapeHTML(error)}</div>` : ""}
         </div>
     `;
 }
 
 function renderProviderConnectionState() {
     return `
-        <div class="surface state-surface">
+            <div class="surface state-surface">
             <div class="state-copy">Connect ${escapeHTML(providerLabel())} in the companion app to generate timestamps.</div>
             <button class="soft-button" data-open-app>Open Companion App</button>
-            ${state.providerError ? `<div class="error-copy">${escapeHTML(state.providerError)}</div>` : ""}
+            ${state.providerError || state.statusError
+                ? `<div class="error-copy">${escapeHTML(state.providerError || state.statusError)}</div>`
+                : ""}
         </div>
     `;
 }
@@ -2567,6 +2957,14 @@ function renderEmptyState(kind) {
     `;
 }
 
+function renderTimestampChapterDiscoveryState() {
+    return `
+        <div class="surface state-surface">
+            <div class="state-copy">Checking for YouTube chapters...</div>
+        </div>
+    `;
+}
+
 function renderErrorState(kind, message) {
     if (message === unavailableMessage(kind)) {
         return `
@@ -2590,12 +2988,12 @@ function renderErrorState(kind, message) {
     `;
 }
 
-function generatedChapterLinks() {
-    return Array.from(panelHost?.shadowRoot?.querySelectorAll?.("[data-generated-chapter='true']") || []);
+function chapterLinks() {
+    return Array.from(panelHost?.shadowRoot?.querySelectorAll?.("[data-chapter='true']") || []);
 }
 
-function syncActiveGeneratedChapterHighlight() {
-    const links = generatedChapterLinks();
+function syncActiveChapterHighlight() {
+    const links = chapterLinks();
     if (links.length === 0) {
         return;
     }
@@ -2631,18 +3029,18 @@ function syncActiveGeneratedChapterHighlight() {
     }
 }
 
-function scheduleActiveGeneratedChapterSync() {
+function scheduleActiveChapterSync() {
     if (activeChapterSyncFrame !== null) {
         return;
     }
 
     activeChapterSyncFrame = requestAnimationFrame(() => {
         activeChapterSyncFrame = null;
-        syncActiveGeneratedChapterHighlight();
+        syncActiveChapterHighlight();
     });
 }
 
-function detachActiveGeneratedChapterTracker() {
+function detachActiveChapterTracker() {
     if (activeChapterSyncFrame !== null) {
         cancelAnimationFrame(activeChapterSyncFrame);
         activeChapterSyncFrame = null;
@@ -2652,33 +3050,33 @@ function detachActiveGeneratedChapterTracker() {
         return;
     }
 
-    activeChapterVideoElement.removeEventListener("timeupdate", scheduleActiveGeneratedChapterSync);
-    activeChapterVideoElement.removeEventListener("seeking", scheduleActiveGeneratedChapterSync);
-    activeChapterVideoElement.removeEventListener("seeked", scheduleActiveGeneratedChapterSync);
-    activeChapterVideoElement.removeEventListener("loadedmetadata", scheduleActiveGeneratedChapterSync);
-    activeChapterVideoElement.removeEventListener("play", scheduleActiveGeneratedChapterSync);
+    activeChapterVideoElement.removeEventListener("timeupdate", scheduleActiveChapterSync);
+    activeChapterVideoElement.removeEventListener("seeking", scheduleActiveChapterSync);
+    activeChapterVideoElement.removeEventListener("seeked", scheduleActiveChapterSync);
+    activeChapterVideoElement.removeEventListener("loadedmetadata", scheduleActiveChapterSync);
+    activeChapterVideoElement.removeEventListener("play", scheduleActiveChapterSync);
     activeChapterVideoElement = null;
 }
 
-function syncActiveGeneratedChapterTracker() {
+function syncActiveChapterTracker() {
     const video = document.querySelector("video");
     if (video === activeChapterVideoElement) {
-        scheduleActiveGeneratedChapterSync();
+        scheduleActiveChapterSync();
         return;
     }
 
-    detachActiveGeneratedChapterTracker();
+    detachActiveChapterTracker();
     activeChapterVideoElement = video;
     if (!activeChapterVideoElement) {
         return;
     }
 
-    activeChapterVideoElement.addEventListener("timeupdate", scheduleActiveGeneratedChapterSync);
-    activeChapterVideoElement.addEventListener("seeking", scheduleActiveGeneratedChapterSync);
-    activeChapterVideoElement.addEventListener("seeked", scheduleActiveGeneratedChapterSync);
-    activeChapterVideoElement.addEventListener("loadedmetadata", scheduleActiveGeneratedChapterSync);
-    activeChapterVideoElement.addEventListener("play", scheduleActiveGeneratedChapterSync);
-    scheduleActiveGeneratedChapterSync();
+    activeChapterVideoElement.addEventListener("timeupdate", scheduleActiveChapterSync);
+    activeChapterVideoElement.addEventListener("seeking", scheduleActiveChapterSync);
+    activeChapterVideoElement.addEventListener("seeked", scheduleActiveChapterSync);
+    activeChapterVideoElement.addEventListener("loadedmetadata", scheduleActiveChapterSync);
+    activeChapterVideoElement.addEventListener("play", scheduleActiveChapterSync);
+    scheduleActiveChapterSync();
 }
 
 function renderTimestampsResult(kind = "timestamps") {
@@ -2691,6 +3089,10 @@ function renderTimestampsResult(kind = "timestamps") {
         return renderErrorState(kind, activeError(kind));
     }
 
+    if (!text && isTimestampChapterDiscoveryPending()) {
+        return renderTimestampChapterDiscoveryState();
+    }
+
     if (!text) {
         return renderEmptyState(kind);
     }
@@ -2698,25 +3100,25 @@ function renderTimestampsResult(kind = "timestamps") {
     const parsed = parseTimestamps(text);
     if (parsed.length === 0) {
         return `
-            <div class="surface result-surface">
+            <div class="surface result-surface chapter-result-surface">
                 <div class="summary-text">${escapeHTML(text)}</div>
-                <div class="caption">${escapeHTML(resultCaption(kind))}</div>
+                ${renderResultCaption(kind)}
             </div>
         `;
     }
 
-    const tracksActiveChapter = kind === "timestamps" && state.timestampsSource === "generated";
+    const tracksActiveChapter = kind === "timestamps";
     return `
-        <div class="surface result-surface">
+        <div class="surface result-surface chapter-result-surface">
             <div class="timestamp-list">
                 ${parsed.map((item) => `
-                    <a class="timestamp-link" href="${escapeHTML(buildTimestampHref(item.seconds))}" data-seconds="${item.seconds}"${tracksActiveChapter ? " data-generated-chapter=\"true\"" : ""}>
+                    <a class="timestamp-link" href="${escapeHTML(buildTimestampHref(item.seconds))}" data-seconds="${item.seconds}"${tracksActiveChapter ? " data-chapter=\"true\"" : ""}>
                         <span class="timestamp-time">${escapeHTML(item.time)}</span>
                         <span class="timestamp-label">${escapeHTML(item.label)}</span>
                     </a>
                 `).join("")}
             </div>
-            <div class="caption">${escapeHTML(resultCaption(kind))}</div>
+            ${renderResultCaption(kind)}
         </div>
     `;
 }
@@ -2794,6 +3196,15 @@ function restoreRenderScrollState(root, scrollState) {
     surface.scrollLeft = scrollState.scrollLeft;
 }
 
+function attachPanelControlListeners(root) {
+    if (!root || wiredPanelRoots.has(root)) {
+        return;
+    }
+
+    wiredPanelRoots.add(root);
+    root.addEventListener("click", handlePanelControlClick, true);
+}
+
 function render() {
     if (!panelHost) {
         return;
@@ -2803,6 +3214,7 @@ function render() {
     if (!root) {
         return;
     }
+    attachPanelControlListeners(root);
 
     const nativePanelMode = panelHost.dataset.ytsPlacement === "native";
     if (nativePanelMode && state.nativeExtensionTab && !nativePanel.extensionTabKinds().includes(state.nativeExtensionTab)) {
@@ -2812,7 +3224,6 @@ function render() {
     panelHost.hidden = nativePanelMode && !state.nativeExtensionTab;
     if (panelHost.hidden) {
         nativePanel.syncTabs();
-        notifyPageActionsChanged();
         return;
     }
 
@@ -2838,6 +3249,10 @@ function render() {
                 --muted: var(--yt-spec-text-secondary, #606060);
                 --accent: #d93025;
                 --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+                --tab-background: var(--yt-spec-badge-chip-background, #f2f2f2);
+                --tab-background-hover: var(--yt-spec-button-chip-background-hover, #e7e7e7);
+                --tab-selected-background: var(--yt-spec-text-primary, #0f0f0f);
+                --tab-selected-text: var(--yt-spec-text-primary-inverse, #ffffff);
                 margin: 0 0 16px;
                 color: var(--text);
                 font-family: "Roboto", "Arial", sans-serif;
@@ -2858,25 +3273,10 @@ function render() {
                     --muted: var(--yt-spec-text-secondary, #aaa);
                     --accent: #ff5a4f;
                     --shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
-                }
-
-                .tab {
-                    background: #2f3033;
-                    color: #f1f1f1;
-                }
-
-                .tab:hover {
-                    background: #3a3b3f;
-                }
-
-                .tab.active {
-                    background: #f1f1f1;
-                    color: #0f0f0f;
-                }
-
-                .tab.active[aria-busy="true"] {
-                    background: #d9d9d9;
-                    color: #0f0f0f;
+                    --tab-background: var(--yt-spec-badge-chip-background, #2f3033);
+                    --tab-background-hover: var(--yt-spec-button-chip-background-hover, #3a3b3f);
+                    --tab-selected-background: var(--yt-spec-static-brand-white, #f1f1f1);
+                    --tab-selected-text: #0f0f0f;
                 }
             }
 
@@ -2922,8 +3322,8 @@ function render() {
                 appearance: none;
                 border: 0;
                 border-radius: 10px;
-                background: #f2f2f2;
-                color: #0f0f0f;
+                background: var(--tab-background);
+                color: var(--text);
                 padding: 0 18px;
                 min-height: 34px;
                 flex: 0 0 auto;
@@ -2965,28 +3365,33 @@ function render() {
                 opacity: 0.9;
             }
 
+            .copy-button[data-copied="true"] {
+                color: #2e9b4b;
+                opacity: 1;
+            }
+
+            .copy-button[data-copied="true"] svg {
+                animation: copy-confirmation 320ms ease-out;
+            }
+
+            @keyframes copy-confirmation {
+                0% { opacity: 0; transform: scale(0.55); }
+                65% { opacity: 1; transform: scale(1.18); }
+                100% { opacity: 1; transform: scale(1); }
+            }
+
             .copy-button:disabled {
                 cursor: default;
                 opacity: 0.22;
             }
 
             .tab:hover {
-                background: #e7e7e7;
+                background: var(--tab-background-hover);
             }
 
             .tab.active {
-                background: #0f0f0f;
-                color: #ffffff;
-            }
-
-            .tab[aria-busy="true"] {
-                background: #e7e7e7;
-                color: #0f0f0f;
-            }
-
-            .tab.active[aria-busy="true"] {
-                color: #ffffff;
-                background: #0f0f0f;
+                background: var(--tab-selected-background);
+                color: var(--tab-selected-text);
             }
 
             .body {
@@ -3006,6 +3411,10 @@ function render() {
 
             .result-surface {
                 align-content: start;
+            }
+
+            .chapter-result-surface {
+                gap: 10px;
             }
 
             .state-surface {
@@ -3034,6 +3443,42 @@ function render() {
                 color: var(--muted);
                 font-size: 1.2rem;
                 line-height: 1.8rem;
+            }
+
+            .chapter-result-surface > .caption {
+                text-align: left;
+            }
+
+            .caption-link {
+                appearance: none;
+                border: 0;
+                background: transparent;
+                color: inherit;
+                cursor: pointer;
+                font: inherit;
+                font-weight: inherit;
+                margin: 0;
+                padding: 0;
+                text-decoration: underline;
+                text-decoration-thickness: 1px;
+                text-underline-offset: 2px;
+            }
+
+            .caption-link:hover {
+                color: var(--text);
+            }
+
+            .caption-link:focus-visible {
+                border-radius: 2px;
+                outline: 2px solid currentColor;
+                outline-offset: 2px;
+            }
+
+            .copy-error {
+                color: var(--muted);
+                font-size: 1.2rem;
+                line-height: 1.8rem;
+                padding: 0 16px 8px;
             }
 
             .debug-copy {
@@ -3226,9 +3671,12 @@ function render() {
                         title="${escapeHTML(copyButtonLabel(state.activeTab))}"
                         ${hasCopyText(state.activeTab) ? "" : "disabled"}
                     >
-                        ${copyIcon()}
+                        ${copyIcon(Boolean(state.copyFeedback[state.activeTab]))}
                     </button>
                 </div>
+                ${state.copyErrors[state.activeTab]
+                    ? `<div class="copy-error" role="status">${escapeHTML(state.copyErrors[state.activeTab])}</div>`
+                    : ""}
                 <div class="body">
                     ${renderActiveContent()}
                 </div>
@@ -3237,56 +3685,33 @@ function render() {
         `}
     `;
 
-    for (const button of root.querySelectorAll("[data-tab]")) {
-        button.addEventListener("click", () => {
-            handleTabSelection(button.getAttribute("data-tab") || "timestamps");
-        });
-    }
-
-    for (const button of root.querySelectorAll("[data-open-app]")) {
-        button.addEventListener("click", openCompanionApp);
-    }
-
-    for (const button of root.querySelectorAll("[data-copy-active]")) {
-        button.addEventListener("click", copyActiveResult);
-    }
-
-    for (const link of root.querySelectorAll("[data-seconds]")) {
-        link.addEventListener("click", (event) => {
-            event.preventDefault();
-            jumpToTime(Number(link.getAttribute("data-seconds") || 0));
-        });
-    }
-
     if (nativePanelMode) {
         nativePanel.syncTabs();
         requestAnimationFrame(() => nativePanel.syncBodyViewport());
     }
 
     restoreRenderScrollState(root, scrollState);
-    syncActiveGeneratedChapterTracker();
-    notifyPageActionsChanged();
+    syncActiveChapterTracker();
 }
 
-async function refreshStatus() {
+async function performStatusRefresh() {
     const previousChapterPreference = normalizedChapterPreference(state.settings.chapterPreference);
     const response = await sendMessageWithTimeout({ type: "ai:getStatus" }, 20000).catch((error) => {
         console.debug("[Apple Intelligence content:status] Status refresh failed", error);
-        return null;
+        return {
+            ok: false,
+            error: error?.message || "The extension could not refresh provider status.",
+        };
     });
-    state.generationMode = response?.generationMode || state.generationMode;
-    state.appleIntelligenceAvailable = Boolean(response?.appleIntelligence?.isConfigured ?? response?.isConfigured);
-    state.codexConnected = Boolean(response?.codex?.connected);
-    state.timestampsAvailable = Boolean(response?.timestampsAvailable ?? state.codexConnected);
-    state.selectedProviderConnected = Boolean(response?.settings?.providerConnected ?? state.timestampsAvailable);
-    state.summaryAvailable = Boolean(response?.summaryAvailable ?? (
-        state.codexConnected
-        || (state.settings.summaryEngine === "appleIntelligence" && state.appleIntelligenceAvailable)
-    ));
-    state.settings = {
-        ...state.settings,
-        ...(response?.settings || {}),
-    };
+
+    const statusResult = contentState.reduceStatusState(state, response);
+    if (!statusResult.applied) {
+        state.statusError = statusResult.error;
+        render();
+        return false;
+    }
+
+    Object.assign(state, statusResult.value);
     state.settings.chapterPreference = normalizedChapterPreference(state.settings.chapterPreference);
     const nextChapterPreference = state.settings.chapterPreference;
     const chapterPreferenceChanged = nextChapterPreference !== previousChapterPreference;
@@ -3307,21 +3732,6 @@ async function refreshStatus() {
         applyNativeChaptersIfAvailable(statusVideoKey);
         state.userSelectedTab = true;
     }
-    state.summaryAvailable = Boolean(response?.summaryAvailable ?? (
-        state.codexConnected
-        || (state.settings.summaryEngine === "appleIntelligence" && state.appleIntelligenceAvailable)
-    ));
-    state.isConfigured = Boolean(response?.isConfigured);
-    state.engine = response?.engine || state.engine;
-    if (state.selectedProviderConnected) {
-        state.providerError = "";
-        state.codexLoginError = "";
-    } else if (state.settings.providerID === "xaiOAuth") {
-        state.providerError = response?.grok?.error || "";
-    } else if (response?.codex?.error) {
-        state.codexLoginError = response.codex.error;
-        state.providerError = response.codex.error;
-    }
     if (!state.userSelectedTab) {
         state.activeTab = defaultActiveTab();
         if (panelHost?.dataset.ytsPlacement === "native" || nativePanel.getMount()) {
@@ -3331,6 +3741,13 @@ async function refreshStatus() {
     nativePanel.syncTabs();
     render();
     prefetchTranscript();
+    return true;
+}
+
+const statusRefreshCoordinator = contentState.createSerialRefreshCoordinator(performStatusRefresh);
+
+async function refreshStatus() {
+    return await statusRefreshCoordinator.request();
 }
 
 function refreshStatusInBackground() {
@@ -3370,23 +3787,10 @@ async function handleTabSelection(kind) {
     }
 }
 
-function pageActionsResponse() {
-    const onWatchPage = isWatchPage();
-    const videoKey = getVideoKey();
-    syncGeneratedChapterOverrideState(videoKey);
-    return {
-        ok: true,
-        canSetVideoChapterSource: Boolean(onWatchPage),
-        nativeChaptersAvailable: hasNativeYouTubeChapters(videoKey),
-        chapterSourceOverride: state.chapterSourceOverride || "default",
-        effectiveChapterSource: effectiveChapterSource(videoKey),
-    };
-}
-
 function resetTimestampResultForChapterSourceChange(videoKey) {
     clearPendingGeneration(videoKey, "timestamps");
     generationRequestKeys.delete(`${videoKey}:timestamps`);
-    state.didAutogenerateAnalysis = false;
+    state.autogenerationAttempted.timestamps = false;
     state.generationIDs.timestamps += 1;
     state.activeTab = "timestamps";
     state.userSelectedTab = true;
@@ -3399,28 +3803,23 @@ function resetTimestampResultForChapterSourceChange(videoKey) {
     state.generationEngineLabels.timestamps = "";
 }
 
-async function setVideoChapterSourceFromPopup(source = "generated") {
+async function switchVideoChapterSource(source = "generated") {
     if (!isWatchPage()) {
-        return {
-            ok: false,
-            error: "Open a YouTube video to choose chapter source.",
-        };
+        return false;
     }
 
     const videoKey = getVideoKey();
     if (!videoKey) {
-        return {
-            ok: false,
-            error: "This YouTube video could not be identified.",
-        };
+        return false;
     }
 
     const nextSource = normalizedChapterSourceOverride(source);
+    if (nextSource === "generated" && !canGenerateTimestamps()) {
+        return false;
+    }
+
     if (nextSource === "native" && !hasNativeYouTubeChapters(videoKey)) {
-        return {
-            ok: false,
-            error: "This video does not have YouTube chapters.",
-        };
+        return false;
     }
 
     if (nextSource) {
@@ -3429,20 +3828,9 @@ async function setVideoChapterSourceFromPopup(source = "generated") {
         chapterSourceOverrideByVideoKey.delete(videoKey);
     }
 
-    await refreshStatus();
     syncGeneratedChapterOverrideState(videoKey);
     resetTimestampResultForChapterSourceChange(videoKey);
     state.nativePanelDismissed = false;
-
-    if (state.nativeChaptersOverridden && !canGenerateTimestamps()) {
-        state.nativeExtensionTab = "timestamps";
-        state.nativeYouTubeTab = "";
-        render();
-        return {
-            ok: false,
-            error: "Connect a timestamps provider in Settings before generating chapters.",
-        };
-    }
 
     if (state.nativeChaptersOverridden) {
         state.nativeExtensionTab = "timestamps";
@@ -3452,23 +3840,24 @@ async function setVideoChapterSourceFromPopup(source = "generated") {
         state.nativeExtensionTab = "";
         state.nativeYouTubeTab = "chapters";
         applyNativeChaptersIfAvailable(videoKey);
-        state.userSelectedTab = true;
     }
 
     await ensurePanel();
+    state.userSelectedTab = true;
     nativePanel.syncTabs();
     render();
     if (state.nativeChaptersOverridden) {
         void maybeGenerateTimestamps();
     }
 
-    return {
-        ...pageActionsResponse(),
-        ok: true,
-    };
+    return true;
 }
 
 async function maybeGenerateTimestamps() {
+    if (shouldWaitForNativeChapterDetection()) {
+        return;
+    }
+
     if (applyNativeChaptersIfAvailable()) {
         render();
         return;
@@ -3492,31 +3881,52 @@ async function maybeGenerateSummary() {
 async function maybeAutogenerateAnalysis() {
     if (
         !isWatchPage()
-        || !panelHost
-        || !panelHost.isConnected
         || document.hidden
-        || state.didAutogenerateAnalysis
         || (state.timestampsText && state.summaryText)
     ) {
+        return;
+    }
+
+    const videoKey = watchVideoKey();
+    const nativeMountAvailable = Boolean(nativePanel.getMount());
+    if (!nativeMountAvailable && !transcriptOrchestrator.hasAvailableTranscript(videoKey)) {
+        // Passive discovery owns fallback eligibility. Do not escalate to
+        // generation or create transcript errors on a page where the extension
+        // has no usable surface.
         return;
     }
 
     applyNativeChaptersIfAvailable();
     prefetchTranscript();
 
-    const requests = [];
-    if (canGenerateTimestamps() && !state.timestampsText) {
-        requests.push(requestGeneration("timestamps"));
-    }
-    if (canGenerateSummary() && !state.summaryText) {
-        requests.push(requestGeneration("summary"));
-    }
-    if (requests.length === 0) {
+    const kinds = automaticGenerationKinds({
+        canGenerateTimestamps: canGenerateTimestamps(),
+        canGenerateSummary: canGenerateSummary(),
+        timestampsText: state.timestampsText,
+        summaryText: state.summaryText,
+        timestampsBlocked: shouldWaitForNativeChapterDetection(),
+        attempted: state.autogenerationAttempted,
+    });
+    if (kinds.length === 0) {
         return;
     }
 
-    state.didAutogenerateAnalysis = true;
-    await Promise.all(requests);
+    const requests = kinds.map((kind) => {
+        state.autogenerationAttempted[kind] = true;
+        return requestGeneration(kind);
+    });
+    if (requests.length > 0) {
+        await Promise.all(requests);
+    }
+}
+
+function autogenerateAnalysisInBackground() {
+    const result = maybeAutogenerateAnalysis();
+    if (result && typeof result.catch === "function") {
+        result.catch((error) => {
+            console.debug("[Apple Intelligence content:generation] Automatic analysis failed", error);
+        });
+    }
 }
 
 async function waitForPendingGenerationJob(videoKey, kind, generationID) {
@@ -3552,81 +3962,23 @@ async function waitForPendingGenerationJob(videoKey, kind, generationID) {
 }
 
 async function pollGenerationJob(kind, videoKey, generationID, jobID, generationTimeoutMs) {
-    const deadline = Date.now() + generationTimeoutMs;
-    const startedAt = Date.now();
-    let lastWaitNoticeAt = startedAt;
-    let response = null;
-
-    while (Date.now() < deadline) {
-        const pollResponse = await sendMessageWithTimeout({
-            type: "ai:getGenerateJob",
-            jobId: jobID,
-        }, 20000).catch((error) => ({
-            ok: false,
-            error: error?.message || "Polling the background job failed.",
-            debug: {
-                layer: "content",
-                step: "poll-failed",
-                detail: error?.stack || error?.message || String(error),
-            },
-        }));
-
-        if (!isCurrentGeneration(videoKey, kind, generationID)) {
-            return {
-                stale: true,
-            };
-        }
-
-        if (pollResponse?.debug?.messages) {
-            if (mergeDebugLines(kind, pollResponse.debug.messages)) {
+    return await generationJobPoller.poll({
+        jobID,
+        timeoutMs: generationTimeoutMs,
+        isCurrent: () => isCurrentGeneration(videoKey, kind, generationID),
+        onMessages: (messages) => {
+            if (mergeDebugLines(kind, messages)) {
                 render();
             }
-        }
-
-        if (!pollResponse?.ok) {
-            response = pollResponse;
-            break;
-        }
-
-        if (pollResponse.status === "completed") {
-            response = {
-                ok: true,
-                text: pollResponse.text,
-                engineLabel: pollResponse.engineLabel || pollResponse.debug?.engineLabel || "",
-                debug: pollResponse.debug,
-            };
-            break;
-        }
-
-        if (pollResponse.status === "failed") {
-            response = {
-                ok: false,
-                error: pollResponse.error,
-                debug: pollResponse.debug,
-            };
-            break;
-        }
-
-        if (Date.now() - lastWaitNoticeAt >= 5000) {
-            lastWaitNoticeAt = Date.now();
-            logDebug(kind, `waiting: ${Math.round((Date.now() - startedAt) / 1000)}s`);
+        },
+        onWait: (elapsedSeconds) => {
+            logDebug(kind, `waiting: ${elapsedSeconds}s`);
             render();
-        }
-
-        await sleep(1000);
-    }
-
-    return response || {
-        ok: false,
-        error: kind === "timestamps"
+        },
+        timeoutError: kind === "timestamps"
             ? `Timed out waiting for ${modelLabel()} timestamps.`
             : `Timed out waiting for ${summaryEngineLabel()} summary.`,
-        debug: {
-            layer: "content",
-            step: "poll-timeout",
-            detail: `jobId=${jobID}`,
-        },
-    };
+    });
 }
 
 async function requestGeneration(kind) {
@@ -3635,6 +3987,9 @@ async function requestGeneration(kind) {
     }
 
     const videoKey = currentVideoKey || getVideoKey() || "";
+    if (kind === "timestamps" && shouldWaitForNativeChapterDetection(videoKey)) {
+        return;
+    }
     if (kind === "timestamps" && applyNativeChaptersIfAvailable(videoKey)) {
         render();
         return;
@@ -3646,16 +4001,10 @@ async function requestGeneration(kind) {
     }
 
     const requestKey = `${videoKey}:${kind}`;
-    if (generationRequestKeys.has(requestKey)) {
+    if (generationRequestDeduplicator.isActive(requestKey)) {
         return;
     }
-
-    generationRequestKeys.add(requestKey);
-    try {
-        await generate(kind);
-    } finally {
-        generationRequestKeys.delete(requestKey);
-    }
+    await generationRequestDeduplicator.run(requestKey, () => generate(kind));
 }
 
 async function generate(kind) {
@@ -3668,6 +4017,9 @@ async function generate(kind) {
         return;
     }
 
+    if (kind === "timestamps" && shouldWaitForNativeChapterDetection(videoKey)) {
+        return;
+    }
     if (kind === "timestamps" && applyNativeChaptersIfAvailable(videoKey)) {
         render();
         return;
@@ -3690,12 +4042,11 @@ async function generate(kind) {
     logDebug(kind, "video: supported YouTube video detected");
     render();
 
-    const transcript = await getTranscript(videoKey, kind).catch((error) => {
+    const transcript = await transcriptOrchestrator.get(videoKey, kind).catch((error) => {
         logDebug(kind, `transcript: failed (${error?.message || String(error)})`);
         return null;
     });
     if (!isCurrentGeneration(videoKey, kind, generationID)) {
-        stopLoadingForStaleGeneration(videoKey, kind, generationID);
         return;
     }
 
@@ -3732,7 +4083,6 @@ async function generate(kind) {
         logDebug(kind, "step: waiting for already starting generation job");
         pendingGeneration = await waitForPendingGenerationJob(videoKey, kind, generationID);
         if (!isCurrentGeneration(videoKey, kind, generationID)) {
-            stopLoadingForStaleGeneration(videoKey, kind, generationID);
             return;
         }
 
@@ -3773,7 +4123,6 @@ async function generate(kind) {
         });
 
         if (!isCurrentGeneration(videoKey, kind, generationID)) {
-            stopLoadingForStaleGeneration(videoKey, kind, generationID);
             return;
         }
 
@@ -3816,12 +4165,10 @@ async function generate(kind) {
 
     const response = await pollGenerationJob(kind, videoKey, generationID, jobID, generationTimeoutMs);
     if (response?.stale) {
-        stopLoadingForStaleGeneration(videoKey, kind, generationID);
         return;
     }
 
     if (!isCurrentGeneration(videoKey, kind, generationID)) {
-        stopLoadingForStaleGeneration(videoKey, kind, generationID);
         return;
     }
 
@@ -3917,7 +4264,7 @@ function jumpToTime(seconds) {
     const safeSeconds = Math.max(0, Math.floor(seconds));
     const moviePlayer = document.querySelector("#movie_player");
     const video = document.querySelector("video");
-    scheduleActiveGeneratedChapterSync();
+    scheduleActiveChapterSync();
 
     const applyNativeSeek = () => {
         if (!video) {
@@ -3927,7 +4274,7 @@ function jumpToTime(seconds) {
         const seekVideo = () => {
             try {
                 video.currentTime = safeSeconds;
-                scheduleActiveGeneratedChapterSync();
+                scheduleActiveChapterSync();
             } catch (_) {
                 // Ignore transient media seek errors and fall back to the URL jump below if needed.
             }
@@ -3973,7 +4320,7 @@ function jumpToTime(seconds) {
     window.location.assign(buildTimestampHref(safeSeconds));
 }
 
-async function buildPanel() {
+function buildPanel() {
     nativePanel.syncTabs();
 
     const mount = getPanelMount();
@@ -3997,7 +4344,7 @@ async function buildPanel() {
     render();
 }
 
-async function ensurePanel() {
+async function reconcilePanel() {
     if (!isWatchPage()) {
         cleanupNonWatchPage();
         return;
@@ -4007,6 +4354,7 @@ async function ensurePanel() {
     let needsRender = false;
     if (currentVideoKey !== nextVideoKey) {
         currentVideoKey = nextVideoKey;
+        beginVideoDiscovery(nextVideoKey);
         initialPlayerResponseCache = {
             videoKey: "",
             response: null,
@@ -4016,27 +4364,31 @@ async function ensurePanel() {
             response: null,
         };
         resetPanelState();
+        removePanel({ preserveNativeControls: true });
         needsRender = true;
     }
 
-    syncActiveGeneratedChapterTracker();
+    syncActiveChapterTracker();
+    if (applyNativeChaptersIfAvailable(nextVideoKey)) {
+        needsRender = true;
+    }
     nativePanel.syncTabs();
 
     const mount = getPanelMount();
     if (!mount) {
+        if (!transcriptOrchestrator.hasAvailableTranscript(nextVideoKey)) {
+            removeStandalonePanels();
+        }
+        autogenerateAnalysisInBackground();
         return;
     }
 
     panelHost = dedupePanelHosts(panelHost);
 
-    if (applyNativeChaptersIfAvailable(nextVideoKey)) {
-        needsRender = true;
-    }
-
     if (!panelHost || !panelHost.isConnected) {
         panelHost = null;
-        await buildPanel();
-        await maybeAutogenerateAnalysis();
+        buildPanel();
+        autogenerateAnalysisInBackground();
         return;
     }
 
@@ -4051,11 +4403,112 @@ async function ensurePanel() {
         render();
     }
 
-    await maybeAutogenerateAnalysis();
+    autogenerateAnalysisInBackground();
+}
+
+async function ensurePanel() {
+    if (panelReconciliationInProgress) {
+        panelReconciliationQueued = true;
+        return;
+    }
+
+    panelReconciliationInProgress = true;
+    try {
+        await reconcilePanel();
+    } finally {
+        panelReconciliationInProgress = false;
+        if (panelReconciliationQueued) {
+            panelReconciliationQueued = false;
+            scheduleNativePanelRefresh();
+        }
+    }
+}
+
+function nativePanelMutationNode(node) {
+    if (
+        !node
+        || node === panelHost
+        || panelHost?.contains(node)
+        || globalThis.YouTubeTimestampsPageControls.isExtensionOwnedNativeControlNode(node)
+    ) {
+        return false;
+    }
+
+    const isElement = node.nodeType === Node.ELEMENT_NODE;
+    if (!isElement) {
+        return false;
+    }
+
+    return node.matches?.("ytd-engagement-panel-section-list-renderer")
+        || Boolean(node.closest?.("ytd-engagement-panel-section-list-renderer"))
+        || Boolean(node.querySelector?.("ytd-engagement-panel-section-list-renderer"));
+}
+
+function nativePanelMutationAffectsMount(record) {
+    if (globalThis.YouTubeTimestampsPageControls.isExtensionOwnedNativeControlNode(record.target)) {
+        return false;
+    }
+
+    if (nativePanelMutationNode(record.target)) {
+        return true;
+    }
+
+    return Array.from(record.addedNodes || []).some(nativePanelMutationNode)
+        || Array.from(record.removedNodes || []).some(nativePanelMutationNode);
+}
+
+function scheduleNativePanelRefresh() {
+    if (
+        nativePanelRefreshFrame !== null
+        || !isWatchPage()
+        || navigationTransition.shouldHoldUI()
+    ) {
+        return;
+    }
+
+    nativePanelRefreshFrame = requestAnimationFrame(() => {
+        nativePanelRefreshFrame = null;
+        void ensurePanel();
+    });
+}
+
+function startNativePanelObserver() {
+    if (nativePanelObserver || typeof MutationObserver !== "function") {
+        return;
+    }
+
+    nativePanelObserver = new MutationObserver((records) => {
+        if (navigationTransition.shouldHoldUI()) {
+            return;
+        }
+        if (records.some(nativePanelMutationAffectsMount)) {
+            // YouTube's Transcript/Timeline chips can appear before the rest
+            // of the new video shell. Inject our sibling chips immediately;
+            // placement/render reconciliation can follow on the next frame.
+            nativePanel.syncTabs();
+            scheduleNativePanelRefresh();
+        }
+    });
+    nativePanelObserver.observe(document.documentElement, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["hidden", "visibility"],
+    });
+}
+
+function stopNativePanelObserver() {
+    nativePanelObserver?.disconnect();
+    nativePanelObserver = null;
+    if (nativePanelRefreshFrame !== null) {
+        cancelAnimationFrame(nativePanelRefreshFrame);
+        nativePanelRefreshFrame = null;
+    }
 }
 
 async function handleForegroundRefresh() {
     if (isWatchPage()) {
+        startNativePanelObserver();
         await ensurePanel();
         refreshStatusInBackground();
         return;
@@ -4066,10 +4519,48 @@ async function handleForegroundRefresh() {
     }
 }
 
-async function handleNavigationChange() {
+function rememberNavigationData(event) {
+    const response = getNavigationResponse(event);
+    const activeVideoKey = getVideoKey();
+    if (!response || !activeVideoKey || !isWatchPage()) {
+        return false;
+    }
+
+    const responseVideoKey = getNavigationResponseVideoKey(response);
+    if (responseVideoKey && responseVideoKey !== activeVideoKey) {
+        return false;
+    }
+
+    navigationDataCache = {
+        videoKey: activeVideoKey,
+        response,
+    };
+    return true;
+}
+
+async function handleNavigationChange(event) {
+    navigationTransition.complete();
+    rememberNavigationData(event);
     lastObservedURL = window.location.href;
 
-    await ensurePanel();
+    const destinationVideoKey = isWatchPage() ? getVideoKey() : "";
+    const watchToWatchNavigation = Boolean(
+        currentVideoKey
+        && destinationVideoKey
+        && currentVideoKey !== destinationVideoKey
+    );
+
+    if (isWatchPage()) {
+        startNativePanelObserver();
+        // Restore extension-owned chrome immediately if YouTube has already
+        // replaced the tab row, but let the new shell settle before resetting
+        // and rebuilding the result host for a different video.
+        nativePanel.syncTabs();
+        scheduleNavigationReconciliation(lastObservedURL);
+    }
+    if (!watchToWatchNavigation) {
+        await ensurePanel();
+    }
 
     if (isWatchPage()) {
         refreshStatusInBackground();
@@ -4078,39 +4569,40 @@ async function handleNavigationChange() {
 
 function handleNavigationStart(event) {
     const nextURL = getNavigationURL(event);
+    navigationTransition.begin();
+    clearNavigationReconcileTimeouts();
+
     if (nextURL && isShortsURL(nextURL)) {
-        cleanupNonWatchPage();
         window.location.assign(new URL(nextURL, window.location.origin).toString());
-        return;
     }
 
-    if (nextURL) {
-        lastObservedURL = new URL(nextURL, window.location.origin).toString();
-    } else {
-        lastObservedURL = window.location.href;
-    }
-
-    if (!nextURL || !isWatchURL(nextURL)) {
-        cleanupNonWatchPage();
-    }
+    // Navigation start is intentionally non-destructive. YouTube fires it
+    // while the outgoing page is still visible, and its URL can be empty in
+    // Safari. The finish event owns cleanup/reset so tabs do not disappear or
+    // rebuild before the destination surface is committed.
 }
 
-async function heartbeat() {
-    const currentURL = window.location.href;
-    const urlChanged = currentURL !== lastObservedURL;
-    if (urlChanged) {
-        lastObservedURL = currentURL;
-    }
-
-    if (urlChanged && isWatchPage()) {
-        await refreshStatus();
-        await ensurePanel();
+function handlePageDataUpdated(event) {
+    if (!rememberNavigationData(event) || !isWatchPage()) {
         return;
     }
 
-    if (isWatchPage() || panelHost || currentVideoKey !== null) {
-        await ensurePanel();
+    scheduleNativePanelRefresh();
+}
+
+function checkForNavigationURLChange() {
+    if (window.location.href === lastObservedURL) {
+        return;
     }
+
+    // YouTube often mutates the URL before publishing yt-navigate-finish.
+    // Keep that fallback from racing the normal lifecycle; the bounded grace
+    // still recovers if Safari misses the finish event altogether.
+    if (navigationTransition.shouldHoldUI()) {
+        return;
+    }
+
+    void handleNavigationChange();
 }
 
 async function init() {
@@ -4121,6 +4613,9 @@ async function init() {
     state.ready = true;
     lastObservedURL = window.location.href;
 
+    if (isWatchPage()) {
+        startNativePanelObserver();
+    }
     window.addEventListener("focus", handleForegroundRefresh);
     window.addEventListener("resize", () => nativePanel.syncBodyViewport());
     window.addEventListener("popstate", handleNavigationChange);
@@ -4129,11 +4624,10 @@ async function init() {
             handleForegroundRefresh();
         }
     });
-    document.addEventListener("click", nativePanel.handleYouTubeControlClick, true);
     document.addEventListener("yt-navigate-start", handleNavigationStart);
     document.addEventListener("yt-navigate-finish", handleNavigationChange);
-
-    setInterval(heartbeat, 1000);
+    document.addEventListener("yt-page-data-updated", handlePageDataUpdated);
+    window.setInterval(checkForNavigationURLChange, NAVIGATION_URL_CHECK_INTERVAL_MS);
 
     await ensurePanel();
     if (isWatchPage()) {
@@ -4141,6 +4635,5 @@ async function init() {
     }
 }
 
-listenForPopupMessages();
 init();
 })();

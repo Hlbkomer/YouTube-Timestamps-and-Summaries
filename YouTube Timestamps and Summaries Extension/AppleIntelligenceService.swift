@@ -168,8 +168,8 @@ final class AppleIntelligenceService {
         languageCode: String = "",
         languageLabel: String = ""
     ) async -> [String: Any] {
-        let model = model(for: kind)
-        let guardrailMode = guardrailMode(for: kind)
+        let model = SystemLanguageModel(useCase: .general, guardrails: .permissiveContentTransformations)
+        let guardrailMode = "permissiveContentTransformations"
         let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let languageContext = LanguageContext(code: languageCode, label: languageLabel)
 
@@ -177,6 +177,10 @@ final class AppleIntelligenceService {
         logger.log("Starting local generation. kind=\(kind, privacy: .public) guardrails=\(guardrailMode, privacy: .public) language=\(languageContext.debugLabel, privacy: .public)")
 
         do {
+            guard kind == "summaryFull" else {
+                throw AppleIntelligenceError.generationFailed("Unsupported Apple Intelligence request: \(kind)")
+            }
+
             guard model.isAvailable else {
                 throw AppleIntelligenceError.unavailable(availabilityDescription(model.availability))
             }
@@ -189,33 +193,17 @@ final class AppleIntelligenceService {
             let text: String
             let chunkCount: Int
             var summaryChunkDebug: [String: Any] = [:]
-            if kind == "videoAnalysis" {
-                let chunks = chunkTranscriptSections(analysisTranscriptText, maxCharacters: maxAnalysisChunkCharacters)
-                chunkCount = chunks.count
-                text = try await generateVideoAnalysis(from: chunks, model: model)
-            } else if kind == "summaryFull" {
-                #if compiler(>=6.4)
-                if #available(macOS 27.0, *) {
-                    let result = try await generateMacOS27FullSummary(
-                        from: analysisTranscriptText,
-                        localModel: model,
-                        languageContext: languageContext
-                    )
-                    chunkCount = result.chunkCount
-                    summaryChunkDebug = result.debugPayload
-                    text = result.text
-                } else {
-                    let plan = legacyFullSummaryChunkPlan(
-                        from: analysisTranscriptText,
-                        languageContext: languageContext,
-                        model: model,
-                        fallbackReason: nil
-                    )
-                    chunkCount = plan.chunks.count
-                    summaryChunkDebug = plan.debugPayload
-                    text = try await generateFullSummary(from: plan.chunks, model: model, languageContext: languageContext)
-                }
-                #else
+            #if compiler(>=6.4)
+            if #available(macOS 27.0, *) {
+                let result = try await generateMacOS27FullSummary(
+                    from: analysisTranscriptText,
+                    localModel: model,
+                    languageContext: languageContext
+                )
+                chunkCount = result.chunkCount
+                summaryChunkDebug = result.debugPayload
+                text = result.text
+            } else {
                 let plan = legacyFullSummaryChunkPlan(
                     from: analysisTranscriptText,
                     languageContext: languageContext,
@@ -225,16 +213,18 @@ final class AppleIntelligenceService {
                 chunkCount = plan.chunks.count
                 summaryChunkDebug = plan.debugPayload
                 text = try await generateFullSummary(from: plan.chunks, model: model, languageContext: languageContext)
-                #endif
-            } else if kind == "summary" {
-                let chunks = chunkTranscript(transcriptText)
-                chunkCount = chunks.count
-                text = try await generateSummary(from: chunks, model: model, languageContext: languageContext)
-            } else {
-                let chunks = chunkTranscript(transcriptText)
-                chunkCount = chunks.count
-                text = try await generateTimestamps(from: chunks, model: model, languageContext: languageContext)
             }
+            #else
+            let plan = legacyFullSummaryChunkPlan(
+                from: analysisTranscriptText,
+                languageContext: languageContext,
+                model: model,
+                fallbackReason: nil
+            )
+            chunkCount = plan.chunks.count
+            summaryChunkDebug = plan.debugPayload
+            text = try await generateFullSummary(from: plan.chunks, model: model, languageContext: languageContext)
+            #endif
 
             print("[AppleIntelligence] Generation succeeded. kind=\(kind) chunks=\(chunkCount) textLength=\(text.count)")
             logger.log("Local generation succeeded. kind=\(kind, privacy: .public) chunks=\(chunkCount, privacy: .public) textLength=\(text.count, privacy: .public)")
@@ -282,24 +272,7 @@ final class AppleIntelligenceService {
         }
     }
 
-    private func model(for kind: String) -> SystemLanguageModel {
-        if usesPermissiveSummaryGuardrails(kind) {
-            return SystemLanguageModel(useCase: .general, guardrails: .permissiveContentTransformations)
-        }
-
-        return SystemLanguageModel.default
-    }
-
-    private func guardrailMode(for kind: String) -> String {
-        usesPermissiveSummaryGuardrails(kind) ? "permissiveContentTransformations" : "default"
-    }
-
-    private func usesPermissiveSummaryGuardrails(_ kind: String) -> Bool {
-        // Apple recommends this official guardrail preset for content transformations
-        // such as summarizing existing user-provided text. Keep timestamps on default.
-        kind == "summaryFull" || kind == "summary"
-    }
-
+    #if false // Retired local timestamp and short-summary paths; excluded from the shipping target.
     private func generateTimestamps(
         from chunks: [String],
         model: SystemLanguageModel,
@@ -655,6 +628,7 @@ final class AppleIntelligenceService {
             maximumResponseTokens: 1_200
         )
     }
+    #endif
 
     private func generateFullSummary(
         from chunks: [String],
@@ -799,6 +773,7 @@ final class AppleIntelligenceService {
         )
     }
 
+    #if false // Deferred Private Cloud Compute experiment; no production entitlement or route.
     @available(macOS 27.0, *)
     private func generateBetaFullSummary(
         from transcript: String,
@@ -1023,6 +998,7 @@ final class AppleIntelligenceService {
         return successfulSummaries
     }
     #endif
+    #endif
 
     private func fullSummaryInstructions(languageContext: LanguageContext) -> String {
         return "You summarize YouTube transcripts clearly and concisely."
@@ -1104,6 +1080,7 @@ final class AppleIntelligenceService {
         return "The detected caption language is \(languageContext.displayName). Write the \(outputName) in \(outputLanguage)."
     }
 
+    #if false // Retired local video-analysis pipeline; current UI requests only full summaries.
     private func generateVideoAnalysis(from chunks: [TranscriptChunk], model: SystemLanguageModel) async throws -> String {
         guard !chunks.isEmpty else {
             throw AppleIntelligenceError.missingTranscript
@@ -1292,6 +1269,7 @@ final class AppleIntelligenceService {
             maximumResponseTokens: 1_000
         )
     }
+    #endif
 
     private func legacyFullSummaryChunkPlan(
         from transcript: String,
@@ -1442,6 +1420,7 @@ final class AppleIntelligenceService {
         return instructionTokens + promptTokens
     }
 
+    #if false // Used only by the deferred Private Cloud Compute experiment.
     @available(macOS 27.0, *)
     private func privateCloudRequestTokenCount(
         model: SystemLanguageModel,
@@ -1452,6 +1431,7 @@ final class AppleIntelligenceService {
         let promptTokens = try await model.tokenCount(for: prompt)
         return instructionTokens + promptTokens
     }
+    #endif
 
     @available(macOS 27.0, *)
     private func summaryInputTokenBudget(contextSize: Int, maximumResponseTokens: Int) -> Int {
@@ -1531,6 +1511,7 @@ final class AppleIntelligenceService {
     }
 
     #if compiler(>=6.4)
+    #if false // Used only by the deferred Private Cloud Compute experiment.
     @available(macOS 27.0, *)
     private func respondPrivateCloud(
         model: PrivateCloudComputeLanguageModel,
@@ -1568,6 +1549,7 @@ final class AppleIntelligenceService {
         return text
     }
     #endif
+    #endif
 
     private func prewarmPrefix(from prompt: String) -> String {
         if let transcriptRange = prompt.range(of: "Transcript:") {
@@ -1592,6 +1574,7 @@ final class AppleIntelligenceService {
         )
     }
 
+    #if false // Deferred Private Cloud Compute diagnostics.
     @available(macOS 27.0, *)
     private func privateCloudAvailabilityDescription(_ availability: PrivateCloudComputeLanguageModel.Availability) -> String {
         switch availability {
@@ -1642,6 +1625,7 @@ final class AppleIntelligenceService {
         }
     }
     #endif
+    #endif
 
     private func readableErrorMessage(_ error: Error) -> String {
         #if compiler(>=6.4)
@@ -1653,12 +1637,6 @@ final class AppleIntelligenceService {
                 )
             }
 
-            if let privateCloudError = error as? PrivateCloudComputeLanguageModel.Error {
-                return readableErrorMessage(
-                    primary: privateCloudError.debugDescription,
-                    error: error
-                )
-            }
         }
         #endif
 

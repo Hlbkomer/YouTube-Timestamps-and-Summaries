@@ -53,6 +53,12 @@ final class GrokGenerationService {
         }
     }
 
+    private struct TextResponse {
+        let text: String
+        let timeToFirstOutputMs: Int?
+        let metrics: XAIResponseMetrics
+    }
+
     func statusPayload() async -> [String: Any] {
         await authService.statusPayload(refresh: true)
     }
@@ -156,14 +162,14 @@ final class GrokGenerationService {
 
             let accessToken = try await authService.accessToken()
             logger.log("Starting Grok generation. kind=\(kind, privacy: .public) model=\(safeModel, privacy: .public) transcriptLength=\(transcriptText.count, privacy: .public)")
-            let rawText = try await requestText(
+            let response = try await requestText(
                 instructions: instructions,
                 prompt: prompt(transcriptText, languageContext),
                 accessToken: accessToken,
                 model: safeModel,
                 emptyResponseMessage: emptyResponseMessage
             )
-            let text = normalize(rawText, transcriptText)
+            let text = normalize(response.text, transcriptText)
             guard !text.isEmpty else {
                 throw GrokGenerationError.invalidResponse(emptyResponseMessage)
             }
@@ -174,7 +180,8 @@ final class GrokGenerationService {
                 model: safeModel,
                 languageContext: languageContext,
                 startedAt: startedAt,
-                text: text
+                text: text,
+                response: response
             )
         } catch {
             let message = userFacingErrorMessage(error)
@@ -195,7 +202,7 @@ final class GrokGenerationService {
         accessToken: String,
         model: String,
         emptyResponseMessage: String
-    ) async throws -> String {
+    ) async throws -> TextResponse {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 10 * 60
@@ -203,9 +210,8 @@ final class GrokGenerationService {
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("TimestampsSummariesForYT/1.0", forHTTPHeaderField: "User-Agent")
-        request.setValue(UUID().uuidString, forHTTPHeaderField: "x-grok-conv-id")
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "instructions": instructions,
             "input": [
@@ -222,8 +228,12 @@ final class GrokGenerationService {
             "stream": true,
             "store": false,
         ]
+        if let reasoningEffort = GenerationSettings.grokReasoningEffort(for: model) {
+            body["reasoning"] = ["effort": reasoningEffort]
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
 
+        let requestStartedAt = Date()
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw GrokGenerationError.invalidResponse("Grok returned an invalid network response.")
@@ -232,6 +242,8 @@ final class GrokGenerationService {
         var output = ""
         var fallbackOutput = ""
         var errorBody = ""
+        var firstOutputAt: Date?
+        var responseMetrics = XAIResponseMetrics()
 
         for try await line in bytes.lines {
             if httpResponse.statusCode != 200 {
@@ -258,11 +270,23 @@ final class GrokGenerationService {
 
             let eventType = event["type"] as? String ?? ""
             if eventType.contains("output_text.delta"), let delta = event["delta"] as? String {
+                if firstOutputAt == nil, delta.contains(where: { !$0.isWhitespace }) {
+                    firstOutputAt = Date()
+                }
                 output += delta
             } else if eventType == "response.output_item.done", let item = event["item"] as? [String: Any] {
-                fallbackOutput += Self.outputText(from: item)
+                let itemText = Self.outputText(from: item)
+                if firstOutputAt == nil, !itemText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    firstOutputAt = Date()
+                }
+                fallbackOutput += itemText
             } else if eventType == "response.completed", let response = event["response"] as? [String: Any] {
-                fallbackOutput += Self.outputText(fromResponse: response)
+                let responseText = Self.outputText(fromResponse: response)
+                if firstOutputAt == nil, !responseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    firstOutputAt = Date()
+                }
+                fallbackOutput += responseText
+                responseMetrics = XAIResponseMetrics.parse(response)
             } else if eventType == "response.failed" {
                 throw GrokGenerationError.requestFailed(errorMessage(from: event) ?? "Grok failed to generate a response.")
             }
@@ -278,13 +302,21 @@ final class GrokGenerationService {
 
         let text = output.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty {
-            return text
+            return TextResponse(
+                text: text,
+                timeToFirstOutputMs: firstOutputAt.map { Int($0.timeIntervalSince(requestStartedAt) * 1_000) },
+                metrics: responseMetrics
+            )
         }
         let fallback = fallbackOutput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !fallback.isEmpty else {
             throw GrokGenerationError.invalidResponse(emptyResponseMessage)
         }
-        return fallback
+        return TextResponse(
+            text: fallback,
+            timeToFirstOutputMs: firstOutputAt.map { Int($0.timeIntervalSince(requestStartedAt) * 1_000) },
+            metrics: responseMetrics
+        )
     }
 
     private func userFacingErrorMessage(_ error: Error) -> String {
@@ -297,23 +329,35 @@ final class GrokGenerationService {
         model: String,
         languageContext: LanguageContext,
         startedAt: Date,
-        text: String
+        text: String,
+        response: TextResponse
     ) -> [String: Any] {
-        [
+        var debug: [String: Any] = [
+            "layer": "native",
+            "kind": kind,
+            "provider": Self.providerID,
+            "model": model,
+            "inputMode": "transcript",
+            "languageCode": languageContext.code,
+            "languageLabel": languageContext.label,
+            "step": "completed",
+            "durationMs": Int(Date().timeIntervalSince(startedAt) * 1_000),
+            "textLength": text.count,
+        ]
+        if let reasoningEffort = GenerationSettings.grokReasoningEffort(for: model) {
+            debug["reasoningEffort"] = reasoningEffort
+        }
+        if let timeToFirstOutputMs = response.timeToFirstOutputMs {
+            debug["timeToFirstOutputMs"] = timeToFirstOutputMs
+        }
+        for (key, value) in response.metrics.debugPayload {
+            debug[key] = value
+        }
+
+        return [
             "ok": true,
             "text": text,
-            "debug": [
-                "layer": "native",
-                "kind": kind,
-                "provider": Self.providerID,
-                "model": model,
-                "inputMode": "transcript",
-                "languageCode": languageContext.code,
-                "languageLabel": languageContext.label,
-                "step": "completed",
-                "durationMs": Int(Date().timeIntervalSince(startedAt) * 1_000),
-                "textLength": text.count,
-            ],
+            "debug": debug,
         ]
     }
 
@@ -324,20 +368,25 @@ final class GrokGenerationService {
         startedAt: Date,
         message: String
     ) -> [String: Any] {
-        [
+        var debug: [String: Any] = [
+            "layer": "native",
+            "kind": kind,
+            "provider": Self.providerID,
+            "model": model,
+            "languageCode": languageContext.code,
+            "languageLabel": languageContext.label,
+            "step": "failed",
+            "durationMs": Int(Date().timeIntervalSince(startedAt) * 1_000),
+            "detail": message,
+        ]
+        if let reasoningEffort = GenerationSettings.grokReasoningEffort(for: model) {
+            debug["reasoningEffort"] = reasoningEffort
+        }
+
+        return [
             "ok": false,
             "error": message,
-            "debug": [
-                "layer": "native",
-                "kind": kind,
-                "provider": Self.providerID,
-                "model": model,
-                "languageCode": languageContext.code,
-                "languageLabel": languageContext.label,
-                "step": "failed",
-                "durationMs": Int(Date().timeIntervalSince(startedAt) * 1_000),
-                "detail": message,
-            ],
+            "debug": debug,
         ]
     }
 

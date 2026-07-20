@@ -5,8 +5,7 @@ const MIN_NATIVE_TIMEOUT_MS = 6 * 60 * 1000;
 const MAX_NATIVE_TIMEOUT_MS = 20 * 60 * 1000;
 const JOB_RETENTION_MS = 30 * 60 * 1000;
 const JOB_MESSAGE_LIMIT = 80;
-const DEFAULT_SELECTED_MODEL = "gpt-5.5";
-const ENABLE_APPLE_SUMMARY_SELECTED_MODEL_FALLBACK = false;
+const DEFAULT_SELECTED_MODEL = "gpt-5.6-terra";
 const ENABLE_APPLE_SUMMARY_TRANSCRIPT_REDACTION = true;
 const APPLE_SUMMARY_CHUNK_CHARACTER_LIMIT = 10000;
 const APPLE_SUMMARY_UNSUPPORTED_LANGUAGE_CHUNK_CHARACTER_LIMIT = 6000;
@@ -19,9 +18,7 @@ const APPLE_SUMMARY_REDACTION_PATTERNS = [
     /\b(?:fuck(?:er|ing)?|fucking|fucked|shit(?:ty)?|bullshit|bitch(?:es)?|asshole|dick|pussy|cunt)\b/gi,
     /\b(?:nigg(?:a|er)s?|fag(?:got)?s?|retard(?:ed)?|whore(?:s)?|slut(?:s)?)\b/gi,
 ];
-const PAGE_ACTION_STATE_CACHE_LIMIT = 30;
 const jobs = new Map();
-const pageActionStateByVideoKey = new Map();
 let nextJobID = 0;
 
 function debugLog(message, extra) {
@@ -60,6 +57,28 @@ function boundedTimeout(timeoutMs) {
 
 function now() {
     return Date.now();
+}
+
+async function copyTextToClipboard(text) {
+    const value = typeof text === "string" ? text : "";
+    if (!value) {
+        return { ok: false, error: "There is no text to copy." };
+    }
+
+    try {
+        if (!globalThis.navigator?.clipboard?.writeText) {
+            throw new Error("The extension clipboard API is unavailable.");
+        }
+
+        await globalThis.navigator.clipboard.writeText(value);
+        return { ok: true };
+    } catch (error) {
+        debugLog("Extension clipboard write failed", error);
+        return {
+            ok: false,
+            error: error?.message || "Safari denied clipboard access.",
+        };
+    }
 }
 
 async function sendNative(action, payload = {}, timeoutMs = MIN_NATIVE_TIMEOUT_MS) {
@@ -121,6 +140,50 @@ function pruneJobs() {
 function appendJobMessage(job, message) {
     const line = `${new Date().toLocaleTimeString()} ${message}`;
     job.messages = [...(job.messages || []), line].slice(-JOB_MESSAGE_LIMIT);
+}
+
+function appendNativeGenerationDiagnostics(job, debug = {}) {
+    if (typeof debug.reasoningEffort === "string" && debug.reasoningEffort) {
+        appendJobMessage(job, `reasoning effort: ${debug.reasoningEffort}`);
+    }
+
+    const timeToFirstOutputMs = Number(debug.timeToFirstOutputMs);
+    if (Number.isFinite(timeToFirstOutputMs) && timeToFirstOutputMs >= 0) {
+        const label = timeToFirstOutputMs >= 1000
+            ? `${(timeToFirstOutputMs / 1000).toFixed(1)}s`
+            : `${Math.round(timeToFirstOutputMs)}ms`;
+        appendJobMessage(job, `time to first output: ${label}`);
+    }
+
+    const diagnosticInteger = (value) => {
+        if (value === null || typeof value === "undefined" || value === "") {
+            return null;
+        }
+        const number = Number(value);
+        return Number.isFinite(number) ? Math.max(0, Math.round(number)) : null;
+    };
+    const inputTokens = diagnosticInteger(debug.inputTokens);
+    const cachedInputTokens = diagnosticInteger(debug.cachedInputTokens);
+    const outputTokens = diagnosticInteger(debug.outputTokens);
+    const reasoningTokens = diagnosticInteger(debug.reasoningTokens);
+    const totalTokens = diagnosticInteger(debug.totalTokens);
+    const tokenParts = [];
+    if (inputTokens !== null) {
+        tokenParts.push(`${inputTokens} input${cachedInputTokens !== null ? ` (${cachedInputTokens} cached)` : ""}`);
+    }
+    if (outputTokens !== null) {
+        tokenParts.push(`${outputTokens} output${reasoningTokens !== null ? ` (${reasoningTokens} reasoning)` : ""}`);
+    }
+    if (totalTokens !== null) {
+        tokenParts.push(`${totalTokens} total`);
+    }
+    if (tokenParts.length > 0) {
+        appendJobMessage(job, `tokens: ${tokenParts.join(", ")}`);
+    }
+
+    if (typeof debug.serviceTier === "string" && debug.serviceTier) {
+        appendJobMessage(job, `service tier: ${debug.serviceTier}`);
+    }
 }
 
 function redactAppleSummaryTranscript(transcriptText) {
@@ -298,30 +361,7 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, m
     }
 
     appendJobMessage(job, `Apple Intelligence summary failed: ${appleResponse?.error || "unknown error"}`);
-
-    // Keep this disabled while testing Apple Intelligence. When enabled later,
-    // guardrail/network failures can fall back to the selected model without
-    // changing the sidebar request architecture.
-    if (!ENABLE_APPLE_SUMMARY_SELECTED_MODEL_FALLBACK) {
-        return appleResponse;
-    }
-
-    appendJobMessage(job, `falling back to ${summaryModelLabel} for summary`);
-    job.engineLabel = summaryModelLabel;
-    const fallbackResponse = await sendNative(selectedProviderAction(providerID, "summary"), {
-        transcript: transcriptText,
-        model: summaryModel,
-        languageCode: metadata.languageCode || "",
-        languageLabel: metadata.languageLabel || "",
-    }, nativeTimeoutMs);
-
-    if (fallbackResponse?.ok) {
-        appendJobMessage(job, `${summaryModelLabel} fallback returned summary (${(fallbackResponse.text || "").length} chars)`);
-    } else {
-        appendJobMessage(job, `${summaryModelLabel} fallback failed: ${fallbackResponse?.error || "unknown error"}`);
-    }
-
-    return fallbackResponse;
+    return appleResponse;
 }
 
 function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_MS, metadata = {}) {
@@ -354,14 +394,10 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
         } else if (kind === "selectedProviderSummary") {
             response = await generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, metadata);
         } else {
-            job.engineLabel = "Apple Intelligence";
-            appendJobMessage(job, "asking the app to use Apple Intelligence");
-            response = await sendNative("generateContent", {
-                kind,
-                transcript: transcriptText,
-                languageCode: metadata.languageCode || "",
-                languageLabel: metadata.languageLabel || "",
-            }, nativeTimeoutMs);
+            response = {
+                ok: false,
+                error: `Unsupported generation job: ${kind}`,
+            };
         }
         job.nativeDebug = response?.debug || null;
 
@@ -377,6 +413,7 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
             if (response.debug?.quotaStatus) {
                 appendJobMessage(job, `quota: ${response.debug.quotaStatus}`);
             }
+            appendNativeGenerationDiagnostics(job, response.debug);
             appendJobMessage(job, `${label} completed with ${job.text.length} chars`);
         } else {
             job.status = "failed";
@@ -421,236 +458,7 @@ function getGenerateJob(jobID) {
     return jobResponse(job);
 }
 
-function isYouTubeVideoURL(url) {
-    try {
-        const parsedURL = new URL(url || "");
-        const host = parsedURL.hostname.toLowerCase();
-        return (host === "youtube.com" || host === "www.youtube.com" || host === "m.youtube.com")
-            && (parsedURL.pathname === "/watch" || parsedURL.pathname.startsWith("/live/"));
-    } catch (_) {
-        return false;
-    }
-}
-
-function videoPageKeyFromURL(url) {
-    try {
-        const parsedURL = new URL(url || "");
-        const host = parsedURL.hostname.toLowerCase();
-        if (!(host === "youtube.com" || host === "www.youtube.com" || host === "m.youtube.com")) {
-            return "";
-        }
-
-        if (parsedURL.pathname === "/watch") {
-            const videoID = parsedURL.searchParams.get("v");
-            return videoID ? `watch:${videoID}` : "";
-        }
-
-        if (parsedURL.pathname.startsWith("/live/")) {
-            const pathParts = parsedURL.pathname.split("/").filter(Boolean);
-            const liveID = pathParts[1];
-            return liveID ? `live:${liveID}` : "";
-        }
-    } catch (_) {
-        return "";
-    }
-
-    return "";
-}
-
-function videoPageKeyFromTab(tab) {
-    return videoPageKeyFromURL(tab?.url || tab?.pendingUrl || "");
-}
-
-function rememberPageActions(tab, response) {
-    if (!response?.ok) {
-        return;
-    }
-
-    const videoKey = videoPageKeyFromTab(tab);
-    if (!videoKey) {
-        return;
-    }
-
-    pageActionStateByVideoKey.delete(videoKey);
-    pageActionStateByVideoKey.set(videoKey, {
-        nativeChaptersAvailable: Boolean(response.nativeChaptersAvailable),
-        chapterSourceOverride: response.chapterSourceOverride || "default",
-        effectiveChapterSource: response.effectiveChapterSource || "",
-    });
-
-    while (pageActionStateByVideoKey.size > PAGE_ACTION_STATE_CACHE_LIMIT) {
-        const oldestKey = pageActionStateByVideoKey.keys().next().value;
-        pageActionStateByVideoKey.delete(oldestKey);
-    }
-}
-
-function rememberedPageActions(tab) {
-    const videoKey = videoPageKeyFromTab(tab);
-    return videoKey ? pageActionStateByVideoKey.get(videoKey) : null;
-}
-
-function rememberedEffectiveChapterSource(state) {
-    if (!state) {
-        return "";
-    }
-
-    if (state.effectiveChapterSource === "generated") {
-        return "generated";
-    }
-
-    if (state.chapterSourceOverride && state.chapterSourceOverride !== "default") {
-        return state.effectiveChapterSource || state.chapterSourceOverride;
-    }
-
-    if (state.nativeChaptersAvailable === false) {
-        return "generated";
-    }
-
-    return "";
-}
-
-async function queryTabs(query) {
-    try {
-        return await browser.tabs.query(query);
-    } catch (_) {
-        return [];
-    }
-}
-
-function isYouTubeVideoTab(tab) {
-    return isYouTubeVideoURL(tab?.url || tab?.pendingUrl || "");
-}
-
-async function activeTab() {
-    const tabQueries = [
-        { active: true, currentWindow: true },
-        { active: true, lastFocusedWindow: true },
-        { active: true },
-    ];
-    let fallbackTab = null;
-
-    for (const query of tabQueries) {
-        const tabs = await queryTabs(query);
-        const videoTab = tabs.find(isYouTubeVideoTab);
-        if (videoTab) {
-            return videoTab;
-        }
-
-        if (!fallbackTab) {
-            fallbackTab = tabs.find(Boolean) || null;
-        }
-    }
-
-    return fallbackTab;
-}
-
-async function sendActiveVideoTabMessage(message) {
-    const tab = await activeTab();
-    if (!tab?.id) {
-        return {
-            ok: false,
-            error: "Open a YouTube video to use this action.",
-        };
-    }
-
-    if ((tab.url || tab.pendingUrl) && !isYouTubeVideoTab(tab)) {
-        return {
-            ok: false,
-            error: "Open a YouTube video to use this action.",
-        };
-    }
-
-    try {
-        const response = await browser.tabs.sendMessage(tab.id, message);
-        rememberPageActions(tab, response);
-        return response;
-    } catch (error) {
-        return {
-            ok: false,
-            error: error?.message || "Safari could not reach the YouTube tab.",
-        };
-    }
-}
-
-async function activeVideoPageActions() {
-    const tab = await activeTab();
-    if (!tab?.id) {
-        return {
-            ok: false,
-            canSetVideoChapterSource: false,
-            error: "Open a YouTube video to use this action.",
-        };
-    }
-
-    if ((tab.url || tab.pendingUrl) && !isYouTubeVideoTab(tab)) {
-        return {
-            ok: false,
-            canSetVideoChapterSource: false,
-            error: "Open a YouTube video to use this action.",
-        };
-    }
-
-    const response = await sendActiveVideoTabMessage({ type: "content:getPageActions" });
-    if (response?.ok) {
-        return response;
-    }
-
-    if (isYouTubeVideoTab(tab)) {
-        const remembered = rememberedPageActions(tab);
-        return {
-            ok: true,
-            canSetVideoChapterSource: true,
-            nativeChaptersAvailable: Boolean(remembered?.nativeChaptersAvailable),
-            chapterSourceOverride: remembered?.chapterSourceOverride || "default",
-            effectiveChapterSource: rememberedEffectiveChapterSource(remembered),
-            error: "",
-        };
-    }
-
-    return {
-        ok: false,
-        canSetVideoChapterSource: false,
-        error: response?.error || "Open a YouTube video to use this action.",
-    };
-}
-
-async function chapterPreferenceStatus() {
-    const status = await statusPayload().catch(() => null);
-    const settings = status?.settings || {};
-    return {
-        chapterPreference: settings.chapterPreference === "alwaysGenerate" ? "alwaysGenerate" : "preferNative",
-        chapterPreferenceOptions: [
-            {
-                id: "preferNative",
-                label: "Prefer native YouTube chapters",
-            },
-            {
-                id: "alwaysGenerate",
-                label: "Always generate chapters",
-            },
-        ],
-    };
-}
-
-async function refreshActiveVideoStatus() {
-    await sendActiveVideoTabMessage({ type: "content:refreshStatus" });
-}
-
-async function pageActionsPayload(response) {
-    const preferenceStatus = await chapterPreferenceStatus();
-    return {
-        ok: Boolean(response?.ok),
-        canSetVideoChapterSource: Boolean(response?.canSetVideoChapterSource),
-        chapterPreference: preferenceStatus.chapterPreference,
-        chapterPreferenceOptions: preferenceStatus.chapterPreferenceOptions,
-        nativeChaptersAvailable: Boolean(response?.nativeChaptersAvailable),
-        chapterSourceOverride: response?.chapterSourceOverride || "default",
-        effectiveChapterSource: response?.effectiveChapterSource || "",
-        error: response?.error || "",
-    };
-}
-
-browser.runtime.onMessage.addListener(async (message, sender) => {
+browser.runtime.onMessage.addListener(async (message) => {
     if (!message?.type) {
         return null;
     }
@@ -664,48 +472,14 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
     case "ai:openApp":
         return await sendNative("openContainerApp");
 
+    case "ai:copyText":
+        return await copyTextToClipboard(message.text);
+
     case "ai:startGenerate":
         return startGenerateJob(message.kind, message.transcript, message.timeoutMs, message.transcriptMetadata || {});
 
     case "ai:getGenerateJob":
         return getGenerateJob(message.jobId);
-
-    case "content:pageActionsChanged":
-        rememberPageActions(sender?.tab, message.pageActions);
-        return { ok: true };
-
-    case "ai:getPageActions": {
-        const [response, preferenceStatus] = await Promise.all([
-            activeVideoPageActions(),
-            chapterPreferenceStatus(),
-        ]);
-        return {
-            ok: Boolean(response?.ok),
-            canSetVideoChapterSource: Boolean(response?.canSetVideoChapterSource),
-            chapterPreference: preferenceStatus.chapterPreference,
-            chapterPreferenceOptions: preferenceStatus.chapterPreferenceOptions,
-            nativeChaptersAvailable: Boolean(response?.nativeChaptersAvailable),
-            chapterSourceOverride: response?.chapterSourceOverride || "default",
-            effectiveChapterSource: response?.effectiveChapterSource || "",
-            error: response?.error || "",
-        };
-    }
-
-    case "ai:setChapterPreference": {
-        const response = await sendNative("saveChapterPreference", {
-            chapterPreference: message.chapterPreference,
-        });
-        await refreshActiveVideoStatus();
-        return response;
-    }
-
-    case "ai:setVideoChapterSource": {
-        const response = await sendActiveVideoTabMessage({
-            type: "content:setVideoChapterSource",
-            source: message.source,
-        });
-        return await pageActionsPayload(response);
-    }
 
     default:
         return null;

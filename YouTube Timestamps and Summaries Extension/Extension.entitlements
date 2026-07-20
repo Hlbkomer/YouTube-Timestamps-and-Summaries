@@ -10,5 +10,9 @@
 	</array>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)Matuko.YouTube-Timestamps-and-Summaries.shared</string>
+	</array>
 </dict>
 </plist>

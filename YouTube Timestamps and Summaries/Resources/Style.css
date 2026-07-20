@@ -149,6 +149,15 @@ body {
     cursor: not-allowed;
 }
 
+.field select[data-selected-unavailable="true"] {
+    color: color-mix(in srgb, var(--muted) 76%, transparent);
+    background: color-mix(in srgb, var(--surface) 72%, var(--panel-border));
+}
+
+.field select option:disabled {
+    color: var(--muted);
+}
+
 .field textarea {
     width: 100%;
     min-height: 120px;

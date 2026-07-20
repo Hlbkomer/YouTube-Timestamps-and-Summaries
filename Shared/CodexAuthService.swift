@@ -1,6 +1,6 @@
 //
 //  CodexAuthService.swift
-//  Timestamps & Summaries for YT
+//  Timestamps & Summaries for YT (Shared)
 //
 //  Created by Codex on 26/04/2026.
 //
@@ -50,6 +50,7 @@ final class CodexAuthService {
     private let callbackURL = "https://auth.openai.com/deviceauth/callback"
     private let tokenRefreshSkew: TimeInterval = 120
     private let defaultExpiry: TimeInterval = 3600
+    private let credentialStore = SharedCredentialStore(service: "Matuko.YouTube-Timestamps-and-Summaries.codex")
 
     private enum Keys {
         static let accessToken = "codex.accessToken"
@@ -145,10 +146,16 @@ final class CodexAuthService {
 
     func signOut() {
         let defaults = GenerationSettings.sharedDefaults
+        try? credentialStore.remove(Keys.accessToken)
+        try? credentialStore.remove(Keys.refreshToken)
         defaults.removeObject(forKey: Keys.accessToken)
         defaults.removeObject(forKey: Keys.refreshToken)
         defaults.removeObject(forKey: Keys.expiresAt)
         defaults.removeObject(forKey: Keys.updatedAt)
+    }
+
+    func accessToken() async throws -> String {
+        try await tokens(refresh: true).accessToken
     }
 
     private func exchangeAuthorizationCode(_ code: String, codeVerifier: String) async throws {
@@ -170,9 +177,14 @@ final class CodexAuthService {
 
     private func tokens(refresh: Bool) async throws -> (accessToken: String, refreshToken: String, expiresAt: Date) {
         let defaults = GenerationSettings.sharedDefaults
+        try credentialStore.migrateLegacyPair(
+            from: defaults,
+            accessTokenKey: Keys.accessToken,
+            refreshTokenKey: Keys.refreshToken
+        )
         guard
-            let accessToken = defaults.string(forKey: Keys.accessToken),
-            let refreshToken = defaults.string(forKey: Keys.refreshToken),
+            let accessToken = try credentialStore.string(for: Keys.accessToken),
+            let refreshToken = try credentialStore.string(for: Keys.refreshToken),
             !accessToken.isEmpty,
             !refreshToken.isEmpty
         else {
@@ -221,8 +233,8 @@ final class CodexAuthService {
         let expiresAt = accessTokenExpiry(accessToken)
             ?? Date().addingTimeInterval(TimeInterval((json["expires_in"] as? Double) ?? defaultExpiry))
         let defaults = GenerationSettings.sharedDefaults
-        defaults.set(accessToken, forKey: Keys.accessToken)
-        defaults.set(refreshToken, forKey: Keys.refreshToken)
+        try credentialStore.set(refreshToken, for: Keys.refreshToken)
+        try credentialStore.set(accessToken, for: Keys.accessToken)
         defaults.set(expiresAt.timeIntervalSince1970, forKey: Keys.expiresAt)
         defaults.set(Date().timeIntervalSince1970, forKey: Keys.updatedAt)
     }

@@ -4,12 +4,11 @@
     const NATIVE_PANEL_TAB_ATTRIBUTE = "data-yts-native-tab";
     const NATIVE_PANEL_HEADER_ACTION_ATTRIBUTE = "data-yts-native-header-action";
     const NATIVE_PANEL_HEADER_COPY_ATTRIBUTE = "data-yts-native-header-copy";
-    const NATIVE_PANEL_HIDDEN_BY_EXTENSION_ATTRIBUTE = "data-yts-native-hidden-by-extension";
-    const NATIVE_PANEL_PREVIOUS_DISPLAY_ATTRIBUTE = "data-yts-native-previous-display";
-    const NATIVE_PANEL_PREVIOUS_HIDDEN_ATTRIBUTE = "data-yts-native-previous-hidden";
-    const NATIVE_PANEL_PREVIOUS_VISIBILITY_ATTRIBUTE = "data-yts-native-previous-visibility";
+    const NATIVE_PANEL_CONTENT_ACTIVE_ATTRIBUTE = "data-yts-extension-content-active";
+    const NATIVE_PANEL_SIBLING_SUPPRESSED_ATTRIBUTE = "data-yts-native-sibling-suppressed";
     const NATIVE_PANEL_NATIVE_TAB_HIDDEN_ATTRIBUTE = "data-yts-native-owned-tab-hidden";
     const NATIVE_PANEL_NATIVE_TAB_PREVIOUS_DISPLAY_ATTRIBUTE = "data-yts-native-owned-tab-previous-display";
+    const NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE = "data-yts-native-owned-tab-visually-inactive";
     const NATIVE_PANEL_VISIBILITY_EXPANDED = "ENGAGEMENT_PANEL_VISIBILITY_EXPANDED";
     const NATIVE_PANEL_VISIBILITY_HIDDEN = "ENGAGEMENT_PANEL_VISIBILITY_HIDDEN";
     const NATIVE_PANEL_TAB_ORDER = ["chapters", "summary", "transcript", "timeline"];
@@ -17,15 +16,52 @@
     const NATIVE_PANEL_BODY_MIN_HEIGHT_PX = 260;
     const NATIVE_PANEL_BODY_MAX_HEIGHT_PX = 620;
     const NATIVE_PANEL_VIEWPORT_BOTTOM_GAP_PX = 16;
-    const NATIVE_PANEL_RESYNC_DELAYS_MS = [0, 25, 75, 150, 300, 600, 1000];
-    const NATIVE_PANEL_NATIVE_TAB_HANDOFF_GRACE_MS = 700;
+    const NATIVE_PANEL_RESYNC_DELAY_MS = 0;
+
+    function createPanelCloseLifecycle() {
+        let phase = "idle";
+
+        return {
+            begin() {
+                phase = "closing";
+            },
+            reset() {
+                phase = "idle";
+            },
+            reconcile({ dismissed, visible }) {
+                if (!dismissed) {
+                    phase = "idle";
+                    return { blockOpen: false, reopened: false };
+                }
+
+                if (!visible) {
+                    phase = "closed";
+                    return { blockOpen: true, reopened: false };
+                }
+
+                if (phase === "closed") {
+                    phase = "idle";
+                    return { blockOpen: false, reopened: true };
+                }
+
+                // The close control fires before YouTube changes the panel's
+                // visibility. Treat that still-visible frame as closing, not
+                // as evidence that the panel was opened again.
+                return { blockOpen: true, reopened: false };
+            },
+        };
+    }
 
     function createNativePanelController(deps) {
         let nativePanelResyncTimeouts = [];
         let nativePanelTabSwitchTimeout = null;
-        let nativePanelTabSwitchGraceTimeout = null;
-        let nativePanelTabSwitchInProgress = false;
+        let nativePanelDismissTimeout = null;
         let transcriptCopyRefreshTimeout = null;
+        let activeNativeContent = null;
+        const wiredNativeTabLists = new WeakSet();
+        const wiredHeaderActionHosts = new WeakSet();
+        const wiredHeaderCopyButtons = new WeakSet();
+        const panelCloseLifecycle = createPanelCloseLifecycle();
 
         const doc = deps.document || globalScope.document;
         const win = deps.window || globalScope.window;
@@ -43,6 +79,20 @@
             return deps.querySelectorAllSafe(root, selector);
         }
 
+        function setAttributeIfChanged(element, name, value) {
+            const nextValue = String(value);
+            if (element.getAttribute(name) !== nextValue) {
+                element.setAttribute(name, nextValue);
+            }
+        }
+
+        function setTextContentIfChanged(element, value) {
+            const nextValue = String(value);
+            if (element.textContent !== nextValue) {
+                element.textContent = nextValue;
+            }
+        }
+
         function directChildByID(element, id) {
             return Array.from(element?.children || []).find((child) => child.id === id) || null;
         }
@@ -57,8 +107,39 @@
         }
 
         function getNativeInThisVideoPanel() {
-            for (const panel of doc.querySelectorAll("ytd-engagement-panel-section-list-renderer")) {
-                if (nativePanelTitle(panel) === "In this video") {
+            const panels = Array.from(doc.querySelectorAll("ytd-engagement-panel-section-list-renderer"));
+            for (const panel of panels) {
+                const title = nativePanelTitle(panel);
+                if (title === "In this video") {
+                    return panel;
+                }
+            }
+
+            // The parent shell has no stable target-id. During some YouTube
+            // experiments its title arrives after the chip row, so identify
+            // it only from recognized native tab semantics. Never use a raw
+            // button count: generic panels such as Description can briefly
+            // expose tab-list-like markup while YouTube initializes them.
+            for (const panel of panels) {
+                if (panel.getAttribute("target-id")) {
+                    continue;
+                }
+
+                const tabList = panel.querySelector?.("chip-bar-view-model [role='tablist'], #subheader [role='tablist'], [role='tablist']");
+                if (!tabList) {
+                    continue;
+                }
+
+                const nativeButtons = querySelectorAllSafe(tabList, "button[role='tab'], button, [role='tab']");
+                const nativeKinds = new Set(
+                    nativeButtons
+                        .map((button) => nativeOwnedTabKindFromText(deps.visibleText(button)))
+                        .filter(Boolean)
+                );
+                if (
+                    nativeKinds.has("transcript")
+                    || (nativeKinds.has("chapters") && nativeKinds.has("timeline"))
+                ) {
                     return panel;
                 }
             }
@@ -102,19 +183,14 @@
         }
 
         function extensionTabKinds() {
-            const currentState = state();
-            const kinds = [];
-            if (currentState.timestampsSource !== "youtubeChapters") {
-                kinds.push("timestamps");
-            }
-            kinds.push("summary");
-
-            return kinds;
+            return ["timestamps", "summary"];
         }
 
         function tabLabel(kind) {
             if (kind === "timestamps") {
-                return state().isLoading.timestamps ? "Chapters..." : "Chapters";
+                return state().isLoading.timestamps || deps.isTimestampChapterDiscoveryPending?.()
+                    ? "Chapters..."
+                    : "Chapters";
             }
 
             return deps.buttonLabel(kind);
@@ -126,13 +202,13 @@
 
         function nativeOwnedTabKindFromText(value) {
             const text = String(value || "").toLowerCase();
-            if (/\b(?:transcript|transkript|transkrip|prepis|přepis)\b/.test(text)) {
+            if (/\b(?:transcript|transcription|transkript|transkrip|prepis|přepis|transcripci[oó]n|trascrizione)\b/.test(text)) {
                 return "transcript";
             }
-            if (/\b(?:chapters?|kapitel)\b/.test(text)) {
+            if (/\b(?:chapters?|key\s+moments?|moments?\s+cl[eé]s?|momentos?\s+clave|momenti\s+chiave|schl[uü]sselmomente|belangrijke\s+momenten|kl[ií]čov[eé]\s+momenty|kľúčov[eé]\s+momenty|kluczowe\s+momenty|kapitel|kapitoly|kapitola|chapitres?|cap[ií]tulos?|capitoli|rozdziały|hoofdstukken)\b/.test(text)) {
                 return "chapters";
             }
-            if (/\b(?:timeline)\b/.test(text)) {
+            if (/\b(?:timeline|zeitachse|chronologie|l[ií]nea\s+de\s+tiempo)\b/.test(text) || text.includes("časová os")) {
                 return "timeline";
             }
 
@@ -184,12 +260,16 @@
                 }))
                 .filter((entry) => entry.kind);
 
-            entries.sort((a, b) => {
+            const orderedEntries = [...entries].sort((a, b) => {
                 const orderDelta = tabOrderIndex(a.kind) - tabOrderIndex(b.kind);
                 return orderDelta || a.sourceIndex - b.sourceIndex;
             });
 
-            for (const entry of entries) {
+            if (entries.every((entry, index) => entry.item === orderedEntries[index].item)) {
+                return;
+            }
+
+            for (const entry of orderedEntries) {
                 tabList.append(entry.item);
             }
         }
@@ -238,78 +318,17 @@
                 || null;
         }
 
-        function selectNativeOwnedTab(kind, mount = getMount(), { preserveUserSelection = false } = {}) {
-            const button = nativeOwnedTabButton(kind, mount);
-            if (!button) {
-                return false;
-            }
-
-            const currentState = state();
-            const wasUserSelected = currentState.userSelectedTab;
-            currentState.nativeExtensionTab = "";
-            currentState.nativeYouTubeTab = kind;
-            if (!isNativeOwnedTabSelected(button)) {
-                button.click();
-            }
-            currentState.nativeExtensionTab = "";
-            currentState.nativeYouTubeTab = kind;
-            if (preserveUserSelection) {
-                currentState.userSelectedTab = wasUserSelected;
-            }
-            syncTabs(mount);
-            scheduleResync();
-            return true;
+        function hasNativeOwnedTab(kind, mount = getMount()) {
+            return Boolean(nativeOwnedTabButton(kind, mount));
         }
 
-        function scrollElementIntoView(element, options) {
-            if (!element?.scrollIntoView) {
-                return;
+        function hasNativeChapterSurface() {
+            if (hasNativeOwnedTab("chapters")) {
+                return true;
             }
 
-            try {
-                element.scrollIntoView(options);
-            } catch (_) {
-                element.scrollIntoView();
-            }
-        }
-
-        function focusElementWithoutScroll(element) {
-            if (!element?.focus) {
-                return;
-            }
-
-            try {
-                element.focus({ preventScroll: true });
-            } catch (_) {
-                element.focus();
-            }
-        }
-
-        function revealNativeOwnedTab(kind, mount = getMount(), { revealPanel = false, focus = false } = {}) {
-            const button = nativeOwnedTabButton(kind, mount);
-            if (!button) {
-                return false;
-            }
-
-            if (revealPanel) {
-                scrollElementIntoView(mount?.panel, {
-                    block: "start",
-                    inline: "nearest",
-                    behavior: "smooth",
-                });
-            }
-
-            scrollElementIntoView(nativeOwnedTabContainer(button), {
-                block: "nearest",
-                inline: "center",
-                behavior: "smooth",
-            });
-
-            if (focus) {
-                focusElementWithoutScroll(button);
-            }
-
-            return true;
+            return Array.from(doc.querySelectorAll("ytd-engagement-panel-section-list-renderer"))
+                .some((panel) => nativeOwnedTabKindFromText(nativePanelTitle(panel)) === "chapters");
         }
 
         function preferredExtensionTab() {
@@ -332,17 +351,6 @@
                 return;
             }
 
-            if (currentState.timestampsSource === "youtubeChapters") {
-                if (selectNativeOwnedTab("chapters", mount, { preserveUserSelection: true })) {
-                    return;
-                }
-
-                currentState.nativeExtensionTab = "";
-                currentState.nativeYouTubeTab = "chapters";
-                currentState.activeTab = "timestamps";
-                return;
-            }
-
             const nextTab = preferredExtensionTab();
             if (!nextTab) {
                 return;
@@ -353,71 +361,64 @@
             currentState.activeTab = nextTab;
         }
 
-        function hideSiblingEngagementPanels(activePanel) {
-            for (const panel of doc.querySelectorAll("ytd-engagement-panel-section-list-renderer")) {
-                if (panel === activePanel || panel.parentElement !== activePanel?.parentElement) {
-                    continue;
-                }
-
-                if (!isNativePanelVisible(panel)) {
-                    continue;
-                }
-
-                rememberNativeOwnedElementState(panel);
-                panel.setAttribute("visibility", NATIVE_PANEL_VISIBILITY_HIDDEN);
-                panel.hidden = true;
-                panel.style.removeProperty("display");
-                panel.style.removeProperty("visibility");
-            }
-        }
-
-        function restoreRoot(mount) {
-            return mount?.panel?.parentElement || mount?.panel || doc;
-        }
-
-        function keepVisible(mount, { hideSiblings = Boolean(state().nativeExtensionTab) } = {}) {
+        function showNativePanel(mount) {
             const panel = mount?.panel;
             if (!panel) {
                 return false;
             }
 
-            if (hideSiblings) {
-                hideSiblingEngagementPanels(panel);
-            } else {
-                restoreNativeOwnedElements(restoreRoot(mount));
-            }
-
             panel.hidden = false;
             panel.removeAttribute("hidden");
             panel.setAttribute("visibility", NATIVE_PANEL_VISIBILITY_EXPANDED);
-            panel.style.removeProperty("display");
             panel.style.removeProperty("visibility");
             if (win.getComputedStyle?.(panel)?.display === "none") {
                 panel.style.display = "block";
             }
 
-            return true;
+            return isNativePanelVisible(panel);
         }
 
         function open(mount) {
-            if (state().nativePanelDismissed) {
+            const panel = mount?.panel;
+            if (!panel) {
+                return false;
+            }
+
+            const wasVisible = isNativePanelVisible(panel);
+            const currentState = state();
+            const closeState = panelCloseLifecycle.reconcile({
+                dismissed: Boolean(currentState.nativePanelDismissed),
+                visible: wasVisible,
+            });
+            if (closeState.blockOpen) {
+                syncPanelHostVisibility();
+                return false;
+            }
+            if (closeState.reopened) {
+                // The panel became hidden after the close and was made visible
+                // again later. Preserve its last selected surface on reopen.
+                currentState.nativePanelDismissed = false;
+            }
+
+            if (
+                !wasVisible
+                && currentState.userSelectedTab
+                && !currentState.nativeExtensionTab
+                && currentState.nativeYouTubeTab
+            ) {
+                // Transcript and Timeline may move to a sibling engagement
+                // surface. Once a person chooses a YouTube-owned tab, do not
+                // reopen this panel behind YouTube's back during reconciliation.
                 syncPanelHostVisibility();
                 return false;
             }
 
-            if (shouldRespectYouTubeTimelineSurface()) {
-                restoreNativeOwnedElements(restoreRoot(mount));
-                syncPanelHostVisibility();
-                syncTabs(mount);
-                return true;
-            }
-
-            if (!keepVisible(mount)) {
+            if (!wasVisible && !showNativePanel(mount)) {
                 return false;
             }
 
             selectDefaultExtensionTab(mount);
-            keepVisible(mount);
+            syncTabs(mount);
             return true;
         }
 
@@ -458,8 +459,38 @@
             color: var(--yt-spec-text-primary-inverse, #fff);
         }
 
-        .yts-native-panel-tab[aria-busy="true"] {
-            opacity: 0.72;
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}].ytChipBarViewModelChipWrapper,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}][role='presentation'],
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}][role='tab'],
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}] button,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}] [role='tab'] {
+            background: transparent !important;
+            color: var(--yt-spec-text-primary, #0f0f0f) !important;
+            box-shadow: none !important;
+        }
+
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}].ytChipBarViewModelChipWrapper::before,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}].ytChipBarViewModelChipWrapper::after,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}][role='presentation']::before,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}][role='presentation']::after,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}] button::before,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}] button::after,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}] [role='tab']::before,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}] [role='tab']::after {
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}] .ytChipShapeChip {
+            background: var(--yt-spec-badge-chip-background, rgba(0, 0, 0, 0.05)) !important;
+            color: var(--yt-spec-text-primary, #0f0f0f) !important;
+            box-shadow: none !important;
+        }
+
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}] .ytChipShapeChip::before,
+        [${NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE}] .ytChipShapeChip::after {
+            background: transparent !important;
+            box-shadow: none !important;
         }
 
         html[dark] .yts-native-panel-tab[aria-selected="true"],
@@ -472,6 +503,14 @@
             display: block;
             width: 100%;
             min-height: 0;
+        }
+
+        [${NATIVE_PANEL_CONTENT_ACTIVE_ATTRIBUTE}] > :not(#${sidebarHostID}) {
+            display: none !important;
+        }
+
+        [${NATIVE_PANEL_SIBLING_SUPPRESSED_ATTRIBUTE}] {
+            display: none !important;
         }
 
         .yts-native-header-actions {
@@ -513,6 +552,20 @@
             opacity: 1;
         }
 
+        .yts-native-header-copy-button[data-copied="true"] {
+            color: #2e9b4b;
+        }
+
+        .yts-native-header-copy-button[data-copied="true"] svg {
+            animation: yts-native-copy-confirmation 320ms ease-out;
+        }
+
+        @keyframes yts-native-copy-confirmation {
+            0% { opacity: 0; transform: scale(0.55); }
+            65% { opacity: 1; transform: scale(1.18); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
         .yts-native-header-copy-button:disabled {
             cursor: default;
             opacity: 0.28;
@@ -552,22 +605,13 @@
                 win.clearTimeout(nativePanelTabSwitchTimeout);
                 nativePanelTabSwitchTimeout = null;
             }
-            if (nativePanelTabSwitchGraceTimeout !== null) {
-                win.clearTimeout(nativePanelTabSwitchGraceTimeout);
-                nativePanelTabSwitchGraceTimeout = null;
-            }
-            nativePanelTabSwitchInProgress = false;
         }
 
-        function beginNativeTabSwitchGrace() {
-            if (nativePanelTabSwitchGraceTimeout !== null) {
-                win.clearTimeout(nativePanelTabSwitchGraceTimeout);
+        function clearDismissTimeout() {
+            if (nativePanelDismissTimeout !== null) {
+                win.clearTimeout(nativePanelDismissTimeout);
+                nativePanelDismissTimeout = null;
             }
-            nativePanelTabSwitchInProgress = true;
-            nativePanelTabSwitchGraceTimeout = win.setTimeout(() => {
-                nativePanelTabSwitchGraceTimeout = null;
-                nativePanelTabSwitchInProgress = false;
-            }, NATIVE_PANEL_NATIVE_TAB_HANDOFF_GRACE_MS);
         }
 
         function syncPanelHostVisibility() {
@@ -584,143 +628,71 @@
             }
         }
 
-        function shouldRespectYouTubeTimelineSurface() {
-            const currentState = state();
-            return currentState.userSelectedTab
-                && !currentState.nativeExtensionTab
-                && currentState.nativeYouTubeTab === "timeline";
-        }
-
         function syncTabsIfMounted() {
-            const mount = getMount();
+            const mount = getMount({ requireVisible: true });
             if (!mount) {
                 return null;
             }
 
-            if (state().nativePanelDismissed) {
-                syncPanelHostVisibility();
-                return mount;
-            }
-
-            if (shouldRespectYouTubeTimelineSurface()) {
-                restoreNativeOwnedElements(restoreRoot(mount));
-                syncPanelHostVisibility();
-                return syncTabs(mount);
-            }
-
-            keepVisible(mount);
             return syncTabs(mount);
         }
 
         function scheduleResync() {
             clearResync();
-            for (const delay of NATIVE_PANEL_RESYNC_DELAYS_MS) {
-                const timeoutID = win.setTimeout(() => {
-                    nativePanelResyncTimeouts = nativePanelResyncTimeouts.filter((id) => id !== timeoutID);
-                    const mount = syncTabsIfMounted();
-                    if (mount && panelHost()?.dataset.ytsPlacement === "native") {
-                        syncBodyViewport(mount);
-                    }
-                }, delay);
-                nativePanelResyncTimeouts.push(timeoutID);
-            }
+            const timeoutID = win.setTimeout(() => {
+                nativePanelResyncTimeouts = nativePanelResyncTimeouts.filter((id) => id !== timeoutID);
+                const mount = syncTabsIfMounted();
+                if (mount && panelHost()?.dataset.ytsPlacement === "native") {
+                    syncBodyViewport(mount);
+                }
+            }, NATIVE_PANEL_RESYNC_DELAY_MS);
+            nativePanelResyncTimeouts.push(timeoutID);
         }
 
         function scheduleNativeOwnedTabSelection(nativeYouTubeTab = "") {
-            const nextNativeYouTubeTab = nativeYouTubeTab || selectedYouTubeTabKind();
-            if (!nextNativeYouTubeTab) {
-                return;
-            }
-
-            const mount = getMount();
-            if (mount) {
-                restoreNativeOwnedElements(restoreRoot(mount));
-            }
             clearResync();
             clearTabSwitch();
-            beginNativeTabSwitchGrace();
-
             nativePanelTabSwitchTimeout = win.setTimeout(() => {
                 nativePanelTabSwitchTimeout = null;
-                clearExtensionTab(nextNativeYouTubeTab);
+                clearExtensionTab(nativeYouTubeTab || selectedYouTubeTabKind() || "native");
             }, 0);
         }
 
-        function restoreNativeOwnedElements(root = doc) {
-            for (const element of querySelectorAllSafe(root, `[${NATIVE_PANEL_HIDDEN_BY_EXTENSION_ATTRIBUTE}]`)) {
-                const previousDisplay = element.getAttribute(NATIVE_PANEL_PREVIOUS_DISPLAY_ATTRIBUTE) || "";
-                if (previousDisplay) {
-                    element.style.display = previousDisplay;
-                } else {
-                    element.style.removeProperty("display");
-                }
-
-                if (element.hasAttribute(NATIVE_PANEL_PREVIOUS_HIDDEN_ATTRIBUTE)) {
-                    const previousHidden = element.getAttribute(NATIVE_PANEL_PREVIOUS_HIDDEN_ATTRIBUTE);
-                    element.hidden = previousHidden === "true";
-                    if (previousHidden === "true") {
-                        element.setAttribute("hidden", "");
-                    } else {
-                        element.removeAttribute("hidden");
-                    }
-                }
-
-                if (element.hasAttribute(NATIVE_PANEL_PREVIOUS_VISIBILITY_ATTRIBUTE)) {
-                    const previousVisibility = element.getAttribute(NATIVE_PANEL_PREVIOUS_VISIBILITY_ATTRIBUTE) || "";
-                    if (previousVisibility) {
-                        element.setAttribute("visibility", previousVisibility);
-                    } else {
-                        element.removeAttribute("visibility");
-                    }
-                }
-
-                element.removeAttribute(NATIVE_PANEL_HIDDEN_BY_EXTENSION_ATTRIBUTE);
-                element.removeAttribute(NATIVE_PANEL_PREVIOUS_DISPLAY_ATTRIBUTE);
-                element.removeAttribute(NATIVE_PANEL_PREVIOUS_HIDDEN_ATTRIBUTE);
-                element.removeAttribute(NATIVE_PANEL_PREVIOUS_VISIBILITY_ATTRIBUTE);
-            }
-        }
-
-        function rememberNativeOwnedElementState(element) {
-            if (!element || element.hasAttribute(NATIVE_PANEL_HIDDEN_BY_EXTENSION_ATTRIBUTE)) {
-                return;
-            }
-
-            element.setAttribute(NATIVE_PANEL_PREVIOUS_DISPLAY_ATTRIBUTE, element.style.display || "");
-            element.setAttribute(NATIVE_PANEL_PREVIOUS_HIDDEN_ATTRIBUTE, element.hidden ? "true" : "false");
-            element.setAttribute(NATIVE_PANEL_PREVIOUS_VISIBILITY_ATTRIBUTE, element.getAttribute("visibility") || "");
-            element.setAttribute(NATIVE_PANEL_HIDDEN_BY_EXTENSION_ATTRIBUTE, "");
-        }
-
-        function hideNativeOwnedElement(element) {
-            if (!element || element === panelHost() || panelHost()?.contains(element)) {
-                return;
-            }
-
-            rememberNativeOwnedElementState(element);
-            element.style.display = "none";
-        }
-
         function syncContentVisibility(mount = getMount()) {
-            if (!mount?.panel) {
-                restoreNativeOwnedElements();
-                return;
+            const nextContent = mount?.content || null;
+            if (activeNativeContent && activeNativeContent !== nextContent) {
+                activeNativeContent.removeAttribute(NATIVE_PANEL_CONTENT_ACTIVE_ATTRIBUTE);
             }
-
-            restoreNativeOwnedElements(mount.panel);
-            if (!state().nativeExtensionTab) {
-                restoreNativeOwnedElements(restoreRoot(mount));
-                return;
-            }
-
-            for (const child of Array.from(mount.content?.children || [])) {
-                if (child !== panelHost()) {
-                    hideNativeOwnedElement(child);
+            activeNativeContent = nextContent;
+            if (!nextContent) {
+                for (const panel of querySelectorAllSafe(doc, `[${NATIVE_PANEL_SIBLING_SUPPRESSED_ATTRIBUTE}]`)) {
+                    panel.removeAttribute(NATIVE_PANEL_SIBLING_SUPPRESSED_ATTRIBUTE);
                 }
+                return;
             }
 
-            for (const transcriptSearch of querySelectorAllSafe(mount.panel, "ytd-transcript-search-panel-renderer")) {
-                hideNativeOwnedElement(transcriptSearch);
+            const extensionContentActive = Boolean(state().nativeExtensionTab);
+            nextContent.toggleAttribute(NATIVE_PANEL_CONTENT_ACTIVE_ATTRIBUTE, extensionContentActive);
+            if (!extensionContentActive) {
+                for (const panel of querySelectorAllSafe(doc, `[${NATIVE_PANEL_SIBLING_SUPPRESSED_ATTRIBUTE}]`)) {
+                    panel.removeAttribute(NATIVE_PANEL_SIBLING_SUPPRESSED_ATTRIBUTE);
+                }
+                return;
+            }
+
+            // YouTube renders Transcript, Timeline, and native Chapters in
+            // sibling engagement panels. Suppress any currently expanded
+            // sibling with our own CSS marker while extension content is
+            // active, without rewriting YouTube's visibility/hidden state.
+            for (const panel of doc.querySelectorAll("ytd-engagement-panel-section-list-renderer")) {
+                if (panel === mount.panel || panel.parentElement !== mount.panel.parentElement) {
+                    continue;
+                }
+
+                const visibility = panel.getAttribute("visibility") || "";
+                if (!panel.hidden && visibility !== NATIVE_PANEL_VISIBILITY_HIDDEN) {
+                    panel.setAttribute(NATIVE_PANEL_SIBLING_SUPPRESSED_ATTRIBUTE, "");
+                }
             }
         }
 
@@ -733,16 +705,24 @@
 
         function restoreHiddenNativeOwnedTabs(root = doc) {
             for (const element of querySelectorAllSafe(root, `[${NATIVE_PANEL_NATIVE_TAB_HIDDEN_ATTRIBUTE}]`)) {
-                const previousDisplay = element.getAttribute(NATIVE_PANEL_NATIVE_TAB_PREVIOUS_DISPLAY_ATTRIBUTE) || "";
-                if (previousDisplay) {
-                    element.style.display = previousDisplay;
-                } else {
-                    element.style.removeProperty("display");
-                }
-
-                element.removeAttribute(NATIVE_PANEL_NATIVE_TAB_HIDDEN_ATTRIBUTE);
-                element.removeAttribute(NATIVE_PANEL_NATIVE_TAB_PREVIOUS_DISPLAY_ATTRIBUTE);
+                restoreHiddenNativeOwnedTab(element);
             }
+        }
+
+        function restoreHiddenNativeOwnedTab(element) {
+            if (!element?.hasAttribute?.(NATIVE_PANEL_NATIVE_TAB_HIDDEN_ATTRIBUTE)) {
+                return;
+            }
+
+            const previousDisplay = element.getAttribute(NATIVE_PANEL_NATIVE_TAB_PREVIOUS_DISPLAY_ATTRIBUTE) || "";
+            if (previousDisplay) {
+                element.style.display = previousDisplay;
+            } else {
+                element.style.removeProperty("display");
+            }
+
+            element.removeAttribute(NATIVE_PANEL_NATIVE_TAB_HIDDEN_ATTRIBUTE);
+            element.removeAttribute(NATIVE_PANEL_NATIVE_TAB_PREVIOUS_DISPLAY_ATTRIBUTE);
         }
 
         function hideNativeOwnedTabElement(element) {
@@ -757,7 +737,11 @@
 
         function shouldHideNativeOwnedTab(kind) {
             return kind === "chapters"
-                && state().nativeChaptersOverridden
+                && (
+                    state().timestampsSource === "youtubeChapters"
+                    || state().nativeChaptersOverridden
+                    || deps.isTimestampChapterDiscoveryPending?.()
+                )
                 && extensionTabKinds().includes("timestamps");
         }
 
@@ -767,15 +751,70 @@
                 return;
             }
 
-            restoreHiddenNativeOwnedTabs(mount.tabList);
             for (const button of querySelectorAllSafe(mount.tabList, "button[role='tab'], button, [role='tab']")) {
                 if (button.hasAttribute(NATIVE_PANEL_TAB_ATTRIBUTE)) {
                     continue;
                 }
 
                 const kind = nativeOwnedTabKindFromText(deps.visibleText(button));
+                const container = nativeOwnedTabContainer(button);
                 if (shouldHideNativeOwnedTab(kind)) {
-                    hideNativeOwnedTabElement(nativeOwnedTabContainer(button));
+                    hideNativeOwnedTabElement(container);
+                } else {
+                    restoreHiddenNativeOwnedTab(container);
+                }
+            }
+        }
+
+        function syncNativeOwnedTabSelectionAppearance(mount = getMount()) {
+            if (!mount?.tabList) {
+                return;
+            }
+
+            const extensionTabActive = Boolean(state().nativeExtensionTab);
+            const selectedNativeTab = extensionTabActive ? "" : state().nativeYouTubeTab;
+            for (const button of querySelectorAllSafe(mount.tabList, "button[role='tab'], button, [role='tab']")) {
+                if (button.hasAttribute(NATIVE_PANEL_TAB_ATTRIBUTE)) {
+                    continue;
+                }
+
+                const container = nativeOwnedTabContainer(button);
+                if (!container) {
+                    continue;
+                }
+
+                container.toggleAttribute(NATIVE_PANEL_NATIVE_TAB_VISUALLY_INACTIVE_ATTRIBUTE, extensionTabActive);
+                if (!extensionTabActive) {
+                    if (selectedNativeTab) {
+                        const selected = nativeOwnedTabKindFromText(deps.visibleText(button)) === selectedNativeTab;
+                        setAttributeIfChanged(button, "aria-selected", selected ? "true" : "false");
+                        if (button.hasAttribute("aria-pressed")) {
+                            setAttributeIfChanged(button, "aria-pressed", selected ? "true" : "false");
+                        }
+                        if (container !== button && container.hasAttribute?.("aria-selected")) {
+                            setAttributeIfChanged(container, "aria-selected", selected ? "true" : "false");
+                        }
+                        if (container !== button && container.hasAttribute?.("aria-pressed")) {
+                            setAttributeIfChanged(container, "aria-pressed", selected ? "true" : "false");
+                        }
+                    }
+                    continue;
+                }
+
+                // YouTube leaves Transcript/Timeline selected when an injected
+                // extension tab takes over the shared content surface. Reflect
+                // the actual visible surface without changing native click flow.
+                if (button.getAttribute("aria-selected") === "true") {
+                    button.setAttribute("aria-selected", "false");
+                }
+                if (button.getAttribute("aria-pressed") === "true") {
+                    button.setAttribute("aria-pressed", "false");
+                }
+                if (container !== button && container.getAttribute?.("aria-selected") === "true") {
+                    container.setAttribute("aria-selected", "false");
+                }
+                if (container !== button && container.getAttribute?.("aria-pressed") === "true") {
+                    container.setAttribute("aria-pressed", "false");
                 }
             }
         }
@@ -832,41 +871,151 @@
             return null;
         }
 
-        function isNativePanelCloseTarget(rawTarget, target, mount = getMount()) {
-            if (!rawTarget || !mount?.panel) {
+        function isPanelCloseTarget(rawTarget, panel) {
+            if (!rawTarget || !panel) {
                 return false;
             }
 
-            const header = panelHeader(mount.panel);
-            if (!header?.contains?.(rawTarget)) {
-                return false;
-            }
-
-            const control = panelCloseControl(header);
-            if (!control) {
-                return false;
-            }
-
-            return control === rawTarget
-                || control === target
-                || Boolean(control.contains?.(rawTarget))
-                || Boolean(control.contains?.(target))
-                || Boolean(target?.contains?.(control));
+            const closeControl = panelCloseControl(panelHeader(panel));
+            return Boolean(
+                closeControl
+                && (
+                    closeControl === rawTarget
+                    || closeControl.contains?.(rawTarget)
+                    || rawTarget.contains?.(closeControl)
+                )
+            );
         }
 
-        function dismissNativePanel(mount = getMount()) {
+        function nativePanelKind(panel) {
+            const identity = `${panel?.getAttribute?.("target-id") || ""} ${nativePanelTitle(panel)}`
+                .replace(/[_-]+/g, " ");
+            return nativeOwnedTabKindFromText(identity);
+        }
+
+        function hideIntegratedPanel(mount) {
+            const panel = mount?.panel;
+            if (!panel) {
+                return;
+            }
+
+            panel.hidden = true;
+            panel.setAttribute("hidden", "");
+            panel.setAttribute("visibility", NATIVE_PANEL_VISIBILITY_HIDDEN);
+            panel.style.removeProperty("display");
+            panel.style.removeProperty("visibility");
+        }
+
+        function dismissIntegratedPanel(mount) {
             const currentState = state();
+            panelCloseLifecycle.begin();
             currentState.nativePanelDismissed = true;
-            currentState.nativeExtensionTab = "";
-            currentState.nativeYouTubeTab = "";
             currentState.userSelectedTab = true;
             clearTranscriptCopyRefresh();
             clearTabSwitch();
             clearResync();
-            restoreNativeOwnedElements(restoreRoot(mount));
-            syncPanelHostVisibility();
+            clearDismissTimeout();
+
+            // YouTube receives the original Close click. Finalize after its
+            // handler because extension-owned Chapters/Summary can make the
+            // shell visible without changing YouTube's private open state.
+            nativePanelDismissTimeout = win.setTimeout(() => {
+                nativePanelDismissTimeout = null;
+                if (!state().nativePanelDismissed) {
+                    return;
+                }
+
+                hideIntegratedPanel(mount);
+                panelCloseLifecycle.reconcile({ dismissed: true, visible: false });
+                syncContentVisibility(null);
+                cleanupHeaderActions();
+            }, 0);
+        }
+
+        function handlePagePanelCloseClick(event) {
+            const rawTarget = event.target || null;
+            const clickedPanel = rawTarget?.closest?.("ytd-engagement-panel-section-list-renderer");
+            if (!clickedPanel || !isPanelCloseTarget(rawTarget, clickedPanel)) {
+                return false;
+            }
+
+            const mount = getMount();
+            if (!mount) {
+                return false;
+            }
+
+            const clickedKind = nativePanelKind(clickedPanel);
+            if (
+                clickedPanel !== mount.panel
+                && clickedKind !== "transcript"
+                && clickedKind !== "timeline"
+            ) {
+                return false;
+            }
+
+            // Observe only. YouTube remains responsible for its own native
+            // Transcript/Timeline surface; we close the shell we made visible.
+            dismissIntegratedPanel(mount);
+            return true;
+        }
+
+        function handlePageTranscriptOpenClick(event) {
+            const descriptionTranscriptSection = event.target?.closest?.(
+                "ytd-video-description-transcript-section-renderer"
+            );
+            const trigger = event.target?.closest?.("button, [role='button']");
+            if (
+                !descriptionTranscriptSection
+                || !trigger
+                || nativeOwnedTabKindFromText(deps.visibleText(trigger)) !== "transcript"
+            ) {
+                return false;
+            }
+
+            const mount = getMount();
+            const transcriptButton = nativeOwnedTabButton("transcript", mount);
+            if (!mount || !transcriptButton || !showNativePanel(mount)) {
+                return false;
+            }
+
+            // YouTube's description command opens a separate modern Transcript
+            // engagement panel. Route it through the existing Transcript chip
+            // instead so the integrated In this video tab row remains the one
+            // visible owner and cannot stack above a second panel.
+            event.preventDefault?.();
+            event.stopPropagation?.();
+            event.stopImmediatePropagation?.();
+
+            const currentState = state();
+            clearDismissTimeout();
+            panelCloseLifecycle.reset();
+            currentState.nativePanelDismissed = false;
+            currentState.userSelectedTab = true;
             syncContentVisibility(mount);
-            cleanupHeaderActions();
+
+            // Keep the current extension ownership in place during the click,
+            // exactly as when the person selects the in-panel Transcript chip.
+            // Its capture listener hands ownership to YouTube on the next turn,
+            // after YouTube has completed the native surface transition.
+            transcriptButton.click?.();
+            return true;
+        }
+
+        function wireHeaderActionHost(host) {
+            if (wiredHeaderActionHosts.has(host)) {
+                return;
+            }
+
+            wiredHeaderActionHosts.add(host);
+            host.addEventListener("click", (event) => {
+                if (!event.target?.closest?.(`[${NATIVE_PANEL_HEADER_COPY_ATTRIBUTE}]`)) {
+                    return;
+                }
+
+                event.preventDefault();
+                stopHeaderCopyEvent(event);
+                void deps.copyHeaderResult();
+            }, true);
         }
 
         function headerActionHost(panel) {
@@ -877,12 +1026,14 @@
 
             let host = header.querySelector(`[${NATIVE_PANEL_HEADER_ACTION_ATTRIBUTE}]`);
             if (host) {
+                wireHeaderActionHost(host);
                 return host;
             }
 
             host = doc.createElement("div");
             host.className = "yts-native-header-actions";
             host.setAttribute(NATIVE_PANEL_HEADER_ACTION_ATTRIBUTE, "");
+            wireHeaderActionHost(host);
 
             const closeControl = panelCloseControl(header);
             if (closeControl?.parentElement) {
@@ -892,6 +1043,19 @@
 
             header.append(host);
             return host;
+        }
+
+        function wireHeaderCopyButton(button) {
+            if (wiredHeaderCopyButtons.has(button)) {
+                return;
+            }
+
+            wiredHeaderCopyButtons.add(button);
+            button.addEventListener("click", (event) => {
+                event.preventDefault();
+                stopHeaderCopyEvent(event);
+                void deps.copyHeaderResult();
+            });
         }
 
         function stopHeaderCopyEvent(event) {
@@ -966,16 +1130,9 @@
                 button.type = "button";
                 button.className = "yts-native-header-copy-button";
                 button.setAttribute(NATIVE_PANEL_HEADER_COPY_ATTRIBUTE, "");
-                button.addEventListener("pointerdown", stopHeaderCopyEvent, true);
-                button.addEventListener("mousedown", stopHeaderCopyEvent, true);
-                button.addEventListener("touchstart", stopHeaderCopyEvent, true);
-                button.addEventListener("click", (event) => {
-                    event.preventDefault();
-                    stopHeaderCopyEvent(event);
-                    void deps.copyHeaderResult();
-                });
                 host.append(button);
             }
+            wireHeaderCopyButton(button);
 
             if (copyKind === "transcript" && !deps.cachedTranscriptCopyText()) {
                 deps.prefetchTranscriptForCopy();
@@ -983,11 +1140,21 @@
 
             const label = deps.copyButtonLabel(copyKind);
             const canCopy = deps.hasCopyText(copyKind);
-            button.dataset.copied = state().copyFeedback[copyKind] ? "true" : "false";
-            button.disabled = !canCopy;
-            button.setAttribute("aria-label", label);
-            button.setAttribute("title", label);
-            button.innerHTML = deps.copyIcon();
+            const copied = Boolean(state().copyFeedback[copyKind]);
+            const copiedValue = copied ? "true" : "false";
+            const iconState = copied ? "copied" : "copy";
+            if (button.dataset.copied !== copiedValue) {
+                button.dataset.copied = copiedValue;
+            }
+            if (button.disabled !== !canCopy) {
+                button.disabled = !canCopy;
+            }
+            setAttributeIfChanged(button, "aria-label", label);
+            setAttributeIfChanged(button, "title", label);
+            if (button.dataset.ytsCopyIconState !== iconState) {
+                button.innerHTML = deps.copyIcon(copied);
+                button.dataset.ytsCopyIconState = iconState;
+            }
 
             if (copyKind === "transcript" && !canCopy) {
                 scheduleTranscriptCopyRefresh(mount);
@@ -1004,6 +1171,7 @@
             if (!currentState.nativeExtensionTab) {
                 if (nextNativeYouTubeTab) {
                     currentState.nativeYouTubeTab = nextNativeYouTubeTab;
+                    currentState.userSelectedTab = true;
                     syncTabs();
                     syncPanelHostVisibility();
                     scheduleResync();
@@ -1019,61 +1187,25 @@
             scheduleResync();
         }
 
-        function handleYouTubeControlClick(event) {
-            const rawTarget = event.target || null;
-            const target = rawTarget?.closest?.("button, [role='button'], a, tp-yt-paper-icon-button, yt-icon-button, ytd-button-renderer, yt-button-shape");
-            const mount = getMount();
-            if (isNativePanelCloseTarget(rawTarget, target, mount)) {
-                dismissNativePanel(mount);
-                return;
-            }
-
-            if (!target || target.hasAttribute(NATIVE_PANEL_TAB_ATTRIBUTE) || panelHost()?.contains(target)) {
-                return;
-            }
-
-            const nativeYouTubeTab = nativeOwnedTabKindFromText(deps.visibleText(target));
-            if (!nativeYouTubeTab) {
-                return;
-            }
-
-            const clickIsNativeTab = Boolean(mount?.tabList?.contains(target));
-            const currentState = state();
-            currentState.nativePanelDismissed = false;
-            if (nativeYouTubeTab === "transcript" && !clickIsNativeTab && nativeOwnedTabButton("transcript", mount)) {
-                event.preventDefault();
-                event.stopPropagation();
-                event.stopImmediatePropagation?.();
-                currentState.userSelectedTab = true;
-                restoreNativeOwnedElements(restoreRoot(mount));
-                keepVisible(mount, { hideSiblings: false });
-                selectNativeOwnedTab("transcript", mount);
-                revealNativeOwnedTab("transcript", mount, { revealPanel: true, focus: true });
-                syncPanelHostVisibility();
-                scheduleResync();
-                return;
-            }
-
-            if (!currentState.nativeExtensionTab) {
-                currentState.userSelectedTab = true;
-                currentState.nativeYouTubeTab = nativeYouTubeTab;
-                scheduleNativeOwnedTabSelection(nativeYouTubeTab);
-                return;
-            }
-
-            currentState.userSelectedTab = true;
-            scheduleNativeOwnedTabSelection(nativeYouTubeTab);
-        }
-
         function attachNativeOwnedTabListener(tabList) {
-            if (tabList.dataset.ytsNativeTabListener === "true") {
+            if (wiredNativeTabLists.has(tabList)) {
                 return;
             }
 
+            wiredNativeTabLists.add(tabList);
             tabList.dataset.ytsNativeTabListener = "true";
             tabList.addEventListener("click", (event) => {
-                const target = event.target?.closest?.("button[role='tab'], button");
-                if (!target || target.hasAttribute(NATIVE_PANEL_TAB_ATTRIBUTE)) {
+                const target = event.target?.closest?.("[role='tab'], button");
+                if (!target) {
+                    return;
+                }
+
+                const extensionKind = target.getAttribute(NATIVE_PANEL_TAB_ATTRIBUTE);
+                if (extensionKind) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.stopImmediatePropagation?.();
+                    void handleExtensionTabSelection(extensionKind);
                     return;
                 }
 
@@ -1083,10 +1215,6 @@
 
         function syncTabs(mount = getMount()) {
             if (!mount) {
-                if (nativePanelTabSwitchInProgress) {
-                    syncPanelHostVisibility();
-                    return null;
-                }
                 cleanupTabs();
                 cleanupHeaderActions();
                 syncContentVisibility(null);
@@ -1120,58 +1248,25 @@
 
                 const currentState = state();
                 const selected = currentState.nativeExtensionTab === kind;
-                button.textContent = tabLabel(kind);
-                button.setAttribute("aria-label", tabAriaLabel(kind));
-                button.setAttribute("aria-selected", selected ? "true" : "false");
-                button.setAttribute("aria-busy", currentState.isLoading[kind] ? "true" : "false");
+                setTextContentIfChanged(button, tabLabel(kind));
+                setAttributeIfChanged(button, "aria-label", tabAriaLabel(kind));
+                setAttributeIfChanged(button, "aria-selected", selected ? "true" : "false");
+                setAttributeIfChanged(button, "aria-busy", currentState.isLoading[kind] ? "true" : "false");
             }
 
             reorderTabs(mount);
             syncNativeOwnedTabVisibility(mount);
-            syncOwnedTabPressedState(mount);
+            syncNativeOwnedTabSelectionAppearance(mount);
             syncContentVisibility(mount);
             syncBodyViewport(mount);
             syncHeaderCopyButton(mount);
             return mount;
         }
 
-        function syncOwnedTabPressedState(mount = getMount()) {
-            if (!mount?.tabList) {
-                return;
-            }
-
-            const extensionTabIsActive = Boolean(state().nativeExtensionTab);
-            const selectedNativeTab = extensionTabIsActive ? "" : state().nativeYouTubeTab;
-            mount.tabList.dataset.ytsExtensionTabActive = extensionTabIsActive ? "true" : "false";
-
-            for (const button of mount.tabList.querySelectorAll("button[role='tab'], button")) {
-                if (button.hasAttribute(NATIVE_PANEL_TAB_ATTRIBUTE)) {
-                    continue;
-                }
-
-                if (!extensionTabIsActive && !selectedNativeTab) {
-                    continue;
-                }
-
-                const selected = !extensionTabIsActive
-                    && nativeOwnedTabKindFromText(deps.visibleText(button)) === selectedNativeTab;
-                button.setAttribute("aria-selected", selected ? "true" : "false");
-                if (button.hasAttribute("aria-pressed")) {
-                    button.setAttribute("aria-pressed", selected ? "true" : "false");
-                }
-
-                const chip = button.querySelector(".ytChipShapeChip, [class*='ytChipShapeChip']");
-                if (chip?.classList) {
-                    chip.classList.toggle("ytChipShapeSelected", selected);
-                    chip.classList.toggle("ytChipShapeActive", selected);
-                    chip.classList.toggle("ytChipShapeInactive", !selected);
-                }
-            }
-        }
-
         async function handleExtensionTabSelection(kind) {
             clearTabSwitch();
             const currentState = state();
+            clearDismissTimeout();
             currentState.activeTab = kind;
             currentState.nativeExtensionTab = kind;
             currentState.nativeYouTubeTab = "";
@@ -1232,22 +1327,30 @@
             cleanupTabs,
             clearResync,
             clearTabSwitch,
+            clearDismissTimeout,
             clearTranscriptCopyRefresh,
             extensionTabKinds,
             getMount,
-            handleYouTubeControlClick,
+            hasNativeChapterSurface,
+            hasNativeOwnedTab,
             headerCopyKind,
+            handlePagePanelCloseClick,
+            handlePageTranscriptOpenClick,
             open,
             scheduleResync,
             scheduleTranscriptCopyRefresh,
+            selectExtensionTab: handleExtensionTabSelection,
             selectDefaultExtensionTab,
             syncBodyViewport,
             syncContentVisibility,
+            syncHeaderCopyButton,
+            syncNativeOwnedTabSelectionAppearance,
             syncTabs,
         };
     }
 
     globalScope.YouTubeTimestampsNativePanel = {
+        createPanelCloseLifecycle,
         createNativePanelController,
     };
 

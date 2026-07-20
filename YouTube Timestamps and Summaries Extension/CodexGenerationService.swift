@@ -60,7 +60,10 @@ final class CodexGenerationService {
         let startedAt = Date()
         let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
-        let safeModel = requestedModel.isEmpty ? GenerationSettings.defaultModelID : requestedModel
+        let safeModel = GenerationSettings.normalizedModelID(
+            requestedModel,
+            providerID: GenerationSettings.chatGPTProviderID
+        )
         let languageContext = LanguageContext(code: languageCode, label: languageLabel)
 
         do {
@@ -127,7 +130,10 @@ final class CodexGenerationService {
         let startedAt = Date()
         let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
-        let safeModel = requestedModel.isEmpty ? GenerationSettings.defaultModelID : requestedModel
+        let safeModel = GenerationSettings.normalizedModelID(
+            requestedModel,
+            providerID: GenerationSettings.chatGPTProviderID
+        )
         let languageContext = LanguageContext(code: languageCode, label: languageLabel)
 
         do {
@@ -307,6 +313,9 @@ final class CodexGenerationService {
         for try await line in bytes.lines {
             if httpResponse.statusCode != 200 {
                 if errorBody.count < 4_000 {
+                    if !errorBody.isEmpty {
+                        errorBody += "\n"
+                    }
                     errorBody += line
                 }
                 continue
@@ -565,32 +574,49 @@ final class CodexGenerationService {
     }
 
     private func errorMessage(from text: String) -> String? {
-        guard let data = text.data(using: .utf8) else {
-            return nil
+        if let data = text.data(using: .utf8), let message = errorMessage(from: data) {
+            return message
         }
-        return errorMessage(from: data)
+
+        for rawLine in text.split(whereSeparator: \.isNewline) {
+            var line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.hasPrefix("data:") {
+                line = String(line.dropFirst("data:".count))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard
+                !line.isEmpty,
+                line != "[DONE]",
+                let data = line.data(using: .utf8),
+                let message = errorMessage(from: data)
+            else {
+                continue
+            }
+            return message
+        }
+
+        return nil
     }
 
     private func errorMessage(from event: [String: Any]) -> String? {
         if let error = event["error"] as? [String: Any] {
-            return (error["message"] as? String) ?? (error["code"] as? String)
+            return (error["message"] as? String)
+                ?? (error["error_description"] as? String)
+                ?? (error["code"] as? String)
         }
-        return event["message"] as? String
+        if let response = event["response"] as? [String: Any], let message = errorMessage(from: response) {
+            return message
+        }
+        return (event["error_description"] as? String)
+            ?? (event["message"] as? String)
+            ?? (event["detail"] as? String)
+            ?? (event["error"] as? String)
     }
 
     private func errorMessage(from data: Data) -> String? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil
         }
-
-        if let error = json["error"] as? [String: Any] {
-            return (error["message"] as? String)
-                ?? (error["error_description"] as? String)
-                ?? (error["code"] as? String)
-        }
-
-        return (json["error_description"] as? String)
-            ?? (json["message"] as? String)
-            ?? (json["error"] as? String)
+        return errorMessage(from: json)
     }
 }

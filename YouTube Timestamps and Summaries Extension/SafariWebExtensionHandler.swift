@@ -72,11 +72,14 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         case "openContainerApp":
             return await openContainerApp(from: context)
 
-        case "saveChapterPreference":
-            return await saveChapterPreference(payload)
-
         case "generateContent":
             let kind = payload["kind"] as? String ?? "timestamps"
+            guard kind == "summaryFull" else {
+                return [
+                    "ok": false,
+                    "error": "Unsupported Apple Intelligence request: \(kind)",
+                ]
+            }
             let transcript = payload["transcript"] as? String ?? ""
             let languageCode = payload["languageCode"] as? String ?? ""
             let languageLabel = payload["languageLabel"] as? String ?? ""
@@ -141,19 +144,6 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 "error": "Unsupported native action: \(action)"
             ]
         }
-    }
-
-    private func saveChapterPreference(_ payload: [String: Any]) async -> [String: Any] {
-        let currentSettings = GenerationSettings.load()
-        let nextSettings = GenerationSettings(
-            providerID: currentSettings.providerID,
-            modelID: currentSettings.modelID,
-            summaryEngine: currentSettings.summaryEngine,
-            summaryModelID: currentSettings.summaryModelID,
-            chapterPreference: payload["chapterPreference"] as? String ?? currentSettings.chapterPreference
-        )
-        nextSettings.save()
-        return await statusPayload()
     }
 
     private func openContainerApp(from context: NSExtensionContext) async -> [String: Any] {

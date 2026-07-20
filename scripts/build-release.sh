@@ -12,7 +12,7 @@ ARCHIVE_PATH="${ARCHIVE_PATH:-$BUILD_ROOT/$SCHEME.xcarchive}"
 EXPORT_PATH="${EXPORT_PATH:-$BUILD_ROOT/export}"
 ARTIFACTS_PATH="${ARTIFACTS_PATH:-$BUILD_ROOT/artifacts}"
 EXPORT_OPTIONS_PATH="${EXPORT_OPTIONS_PATH:-$BUILD_ROOT/ExportOptions-DeveloperID.plist}"
-ZIP_PATH="${ZIP_PATH:-$ARTIFACTS_PATH/$SCHEME.zip}"
+ZIP_PATH="${ZIP_PATH:-$ARTIFACTS_PATH/Timestamps-and-Summaries-for-YT.zip}"
 NOTARIZE="${NOTARIZE:-0}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 CLEAN="${CLEAN:-1}"
@@ -119,8 +119,10 @@ main() {
     echo "==> Building zip artifact"
     zip_app "$app_path"
 
-    echo "==> Gatekeeper assessment before notarization"
-    spctl -a -vv "$app_path" || true
+    echo "==> Informational Gatekeeper assessment before notarization"
+    if ! spctl -a -vv "$app_path"; then
+        echo "Gatekeeper rejection is expected before notarization; continuing." >&2
+    fi
 
     if [[ "$NOTARIZE" == "1" ]]; then
         echo "==> Submitting zip for notarization"
@@ -128,13 +130,13 @@ main() {
 
         echo "==> Stapling notarization ticket"
         xcrun stapler staple "$app_path"
-        xcrun stapler validate "$app_path" || true
+        xcrun stapler validate "$app_path"
 
         echo "==> Rebuilding zip artifact after stapling"
         zip_app "$app_path"
 
         echo "==> Gatekeeper assessment after notarization"
-        spctl -a -vv "$app_path" || true
+        spctl -a -vv "$app_path"
     fi
 
     echo

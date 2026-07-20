@@ -2,13 +2,15 @@
 
 Date: 2026-07-01
 
-This note captures the investigation before changing the current sidebar implementation. It is intended as a checkpoint for the planned move from an extension-owned sidebar toward the native YouTube `In this video` surface.
+Status: **Historical design record.**
 
-Implementation follow-up: the native panel work is now documented in [native-panel-integration.md](native-panel-integration.md). This file remains as the original investigation and design checkpoint.
+This note captures the investigation performed before changing the original standalone-sidebar implementation. It is a checkpoint for the move from an extension-owned sidebar toward the native YouTube `In this video` surface, not a description of the shipping implementation.
 
-## Current App Baseline
+The implemented native panel, automatic `Key moments`, source switching, control routing, and navigation lifecycle are documented in [native-panel-integration.md](native-panel-integration.md). This file remains only as the original investigation and design checkpoint.
 
-The current Safari WebExtension injects one shadow-root sidebar on supported YouTube watch and live pages.
+## Baseline At Time Of Investigation
+
+At the time of this investigation, the Safari WebExtension injected one shadow-root sidebar on supported YouTube watch and live pages.
 
 - Host ID: `youtube-timestamps-sidebar-root`
 - Mount target: `ytd-watch-flexy #secondary-inner` or `#secondary`
@@ -17,7 +19,7 @@ The current Safari WebExtension injects one shadow-root sidebar on supported You
 - Summary generation: Apple Intelligence or selected provider
 - Autogeneration: both available jobs can start automatically when the panel is present
 
-Important current files:
+Important files at that time:
 
 - `YouTube Timestamps and Summaries Extension/Resources/content.js`
 - `YouTube Timestamps and Summaries Extension/Resources/youtube-helpers.js`
@@ -134,7 +136,8 @@ Potential tests:
 - no chapters returns an empty list
 - generated timestamp text still parses into chapter items
 - autogeneration skips timestamp generation when native chapters exist
-- fallback sidebar still mounts when native panel injection is unavailable
+- autogeneration still creates Summary when native chapters satisfy the Chapters result and a transcript plus summary engine are available
+- fallback sidebar still mounts when native panel injection is unavailable and a transcript is confirmed
 
 ## Open Risks
 
@@ -142,7 +145,7 @@ Potential tests:
 - Panel chips and source panels are hidden until user interaction, so injection must survive delayed rendering.
 - YouTube may localize visible labels, so labels are not stable selectors.
 - Mobile YouTube may differ from desktop YouTube and may need a separate fallback.
-- Native panel insertion needs careful testing around livestreams, transcript-unavailable videos, comments panels, and Shorts navigation.
+- Native panel insertion needs careful testing around livestreams, transcript-unavailable videos, comments panels, and Shorts navigation; transcript-unavailable pages without a native shell must remain untouched.
 
 ## External Reference
 

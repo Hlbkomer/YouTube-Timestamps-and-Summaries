@@ -9,7 +9,7 @@ The sidebar has one `Summary` tab. When Apple Intelligence is selected as the su
 
 Selected-provider summaries are not affected by this switch. Grok and ChatGPT summaries continue to use the model selected in the companion app on all supported macOS versions.
 
-Successful Apple summaries on macOS 27 display the active engine and elapsed time in the result caption, for example: “Generated with Apple Intelligence in 150 seconds.” Selected-provider timestamps and summaries use the same caption area with their model name, for example: “Generated with Grok 4.5 in 8 seconds.”
+Successful Apple summaries on macOS 27 display the active engine and elapsed time in the result caption, for example: “Generated with Apple Intelligence in 150 seconds.” Selected-provider summaries use the same wording with their model name. Generated timestamp results use the chapter-specific form, for example: “Chapters generated with Grok 4.5 in 8 seconds.”
 
 ## Why T27 and S27 Were Removed
 

@@ -30,6 +30,32 @@ test("getNavigationURL extracts YouTube SPA destination URLs", () => {
     assert.equal(fromEndpoint, "https://www.youtube.com/live/Kgm0P-uH-vM");
 });
 
+test("getNavigationResponse extracts fresh YouTube SPA page data", () => {
+    const response = { engagementPanels: [{ id: "new-video-panel" }] };
+    const nestedResponse = { contents: { id: "page-data" } };
+
+    assert.equal(helpers.getNavigationResponse({ detail: { response } }), response);
+    assert.equal(helpers.getNavigationResponse({
+        detail: { pageData: { response: nestedResponse } },
+    }), nestedResponse);
+    assert.equal(helpers.getNavigationResponse({ detail: { response: [] } }), null);
+    assert.equal(helpers.getNavigationResponse({}), null);
+});
+
+test("getNavigationResponseVideoKey validates SPA data ownership", () => {
+    assert.equal(helpers.getNavigationResponseVideoKey({
+        playerResponse: { videoDetails: { videoId: "newVideo" } },
+    }), "newVideo");
+    assert.equal(helpers.getNavigationResponseVideoKey({
+        currentEndpoint: {
+            commandMetadata: {
+                webCommandMetadata: { url: "/watch?v=endpointVideo" },
+            },
+        },
+    }), "endpointVideo");
+    assert.equal(helpers.getNavigationResponseVideoKey({}), "");
+});
+
 test("extractVideoKey resolves watch, live, canonical, and player-response sources", () => {
     assert.equal(helpers.extractVideoKey({
         currentUrl: "https://www.youtube.com/watch?v=abc123",
@@ -133,6 +159,51 @@ test("parseNativeYouTubeChapters reads macro marker engagement panels", () => {
     ]);
 });
 
+test("parseNativeYouTubeChapters finds Key moments in nested macro-marker data", () => {
+    const parsed = helpers.parseNativeYouTubeChapters({
+        frameworkUpdates: {
+            entityBatchUpdate: {
+                mutations: [{
+                    payload: {
+                        keyMomentsSurface: {
+                            content: {
+                                macroMarkersListRenderer: {
+                                    contents: [
+                                        {
+                                            macroMarkersInfoItemRenderer: {
+                                                infoText: { simpleText: "Key moments" },
+                                            },
+                                        },
+                                        {
+                                            macroMarkersListItemRenderer: {
+                                                title: { simpleText: "Opening" },
+                                                timeDescription: { simpleText: "0:00" },
+                                            },
+                                        },
+                                        {
+                                            macroMarkersListItemRenderer: {
+                                                title: { simpleText: "Main result" },
+                                                navigationEndpoint: {
+                                                    watchEndpoint: { startTimeSeconds: 145 },
+                                                },
+                                            },
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                }],
+            },
+        },
+    });
+
+    assert.deepEqual(parsed, [
+        { time: "0:00", label: "Opening", seconds: 0 },
+        { time: "2:25", label: "Main result", seconds: 145 },
+    ]);
+});
+
 test("parseNativeYouTubeChapters falls back to player bar chapters", () => {
     const parsed = helpers.parseNativeYouTubeChapters({
         playerOverlays: {
@@ -205,6 +276,73 @@ test("parseNativeYouTubeChapters deduplicates repeated native chapter entries", 
 
     assert.deepEqual(parsed, [
         { time: "0:00", label: "Intro", seconds: 0 },
+    ]);
+});
+
+test("parseNativeYouTubeChaptersFromDOM reads YouTube's live macro-marker nodes", () => {
+    function chapterNode(title, time) {
+        const titleNode = {
+            textContent: title,
+            getAttribute: () => title,
+        };
+        const timeNode = {
+            textContent: time,
+            getAttribute: () => "",
+        };
+        const detailsNode = {
+            querySelector(selector) {
+                if (selector.includes("h3.macro-markers")) {
+                    return titleNode;
+                }
+                if (selector.includes("#time")) {
+                    return timeNode;
+                }
+                return null;
+            },
+        };
+
+        return {
+            querySelector(selector) {
+                return selector === "#details:not([hidden])" ? detailsNode : null;
+            },
+        };
+    }
+
+    const root = {
+        querySelectorAll(selector) {
+            assert.equal(selector, "ytd-macro-markers-list-item-renderer");
+            return [
+                chapterNode("Show Open", "0:00"),
+                chapterNode("Headlines", "5:00"),
+            ];
+        },
+    };
+
+    assert.deepEqual(helpers.parseNativeYouTubeChaptersFromDOM(root), [
+        { time: "0:00", label: "Show Open", seconds: 0 },
+        { time: "5:00", label: "Headlines", seconds: 300 },
+    ]);
+});
+
+test("parseNativeYouTubeChaptersFromDOM prefers renderer data when available", () => {
+    const root = {
+        querySelectorAll() {
+            return [{
+                data: {
+                    title: { simpleText: "Deep Dive" },
+                    timeDescription: { simpleText: "12:34" },
+                    onTap: {
+                        watchEndpoint: {
+                            startTimeSeconds: 754,
+                        },
+                    },
+                },
+            }];
+        },
+    };
+
+    assert.deepEqual(helpers.parseNativeYouTubeChaptersFromDOM(root), [
+        { time: "12:34", label: "Deep Dive", seconds: 754 },
     ]);
 });
 

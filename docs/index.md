@@ -9,7 +9,7 @@ Timestamps & Summaries for YT is a Safari extension and macOS companion app that
 - chronological timestamps for YouTube videos
 - short summaries for YouTube videos
 
-The extension integrates with YouTube's native `In this video` panel when available, with a standalone sidebar fallback. It reads the available YouTube transcript, creates summaries with Apple Intelligence on the Mac or the selected provider, and creates chapters/timestamps when the selected provider is ready. No API key or developer backend is required.
+The extension integrates with YouTube's native `In this video` panel when available, with a standalone sidebar fallback only after a usable transcript is confirmed. If neither the native shell nor a transcript exists, it leaves the page untouched. It creates summaries with Apple Intelligence on the Mac or the selected provider, and creates chapters/timestamps when the selected provider is ready. No API key or developer backend is required.
 
 ![Companion app screenshot](readme-assets/companion-app.png)
 
@@ -24,16 +24,20 @@ The extension integrates with YouTube's native `In this video` panel when availa
 5. The selected provider or Apple Intelligence creates the summary, depending on the user's setting.
 6. The extension validates timestamp candidates against real transcript cue times before showing clickable generated chapters.
 
-When YouTube already provides native chapters, the extension uses those chapters and skips generated timestamp creation for that video by default. The companion app and Safari popup can switch the default to always generate extension chapters, and the Safari popup can override the current video between YouTube chapters and generated chapters. When generated chapters are shown, the currently playing generated chapter is highlighted during playback.
+When YouTube already provides creator chapters or automatic `Key moments`, the extension imports them into the same compact Chapters list and skips generated timestamp creation for that video by default. The companion app can switch the default to always generate extension chapters. The Chapters footer identifies the active source and offers `Generate chapters from transcript` before a matching generated result exists, `View generated chapters` once it is cached, or `View YouTube chapters` when switching back. The Safari toolbar popup contains only Settings; current-video source switching lives beside the result so page state has one owner. The currently playing chapter is highlighted during playback regardless of source.
 
-Successful results include a small caption with the active model or Apple Intelligence plus elapsed generation time, for example `Generated with Grok 4.5 in 8 seconds.` or `Generated with Apple Intelligence in 150 seconds.` In the native panel, generated timestamps are presented as `Chapters`; in the standalone fallback they remain `Timestamps`.
+Imported chapters resolve only the Chapters result: Summary still starts automatically whenever its configured engine and the shared transcript are available. Lazy native chapter discovery renders `Checking for YouTube chapters...` rather than a temporary empty result. If both the native `In this video` shell and a usable transcript are absent, the page is left unchanged; when only the shell is absent, a confirmed transcript can still use the standalone fallback.
+
+During YouTube watch-to-watch navigation, the extension keeps the outgoing tab chrome stable until the destination commits, then clears the previous video's rows before rendering the new result. Async generation is matched by video key and monotonic generation ID, preventing stale work from changing the destination result or clearing its `Chapters...` busy state during tab switching. When navigation commits to the homepage or another non-video page, the integration is removed cleanly. A lightweight route guard on feeds/homepage forces watch/live links through a real navigation so Safari reliably injects the full video-page integration, while Shorts and other non-video pages remain untouched.
+
+Successful results include a small caption with the active model or Apple Intelligence plus elapsed generation time. Generated chapters use `Chapters generated with Grok 4.5 in 8 seconds.`; summaries use `Generated with Grok 4.5 in 8 seconds.` or `Generated with Apple Intelligence in 150 seconds.` In the native panel, generated timestamps are presented as `Chapters`; in the standalone fallback they remain `Timestamps`.
 
 ## Requirements
 
-- macOS 26 or later
+- macOS 26.4 or later
 - optional ChatGPT/Codex or Grok sign-in for timestamps and model-powered summaries.
 - Apple Intelligence enabled and compatible Apple silicon hardware only if Apple Intelligence is selected for summaries
-- a YouTube video with captions or an available transcript
+- captions or an available transcript for generated results; imported YouTube chapters can display without one
 
 ## Data Flow
 
@@ -47,6 +51,10 @@ Successful results include a small caption with the active model or Apple Intell
 The native YouTube panel implementation notes are documented in [native-panel-integration.md](native-panel-integration.md).
 
 The Grok and ChatGPT/Codex picker catalog behavior, model exclusions, and remote catalog maintenance process are documented in [model-catalog.md](model-catalog.md).
+
+The repository-wide maintenance findings, justified Safari workarounds, and recommended cleanup order are documented in [code-complexity-review.md](code-complexity-review.md).
+
+The current version 1.1 behavior audit, automated validation, and remaining manual release gates are documented in [release-1.1-readiness.md](release-1.1-readiness.md).
 
 ## Download And Support
 

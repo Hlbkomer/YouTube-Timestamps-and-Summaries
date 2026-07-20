@@ -9,12 +9,10 @@ const providerSelect = document.getElementById("provider-select");
 const modelSelect = document.getElementById("model-select");
 const chapterPreferenceSelect = document.getElementById("chapter-preference-select");
 const summarySelect = document.getElementById("summary-select");
-const generationSetupHint = document.getElementById("generation-setup-hint");
 const codexSignInButton = document.getElementById("codex-sign-in");
 const codexSignOutButton = document.getElementById("codex-sign-out");
 const copyCodexCodeButton = document.getElementById("copy-codex-code");
 const grokStatus = document.getElementById("grok-status");
-const grokSubscriptionHint = document.getElementById("grok-subscription-hint");
 const grokSignInButton = document.getElementById("grok-sign-in");
 const grokSignOutButton = document.getElementById("grok-sign-out");
 const grokPairing = document.getElementById("grok-pairing");
@@ -44,9 +42,19 @@ function renderChecklist() {
 function renderOptions(select, options, selectedID) {
     const currentValue = select.value || selectedID;
     select.innerHTML = options
-        .map((option) => `<option value="${option.id}">${option.label}</option>`)
+        .map((option) => `<option value="${option.id}"${option.disabled ? " disabled" : ""}>${option.label}</option>`)
         .join("");
     select.value = selectedID || currentValue;
+}
+
+function providerIsConnected(providerID, state) {
+    if (providerID === "openaiCodex") {
+        return Boolean(state.codex?.connected);
+    }
+    if (providerID === "xaiOAuth") {
+        return Boolean(state.grok?.connected);
+    }
+    return false;
 }
 
 function saveGenerationSettings() {
@@ -64,19 +72,22 @@ window.renderAppState = function renderAppState(state) {
 
     const label = settingsLabel(Boolean(state.usesSettingsLabel));
     const settings = state.settings || {};
+    const selectedProviderID = settings.providerID || "openaiCodex";
+    const providerOptions = (state.providerOptions || []).map((option) => ({
+        ...option,
+        disabled: !providerIsConnected(option.id, state),
+    }));
+    const selectedProviderConnected = providerIsConnected(selectedProviderID, state);
 
-    renderOptions(providerSelect, state.providerOptions || [], settings.providerID || "openaiCodex");
-    renderOptions(modelSelect, state.modelOptions || [], settings.modelID || "gpt-5.5");
+    renderOptions(providerSelect, providerOptions, selectedProviderID);
+    renderOptions(modelSelect, state.modelOptions || [], settings.modelID || "gpt-5.6-terra");
     renderOptions(chapterPreferenceSelect, state.chapterPreferenceOptions || [], settings.chapterPreference || "preferNative");
     renderOptions(summarySelect, state.summaryOptions || [], settings.summaryModelID || settings.modelID || "appleIntelligence");
 
     const chatGPTConnected = Boolean(state.codex?.connected);
-    const selectedProviderConnected = Boolean(state.selectedProviderConnected);
-    providerSelect.disabled = false;
+    providerSelect.disabled = providerOptions.length === 0 || providerOptions.every((option) => option.disabled);
+    providerSelect.dataset.selectedUnavailable = String(!selectedProviderConnected);
     modelSelect.disabled = !selectedProviderConnected;
-    generationSetupHint.textContent = selectedProviderConnected
-        ? ""
-        : "Connect the selected provider to enable its timestamp model settings.";
 
     if (chatGPTConnected) {
         codexStatus.textContent = "ChatGPT is connected.";
@@ -84,9 +95,7 @@ window.renderAppState = function renderAppState(state) {
         codexSignInButton.hidden = true;
         codexSignOutButton.hidden = false;
     } else {
-        codexStatus.textContent = state.codex?.error
-            ? `ChatGPT is not connected: ${state.codex.error}`
-            : "ChatGPT is not connected. Apple Intelligence summaries still work when available.";
+        codexStatus.textContent = "ChatGPT is not connected.";
         codexStatus.dataset.state = "missing";
         codexSignInButton.hidden = false;
         codexSignOutButton.hidden = true;
@@ -94,16 +103,13 @@ window.renderAppState = function renderAppState(state) {
 
     const grokConnected = Boolean(state.grok?.connected);
     const grokLoginInProgress = Boolean(state.grokLogin);
-    grokSubscriptionHint.hidden = grokConnected;
     if (grokConnected) {
         grokStatus.textContent = "Grok is connected.";
         grokStatus.dataset.state = "connected";
         grokSignInButton.hidden = true;
         grokSignOutButton.hidden = false;
     } else {
-        grokStatus.textContent = state.grok?.error
-            ? `Grok is not connected: ${state.grok.error}`
-            : "Grok is not connected.";
+        grokStatus.textContent = "Grok is not connected.";
         grokStatus.dataset.state = "missing";
         grokSignInButton.hidden = false;
         grokSignOutButton.hidden = true;

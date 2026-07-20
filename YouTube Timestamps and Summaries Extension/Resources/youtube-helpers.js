@@ -45,6 +45,37 @@
         return "";
     }
 
+    function getNavigationResponse(event) {
+        const candidates = [
+            event?.detail?.response,
+            event?.detail?.pageData?.response,
+            event?.detail?.pageData,
+        ];
+
+        return candidates.find((candidate) => (
+            candidate
+            && typeof candidate === "object"
+            && !Array.isArray(candidate)
+        )) || null;
+    }
+
+    function getNavigationResponseVideoKey(response) {
+        const directVideoKey = response?.playerResponse?.videoDetails?.videoId
+            || response?.response?.playerResponse?.videoDetails?.videoId
+            || response?.videoDetails?.videoId
+            || response?.currentEndpoint?.watchEndpoint?.videoId
+            || "";
+        if (typeof directVideoKey === "string" && directVideoKey.trim()) {
+            return directVideoKey.trim();
+        }
+
+        const endpointURL = response?.currentEndpoint
+            ?.commandMetadata
+            ?.webCommandMetadata
+            ?.url;
+        return extractVideoKey({ currentUrl: endpointURL || "" });
+    }
+
     function extractVideoKey({
         currentUrl = "",
         canonicalHref = "",
@@ -227,6 +258,43 @@
         return uniqueChapters(chapters);
     }
 
+    function parseNestedMacroMarkerChapters(initialData) {
+        if (!initialData || typeof initialData !== "object") {
+            return [];
+        }
+
+        const chapters = [];
+        const pending = [initialData];
+        const visited = new WeakSet();
+
+        while (pending.length > 0) {
+            const value = pending.pop();
+            if (!value || typeof value !== "object" || visited.has(value)) {
+                continue;
+            }
+            visited.add(value);
+
+            const marker = value.macroMarkersListItemRenderer;
+            if (marker) {
+                const chapter = chapterItem(
+                    textFromRuns(marker.title),
+                    macroMarkerStartSeconds(marker),
+                );
+                if (chapter) {
+                    chapters.push(chapter);
+                }
+            }
+
+            for (const child of Array.isArray(value) ? value : Object.values(value)) {
+                if (child && typeof child === "object") {
+                    pending.push(child);
+                }
+            }
+        }
+
+        return uniqueChapters(chapters);
+    }
+
     function parsePlayerBarChapters(initialData) {
         const markersMap = initialData?.playerOverlays
             ?.playerOverlayRenderer
@@ -282,7 +350,84 @@
             return macroMarkerChapters;
         }
 
+        // Automatic chapters can be presented as "Key moments" and YouTube
+        // may nest their macro-marker list below a different engagement-panel
+        // wrapper. The item renderer is the stable data contract, not the
+        // English surface title or one fixed parent path.
+        const nestedMacroMarkerChapters = parseNestedMacroMarkerChapters(initialData);
+        if (nestedMacroMarkerChapters.length > 0) {
+            return nestedMacroMarkerChapters;
+        }
+
         return parsePlayerBarChapters(initialData);
+    }
+
+    function querySelectorAllSafe(root, selector) {
+        try {
+            return Array.from(root?.querySelectorAll?.(selector) || []);
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function querySelectorSafe(root, selector) {
+        try {
+            return root?.querySelector?.(selector) || null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function normalizedDOMText(node) {
+        return String(node?.textContent || node?.getAttribute?.("title") || "")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function chapterRendererData(node) {
+        const candidates = [
+            node?.data,
+            node?.__data?.data,
+            node?.__dataHost?.data,
+        ];
+
+        for (const candidate of candidates) {
+            const renderer = candidate?.macroMarkersListItemRenderer || candidate;
+            if (renderer?.title || renderer?.timeDescription || renderer?.onTap || renderer?.repeatButton) {
+                return renderer;
+            }
+        }
+
+        return null;
+    }
+
+    function chapterFromDOMNode(node) {
+        const renderer = chapterRendererData(node);
+        if (renderer) {
+            return chapterItem(
+                textFromRuns(renderer.title),
+                macroMarkerStartSeconds(renderer),
+            );
+        }
+
+        const visibleDetails = querySelectorSafe(node, "#details:not([hidden])") || node;
+        const titleNode = querySelectorSafe(
+            visibleDetails,
+            "h3.macro-markers:not([hidden]), h3:not([hidden])[title], [data-title]:not([hidden])",
+        );
+        const timeNode = querySelectorSafe(visibleDetails, "#time:not([hidden]), #time-description:not([hidden])");
+        const title = normalizedDOMText(titleNode);
+        const timeMatch = normalizedDOMText(timeNode).match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/);
+        if (!title || !timeMatch) {
+            return null;
+        }
+
+        return chapterItem(title, timeToSeconds(timeMatch[0]));
+    }
+
+    function parseNativeYouTubeChaptersFromDOM(root) {
+        const items = querySelectorAllSafe(root, "ytd-macro-markers-list-item-renderer");
+        return uniqueChapters(items.map(chapterFromDOMNode));
     }
 
     function hasNativeYouTubeChapters(initialData) {
@@ -461,12 +606,15 @@
         canGenerateTimestampsFromStatus,
         defaultGenerationTab,
         extractVideoKey,
+        getNavigationResponse,
+        getNavigationResponseVideoKey,
         getNavigationURL,
         hasNativeYouTubeChapters,
         isShortsURL,
         isVideoURL,
         isWatchURL,
         parseNativeYouTubeChapters,
+        parseNativeYouTubeChaptersFromDOM,
         parseTimestamps,
         renderSummaryHTML,
         renderSummaryInlineHTML,

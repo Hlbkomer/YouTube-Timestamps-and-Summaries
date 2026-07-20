@@ -2,6 +2,9 @@ const {
     getNavigationURL,
     isVideoURL,
 } = globalThis.YouTubeTimestampsHelpers;
+const VIDEO_URL_CHECK_INTERVAL_MS = 250;
+let lastObservedURL = window.location.href;
+let videoReloadRequested = false;
 
 // This lightweight guard is the only script that should run on non-video
 // YouTube pages. It turns watch/live SPA navigations into full navigations so
@@ -17,6 +20,26 @@ function hasModifierKey(event) {
 
 function navigate(url) {
     window.location.assign(new URL(url, window.location.origin).toString());
+}
+
+function reloadCurrentVideoPage() {
+    if (videoReloadRequested || !isVideoURL(window.location.href)) {
+        return false;
+    }
+
+    videoReloadRequested = true;
+    window.location.reload();
+    return true;
+}
+
+function checkForVideoURLChange() {
+    const currentURL = window.location.href;
+    if (currentURL === lastObservedURL) {
+        return;
+    }
+
+    lastObservedURL = currentURL;
+    reloadCurrentVideoPage();
 }
 
 document.addEventListener("click", (event) => {
@@ -73,10 +96,12 @@ document.addEventListener("yt-navigate-start", (event) => {
     navigate(nextURL);
 });
 
-window.addEventListener("popstate", () => {
-    if (!isVideoURL(window.location.href)) {
-        return;
-    }
-
-    navigate(window.location.href);
+document.addEventListener("yt-navigate-finish", () => {
+    reloadCurrentVideoPage();
 });
+
+window.addEventListener("popstate", () => {
+    reloadCurrentVideoPage();
+});
+
+window.setInterval(checkForVideoURLChange, VIDEO_URL_CHECK_INTERVAL_MS);

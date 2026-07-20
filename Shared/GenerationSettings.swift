@@ -1,11 +1,11 @@
 //
 //  GenerationSettings.swift
-//  Timestamps & Summaries for YT
+//  Timestamps & Summaries for YT (Shared)
 //
 
 import Foundation
 
-struct GenerationSettings {
+nonisolated struct GenerationSettings {
     static let appGroupIdentifier = "group.Matuko.YouTube-Timestamps-and-Summaries.shared"
     static let providerIDKey = "generation.providerID"
     static let modelIDKey = "generation.modelID"
@@ -17,8 +17,10 @@ struct GenerationSettings {
     static let grokProviderID = "xaiOAuth"
     private static let legacyGrokBuildProviderID = "grokBuild"
     private static let legacyGrokBuildModelID = "grok-build-0.1"
+    private static let legacyChatGPTSolAlias = "gpt-5.6"
+    static let chatGPTSolModelID = "gpt-5.6-sol"
     static let defaultProviderID = chatGPTProviderID
-    static let defaultModelID = "gpt-5.5"
+    static let defaultModelID = "gpt-5.6-terra"
     static let defaultGrokModelID = "grok-4.5"
     static let defaultSummaryEngine = "selectedModel"
     static let appleIntelligenceModelID = "appleIntelligence"
@@ -93,7 +95,7 @@ struct GenerationSettings {
         [
             [
                 "id": preferNativeChapters,
-                "label": "Prefer native YouTube chapters",
+                "label": "Prefer YouTube chapters when available",
             ],
             [
                 "id": alwaysGenerateChapters,
@@ -131,6 +133,18 @@ struct GenerationSettings {
         default:
             return [
                 [
+                    "id": chatGPTSolModelID,
+                    "label": "GPT-5.6 Sol",
+                ],
+                [
+                    "id": "gpt-5.6-terra",
+                    "label": "GPT-5.6 Terra",
+                ],
+                [
+                    "id": "gpt-5.6-luna",
+                    "label": "GPT-5.6 Luna",
+                ],
+                [
                     "id": "gpt-5.5",
                     "label": "GPT-5.5 Thinking",
                 ],
@@ -146,6 +160,28 @@ struct GenerationSettings {
         }
     }
 
+    static func sortedModelOptions(_ options: [[String: String]]) -> [[String: String]] {
+        options.enumerated()
+            .sorted { lhs, rhs in
+                let lhsVersion = modelVersionComponents(lhs.element["id"] ?? "")
+                let rhsVersion = modelVersionComponents(rhs.element["id"] ?? "")
+                let componentCount = max(lhsVersion.count, rhsVersion.count)
+
+                for index in 0..<componentCount {
+                    let lhsComponent = index < lhsVersion.count ? lhsVersion[index] : -1
+                    let rhsComponent = index < rhsVersion.count ? rhsVersion[index] : -1
+                    if lhsComponent != rhsComponent {
+                        return lhsComponent > rhsComponent
+                    }
+                }
+
+                // Keep the curated/API order for variants of the same version,
+                // such as GPT-5.6 Sol, Terra, and Luna.
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
+    }
+
     static func supportedModelIDs(for providerID: String) -> Set<String> {
         Set(modelOptions(for: providerID).compactMap { $0["id"] })
     }
@@ -155,7 +191,7 @@ struct GenerationSettings {
         providerID: String,
         fallback: String? = nil
     ) -> String {
-        let candidate = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate = canonicalModelID(modelID, providerID: providerID)
         guard isUsableModelID(candidate, providerID: providerID) else {
             return fallback ?? defaultModelID(for: providerID)
         }
@@ -163,7 +199,7 @@ struct GenerationSettings {
     }
 
     static func isUsableModelID(_ modelID: String, providerID: String) -> Bool {
-        let candidate = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate = canonicalModelID(modelID, providerID: providerID)
         let normalizedProviderID = normalizedProviderID(providerID)
         if supportedModelIDs(for: normalizedProviderID).contains(candidate) {
             return true
@@ -175,6 +211,19 @@ struct GenerationSettings {
         normalizedProviderID(providerID) == grokProviderID
             ? defaultGrokModelID
             : defaultModelID
+    }
+
+    /// Grok 4.5 defaults to high reasoning at the API. Chapter extraction and
+    /// transcript summarization are latency-sensitive, constrained tasks, so
+    /// explicitly request the model's supported low-reasoning mode. Older and
+    /// future model families retain the provider default until validated.
+    static func grokReasoningEffort(for modelID: String) -> String? {
+        let candidate = modelID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return candidate == "grok-4.5" || candidate.hasPrefix("grok-4.5-")
+            ? "low"
+            : nil
     }
 
     static func modelLabel(for modelID: String, providerID: String = defaultProviderID) -> String {
@@ -213,6 +262,20 @@ struct GenerationSettings {
         default:
             return modelID.hasPrefix("gpt-")
         }
+    }
+
+    private static func modelVersionComponents(_ modelID: String) -> [Int] {
+        modelID
+            .split(whereSeparator: { !$0.isNumber })
+            .compactMap { Int($0) }
+    }
+
+    private static func canonicalModelID(_ modelID: String, providerID: String) -> String {
+        let candidate = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedProviderID(providerID) == chatGPTProviderID, candidate == legacyChatGPTSolAlias {
+            return chatGPTSolModelID
+        }
+        return candidate
     }
 
     private static func generatedModelLabel(for modelID: String, providerID: String) -> String {

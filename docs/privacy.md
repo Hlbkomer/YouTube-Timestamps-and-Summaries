@@ -4,7 +4,7 @@ title: Privacy Policy
 
 # Privacy Policy
 
-Last updated: April 26, 2026
+Last updated: July 18, 2026
 
 This Privacy Policy explains how Timestamps & Summaries for YT handles data when generating timestamps and summaries.
 
@@ -39,7 +39,9 @@ This information is used only to:
 
 The app stores its settings locally on the user's Mac.
 
-ChatGPT and Grok sign-in tokens are stored locally in the shared app group container. Users can remove them by signing out in the companion app or removing the app's local data. During a Grok sign-in, the temporary OAuth state, PKCE verifier, callback URL, and one-time authorization code are used only to finish that sign-in and are not stored with the tokens.
+ChatGPT and Grok access and refresh tokens are stored locally in the macOS data-protection Keychain under a shared access group so the companion app and Safari extension can use the same signed-in sessions. The tokens are not synchronized through iCloud. Non-secret token expiry metadata and app settings remain in the shared app-group preferences. Users can remove provider tokens by signing out in the companion app or removing the app's local data. During a Grok sign-in, the temporary OAuth state, PKCE verifier, callback URL, and one-time authorization code are used only to finish that sign-in and are not stored with the tokens.
+
+When upgrading from an older release, existing provider tokens are copied from shared preferences to Keychain on first use. The old preference values are removed only after both access and refresh tokens are safely present in Keychain.
 
 ## No Separate Developer Backend
 
@@ -59,7 +61,7 @@ Local settings remain on the user's Mac until the user changes or removes them.
 
 ## Security
 
-The app uses local system storage for saved app settings plus ChatGPT and Grok sign-in tokens. During a person-initiated Grok sign-in, the companion app temporarily receives the browser callback on loopback and closes it immediately afterward. If Safari cannot reach that loopback callback, the person may paste the callback URL or one-time authorization code into the app to finish the same short-lived sign-in; that pasted value is not saved.
+The app uses local preferences for saved app settings and macOS Keychain for ChatGPT and Grok access/refresh tokens. During a person-initiated Grok sign-in, the companion app temporarily receives the browser callback on loopback and closes it immediately afterward. If Safari cannot reach that loopback callback, the person may paste the callback URL or one-time authorization code into the app to finish the same short-lived sign-in; that pasted value is not saved.
 
 No method of storage is completely secure, but reasonable steps are taken to keep local settings protected on the user's device.
 

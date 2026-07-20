@@ -3,7 +3,7 @@
     "default_locale": "en",
     "name": "__MSG_extension_name__",
     "description": "__MSG_extension_description__",
-    "version": "1.0.5",
+    "version": "1.1",
     "icons": {
         "16": "images/icon-16.png",
         "32": "images/icon-32.png",
@@ -27,7 +27,7 @@
         }
     },
     "permissions": [
-        "activeTab",
+        "clipboardWrite",
         "nativeMessaging"
     ],
     "host_permissions": [
@@ -54,7 +54,7 @@
             "run_at": "document_start"
         },
         {
-            "js": [ "youtube-helpers.js", "native-panel.js", "content.js" ],
+            "js": [ "chapter-state.js", "content-state.js", "transcript-orchestrator.js", "generation-orchestrator.js", "youtube-helpers.js", "page-controls.js", "native-panel.js", "content.js" ],
             "matches": [
                 "*://www.youtube.com/watch*",
                 "*://youtube.com/watch*",

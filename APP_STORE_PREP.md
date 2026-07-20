@@ -8,6 +8,12 @@ For paste-ready App Store Connect fields and privacy answers, see:
 
 - [APP_STORE_CONNECT_COPY.md](APP_STORE_CONNECT_COPY.md)
 
+Primary Apple references used for this review:
+
+- [Distributing your Safari web extension](https://developer.apple.com/documentation/safariservices/distributing-your-safari-web-extension)
+- [App Privacy Details](https://developer.apple.com/app-store/app-privacy-details/)
+- [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
+
 ## What Apple’s flow looks like
 
 - A Safari web extension is distributed through a containing macOS app.
@@ -24,8 +30,9 @@ For paste-ready App Store Connect fields and privacy answers, see:
 - The containing macOS app and Safari web extension are working end to end.
 - GitHub repo, README, support links, privacy policy, and terms already exist.
 - A root site for public links exists at `https://hlbkomer.github.io/`.
-- The current default review-safe path can generate Apple Intelligence summaries without ChatGPT sign-in.
-- ChatGPT sign-in is optional and unlocks timestamp generation plus GPT summaries.
+- Apple Intelligence can generate summaries without a cloud-provider sign-in when the reviewer selects it as the Summary model.
+- ChatGPT and Grok sign-in are optional and unlock generated chapters plus provider-powered summaries.
+- Existing YouTube creator chapters and automatic Key moments work without either provider and appear in the same compact Chapters view.
 - Developer signing and notarization work is already underway for outside-the-store distribution.
 
 ## Likely App Review risks
@@ -45,7 +52,7 @@ This also fits Apple’s App Store metadata length limits more comfortably.
 
 ### 2. Optional Apple Intelligence summary mode
 
-Apple Intelligence is optional and only used when selected for summaries. The default generation path uses ChatGPT for both timestamps and summaries.
+Apple Intelligence is optional and only used when selected for summaries. Cloud generation uses whichever connected provider and model the person selects; the app does not silently send an Apple Intelligence request to a provider if local generation fails.
 
 Recommended plan:
 
@@ -57,16 +64,16 @@ Recommended plan:
 
 App Store Connect requires app privacy disclosures before submission.
 
-This app does not operate its own backend. The current default build sends transcript text to ChatGPT through the user's signed-in account for timestamps and summaries.
+This app does not operate its own backend. When cloud generation is selected, the build sends transcript text directly to the selected ChatGPT/Codex or Grok service through the person's signed-in account. Apple Intelligence summary generation stays on the Mac.
 
 The current likely direction is:
 
 - no tracking
-- no data collected by the developer
-- ChatGPT sign-in is required only for timestamp generation and optional GPT summaries
-- transcript text is sent to ChatGPT for timestamp generation and, by default, summary generation
+- no transcript or account data sent to a developer-operated backend
+- generated chapters and provider summaries require a connected selected provider
+- transcript text is sent directly to the selected provider for generated chapters and provider summaries
 - transcript text is used locally for Apple Intelligence summary generation when that option is selected
-- local settings remain on the user's Mac
+- OAuth credentials are stored in the local macOS data-protection Keychain; non-secret settings remain in the shared app-group preferences on the Mac
 
 ## Recommended App Store metadata
 
@@ -91,21 +98,23 @@ Use the Safari extension to generate:
 - chronological timestamps
 - short video summaries
 
-The app includes a lightweight macOS companion app for enabling the Safari extension, signing in with ChatGPT, and choosing generation settings. The Safari extension generates timestamps and summaries automatically on supported video pages.
+The app includes a lightweight macOS companion app for enabling the Safari extension, optionally signing in with ChatGPT or Grok, and choosing generation settings. The Safari extension shows chapters and summaries automatically on supported video pages.
 
 Features:
 
-- simple Safari sidebar for timestamps and summaries
+- native-looking Chapters and Summary tabs inside YouTube's `In this video` panel, with a transcript-backed standalone fallback when that panel is unavailable
+- one compact chapter format for YouTube creator chapters, automatic Key moments, and generated chapters
+- an inline source action for switching between YouTube and generated chapters when both are available
 - clickable timestamp links that jump to the right moment
 - transcript-based generation
-- Apple Intelligence summaries on your Mac without ChatGPT sign-in
-- optional ChatGPT generation through the user's account
+- Apple Intelligence summaries on your Mac without provider sign-in
+- optional ChatGPT/Codex or Grok generation through the user's account
 - no API key or developer backend required
 
 Important notes:
 
-- requires Safari on macOS 26 or later
-- requires ChatGPT sign-in only for timestamp generation and optional GPT summaries
+- requires Safari on macOS 26.4 or later
+- generated chapters and cloud summaries require the selected provider to be connected
 - Apple Intelligence summaries require Apple Intelligence enabled on a compatible Mac
 - videos need captions or an available transcript
 - generated output may be incomplete or inaccurate
@@ -121,7 +130,7 @@ Suggested App Review notes:
 ```text
 This app is a macOS container app for a Safari web extension.
 
-The extension adds a sidebar on supported YouTube video pages. Without sign-in, it opens the Summary tab by default and generates summaries locally with Apple Intelligence when available. ChatGPT sign-in is optional and unlocks timestamp generation plus GPT summaries.
+The extension adds Chapters and Summary tabs to YouTube's `In this video` panel when available, with a standalone sidebar fallback when a usable transcript exists. Pages with neither the native panel nor a transcript are left unchanged. Existing YouTube chapters and Key moments require no sign-in. Apple Intelligence can generate summaries locally without provider sign-in when it is selected as the Summary model. ChatGPT or Grok sign-in is optional and unlocks generated chapters plus provider-powered summaries.
 
 No API key or developer-operated backend is required.
 
@@ -129,14 +138,16 @@ Review steps:
 1. Launch the macOS app.
 2. Click “Open Safari Extension Settings” and enable the Safari extension.
 3. Open a supported YouTube watch page in Safari.
-4. Use the Summary tab in the extension sidebar. No ChatGPT account is required for this Apple Intelligence summary path.
-5. Optional: sign in with ChatGPT in the companion app to test timestamp generation.
+4. In the companion app, choose Apple Intelligence as the Summary model, then use Summary in the YouTube panel. No provider account is required for this path.
+5. On a video with YouTube chapters or Key moments and a transcript, confirm the compact Chapters list, its YouTube attribution footer, and automatic Summary creation.
+6. Optional: sign in with ChatGPT or Grok to test transcript-generated chapters and provider summaries.
+7. If both YouTube and generated chapters exist, use the inline footer action to switch sources.
 
 Important:
-- Timestamp generation requires optional ChatGPT sign-in.
-- Summary generation works without ChatGPT when Apple Intelligence is available.
-- Summary generates automatically on supported watch pages; timestamps generate automatically after ChatGPT is connected.
-- Videos without captions or an available transcript will show a clear error.
+- Generated chapters require a connected selected provider. YouTube-provided chapters do not.
+- Summary generation works without a provider when Apple Intelligence is selected and available.
+- Chapters and Summary load automatically on supported watch pages when their configured source/engine is available.
+- A page with neither YouTube's native panel nor a transcript is left unchanged. If the native panel exists and generation is requested without a transcript, the extension reports that clearly.
 ```
 
 ## Privacy disclosure prep
@@ -146,19 +157,20 @@ The final App Store Connect answers should be reviewed carefully before submissi
 - data is not used for tracking
 - data is not sold
 - app settings are stored locally on device
-- ChatGPT tokens are stored locally in Safari extension storage
-- transcript text is sent to ChatGPT for timestamp generation and, by default, summary generation
+- ChatGPT and Grok OAuth credentials are stored in the local macOS data-protection Keychain under a shared app/extension access group
+- transcript text is sent directly to the selected provider for generated chapters and provider summaries
 - transcript text is used locally for Apple Intelligence summary generation when that option is selected
 
-This section still needs a careful final pass before submission.
+Apple's App Privacy definition can include data handled by third-party partners, not only data sent to a developer backend. Before submission, re-check the current ChatGPT and xAI service retention/account-linking terms and map transcript text to the App Store Connect data types and purposes. Do not answer `No data collected` solely because this project has no backend.
 
 ## Assets to prepare
 
 - macOS app icon
 - at least a few clean macOS screenshots:
   - companion app setup screen
-  - Safari video page with timestamps sidebar
-  - Safari video page with summary view
+  - Safari video page with the native `In this video` Chapters view
+  - Safari video page with the Summary view
+  - optional source-switch example showing YouTube and generated chapters
 - support URL:
   - `https://hlbkomer.github.io/`
 - privacy policy URL:
@@ -172,4 +184,5 @@ This section still needs a careful final pass before submission.
    - subtitle `Safari Extension for YouTube`
 3. Complete App Privacy in App Store Connect.
 4. Align the in-app visible title with the App Store-facing name.
-5. Upload an App Store build when the metadata is ready.
+5. Reconcile the App Privacy answers with the current ChatGPT and xAI service terms.
+6. Upload an App Store build when the metadata is ready.

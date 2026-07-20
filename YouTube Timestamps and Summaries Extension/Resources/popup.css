@@ -6,7 +6,7 @@
 
 body {
     margin: 0;
-    min-width: 360px;
+    min-width: 220px;
     color: CanvasText;
     background: Canvas;
 }
@@ -36,20 +36,6 @@ body {
 .row span {
     min-width: 0;
     white-space: nowrap;
-}
-
-select {
-    background: Canvas;
-    border: 1px solid color-mix(in srgb, CanvasText 22%, transparent);
-    border-radius: 6px;
-    color: inherit;
-    font: inherit;
-    min-width: 148px;
-    padding: 4px 8px;
-}
-
-select:disabled {
-    opacity: 0.55;
 }
 
 .button {

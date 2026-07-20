@@ -497,7 +497,6 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
                 appleIntelligenceAvailable: appleIntelligenceState.available,
                 selectedProviderConnected: selectedProviderConnected
             ),
-            "selectedProviderConnected": selectedProviderConnected,
             "extensionEnabled": extensionEnabled as Any,
             "usesSettingsLabel": ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 13,
             "message": (message ?? statusMessage) ?? NSNull(),
@@ -590,7 +589,7 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         if settings.summaryModelID != GenerationSettings.appleIntelligenceModelID {
             options = addingModelOptionIfNeeded(settings.summaryModelID, providerID: providerID, to: options)
         }
-        return options
+        return GenerationSettings.sortedModelOptions(options)
     }
 
     private func mergedModelOptions(

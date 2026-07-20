@@ -2,329 +2,333 @@
 //  YouTube_Timestamps_and_SummariesTests.swift
 //  Timestamps & Summaries for YT Tests
 //
-//  Created by Matus Vojtek on 21/04/2026.
-//
 
 import Foundation
+import Network
 import Testing
+@testable import Timestamps___Summaries_for_YT
 
+@MainActor
 struct YouTube_Timestamps_and_SummariesTests {
 
-    @Test func extensionBundleIdentifierMatchesSafariExtensionTarget() throws {
-        let viewControllerSource = try source(appPath("ViewController.swift"))
+    @Test func generationDefaultsAndIndependentSummarySelectionBehaveCorrectly() {
+        #expect(GenerationSettings.defaultModelID == "gpt-5.6-terra")
 
-        #expect(viewControllerSource.contains(#"let extensionBundleIdentifier = "Matuko.YouTube-Timestamps-and-Summaries.Extension""#))
+        let defaults = GenerationSettings(
+            providerID: "",
+            modelID: "",
+            summaryEngine: "",
+            chapterPreference: "invalid"
+        )
+        #expect(defaults.providerID == GenerationSettings.chatGPTProviderID)
+        #expect(defaults.modelID == GenerationSettings.defaultModelID)
+        #expect(defaults.summaryModelID == GenerationSettings.defaultModelID)
+        #expect(defaults.summaryEngine == GenerationSettings.defaultSummaryEngine)
+        #expect(defaults.chapterPreference == GenerationSettings.preferNativeChapters)
+
+        let appleSummary = GenerationSettings(
+            providerID: GenerationSettings.grokProviderID,
+            modelID: "grok-4.3",
+            summaryEngine: GenerationSettings.appleIntelligenceModelID,
+            summaryModelID: GenerationSettings.appleIntelligenceModelID,
+            chapterPreference: GenerationSettings.alwaysGenerateChapters
+        )
+        #expect(appleSummary.modelID == "grok-4.3")
+        #expect(appleSummary.summaryModelID == GenerationSettings.appleIntelligenceModelID)
+        #expect(appleSummary.summaryEngine == GenerationSettings.appleIntelligenceModelID)
+        #expect(appleSummary.chapterPreference == GenerationSettings.alwaysGenerateChapters)
     }
 
-    @Test func generationDefaultsUseChatGPTForTimestampsAndSummary() throws {
-        let appSettingsSource = try source(appPath("GenerationSettings.swift"))
-
-        #expect(appSettingsSource.contains(#"static let chatGPTProviderID = "openaiCodex""#))
-        #expect(appSettingsSource.contains(#"static let defaultProviderID = chatGPTProviderID"#))
-        #expect(appSettingsSource.contains(#"static let defaultModelID = "gpt-5.5""#))
-        #expect(appSettingsSource.contains(#"static let defaultSummaryEngine = "selectedModel""#))
+    @Test func providerAndModelNormalizationHandlesAliasesAndFutureModels() {
+        #expect(GenerationSettings.normalizedProviderID("grokBuild") == GenerationSettings.grokProviderID)
+        #expect(GenerationSettings.normalizedProviderID("unknown") == GenerationSettings.chatGPTProviderID)
+        #expect(GenerationSettings.normalizedModelID(
+            "gpt-5.6",
+            providerID: GenerationSettings.chatGPTProviderID
+        ) == GenerationSettings.chatGPTSolModelID)
+        #expect(GenerationSettings.isUsableModelID(
+            "gpt-6.0-future",
+            providerID: GenerationSettings.chatGPTProviderID
+        ))
+        #expect(GenerationSettings.isUsableModelID(
+            "grok-5.0-future",
+            providerID: GenerationSettings.grokProviderID
+        ))
+        #expect(!GenerationSettings.isUsableModelID(
+            "grok-4.20-beta",
+            providerID: GenerationSettings.grokProviderID
+        ))
+        #expect(!GenerationSettings.isUsableModelID(
+            "grok-build-0.1",
+            providerID: GenerationSettings.grokProviderID
+        ))
+        #expect(!GenerationSettings.isUsableModelID(
+            "grok-imagine-1",
+            providerID: GenerationSettings.grokProviderID
+        ))
     }
 
-    @Test func appAndExtensionGenerationDefaultsStayInSync() throws {
-        let appSettingsSource = try source(appPath("GenerationSettings.swift"))
-        let extensionSettingsSource = try source(extensionPath("GenerationSettings.swift"))
+    @Test func localModelOptionsContainUniqueUsableFallbacks() throws {
+        for providerID in [GenerationSettings.chatGPTProviderID, GenerationSettings.grokProviderID] {
+            let options = GenerationSettings.modelOptions(for: providerID)
+            let ids = try options.map { try #require($0["id"]) }
+            #expect(!ids.isEmpty)
+            #expect(Set(ids).count == ids.count)
+            #expect(ids.allSatisfy {
+                GenerationSettings.isUsableModelID($0, providerID: providerID)
+            })
+        }
+        #expect(GenerationSettings.supportedModelIDs(
+            for: GenerationSettings.chatGPTProviderID
+        ).contains(GenerationSettings.chatGPTSolModelID))
+        #expect(GenerationSettings.supportedModelIDs(
+            for: GenerationSettings.grokProviderID
+        ).contains(GenerationSettings.defaultGrokModelID))
+    }
 
-        let sharedContracts = [
-            #"static let appGroupIdentifier = "group.Matuko.YouTube-Timestamps-and-Summaries.shared""#,
-            #"static let providerIDKey = "generation.providerID""#,
-            #"static let modelIDKey = "generation.modelID""#,
-            #"static let summaryEngineKey = "generation.summaryEngine""#,
-            #"static let summaryModelIDKey = "generation.summaryModelID""#,
-            #"static let chapterPreferenceKey = "generation.chapterPreference""#,
-            #"static let chatGPTProviderID = "openaiCodex""#,
-            #"static let defaultProviderID = chatGPTProviderID"#,
-            #"static let defaultModelID = "gpt-5.5""#,
-            #"static let defaultSummaryEngine = "selectedModel""#,
-            #"static let preferNativeChapters = "preferNative""#,
-            #"static let alwaysGenerateChapters = "alwaysGenerate""#,
-            #"static let defaultChapterPreference = preferNativeChapters"#,
-            #"static let grokProviderID = "xaiOAuth""#,
-            #"static let defaultGrokModelID = "grok-4.5""#,
-            #"static func modelOptions(for providerID: String)"#,
-            #"static func supportedModelIDs(for providerID: String)"#,
-            #"static func isUsableModelID(_ modelID: String, providerID: String) -> Bool"#,
-            #"static var chapterPreferenceOptions: [[String: String]]"#,
-        ]
+    @Test func modelOptionsSortHigherVersionsBeforeLowerVersions() throws {
+        let grokOptions = GenerationSettings.sortedModelOptions([
+            ["id": "grok-4.3", "label": "Grok 4.3"],
+            ["id": "grok-4.5", "label": "Grok 4.5"],
+            ["id": "grok-4.4", "label": "Grok 4.4"],
+        ])
+        #expect(grokOptions.compactMap { $0["id"] } == [
+            "grok-4.5",
+            "grok-4.4",
+            "grok-4.3",
+        ])
 
-        for contract in sharedContracts {
-            #expect(appSettingsSource.contains(contract))
-            #expect(extensionSettingsSource.contains(contract))
+        let chatGPTOptions = GenerationSettings.sortedModelOptions([
+            ["id": "gpt-5.6-sol", "label": "GPT-5.6 Sol"],
+            ["id": "gpt-5.6-terra", "label": "GPT-5.6 Terra"],
+            ["id": "gpt-5.5", "label": "GPT-5.5 Thinking"],
+        ])
+        #expect(chatGPTOptions.compactMap { $0["id"] } == [
+            "gpt-5.6-sol",
+            "gpt-5.6-terra",
+            "gpt-5.5",
+        ])
+    }
+
+    @Test func grok45UsesLowReasoningWhileOtherModelsKeepProviderDefaults() {
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5") == "low")
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5-latest") == "low")
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.3") == nil)
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-5.0-future") == nil)
+    }
+
+    @Test func publishedModelCatalogContainsUniqueUsableEntries() throws {
+        let data = try Data(contentsOf: repositoryURL("docs/model-catalog.json"))
+        let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let providers = try #require(root["providers"] as? [String: Any])
+
+        for providerID in [GenerationSettings.chatGPTProviderID, GenerationSettings.grokProviderID] {
+            guard
+                let provider = providers[providerID] as? [String: Any],
+                let entries = provider["models"] as? [[String: Any]]
+            else {
+                if providerID == GenerationSettings.grokProviderID {
+                    continue
+                }
+                Issue.record("Published catalog is missing \(providerID)")
+                continue
+            }
+            let ids = entries.compactMap { $0["id"] as? String }
+            #expect(ids.count == entries.count)
+            #expect(Set(ids).count == ids.count)
+            #expect(ids.allSatisfy {
+                GenerationSettings.isUsableModelID($0, providerID: providerID)
+            })
+        }
+    }
+
+    @Test func xAITokenResponseUsesRefreshFallbackAndExplicitExpiry() throws {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let data = try JSONSerialization.data(withJSONObject: [
+            "access_token": "access",
+            "expires_in": 90,
+        ])
+        let tokens = try XAITokenResponseParser.parse(
+            data,
+            existingRefreshToken: "refresh",
+            now: now
+        )
+
+        #expect(tokens.accessToken == "access")
+        #expect(tokens.refreshToken == "refresh")
+        #expect(tokens.expiresAt == Date(timeIntervalSince1970: 1_090))
+    }
+
+    @Test func xAITokenResponsePrefersJWTExpiryAndParsesProviderErrors() throws {
+        let payload = try JSONSerialization.data(withJSONObject: ["exp": 9_999])
+        let encodedPayload = payload.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let data = try JSONSerialization.data(withJSONObject: [
+            "access_token": "header.\(encodedPayload).signature",
+            "refresh_token": "refresh",
+            "expires_in": 1,
+        ])
+        let tokens = try XAITokenResponseParser.parse(data, now: .distantPast)
+        #expect(tokens.expiresAt == Date(timeIntervalSince1970: 9_999))
+
+        let errorData = try JSONSerialization.data(withJSONObject: [
+            "error": ["message": "provider rejected request"],
+        ])
+        #expect(XAITokenResponseParser.errorMessage(from: errorData) == "provider rejected request")
+        #expect(XAITokenResponseParser.errorMessage(from: Data("plain failure".utf8)) == "plain failure")
+    }
+
+    @Test func xAIResponseMetricsParseUsageDetailsAndServiceTier() {
+        let metrics = XAIResponseMetrics.parse([
+            "service_tier": "default",
+            "usage": [
+                "input_tokens": 40_030,
+                "output_tokens": 420,
+                "total_tokens": 40_450,
+                "input_tokens_details": ["cached_tokens": 12_000],
+                "output_tokens_details": ["reasoning_tokens": 120],
+            ],
+        ])
+
+        #expect(metrics.inputTokens == 40_030)
+        #expect(metrics.outputTokens == 420)
+        #expect(metrics.totalTokens == 40_450)
+        #expect(metrics.cachedInputTokens == 12_000)
+        #expect(metrics.reasoningTokens == 120)
+        #expect(metrics.serviceTier == "default")
+        #expect(metrics.debugPayload["reasoningTokens"] as? Int == 120)
+    }
+
+    @Test func xAITrustBoundaryAcceptsOnlyHTTPSXAIHosts() throws {
+        #expect(XAITokenSession.isTrustedXAIURL(try #require(URL(string: "https://auth.x.ai/oauth/token"))))
+        #expect(XAITokenSession.isTrustedXAIURL(try #require(URL(string: "https://x.ai/oauth/token"))))
+        #expect(!XAITokenSession.isTrustedXAIURL(try #require(URL(string: "http://auth.x.ai/oauth/token"))))
+        #expect(!XAITokenSession.isTrustedXAIURL(try #require(URL(string: "https://evilx.ai/oauth/token"))))
+        #expect(!XAITokenSession.isTrustedXAIURL(try #require(URL(string: "https://example.com/oauth/token"))))
+    }
+
+    @Test func xAILoopbackCallbackSurvivesBrowserProbeAndReturnsACompleteHTTPResponse() async throws {
+        let server = try XAILoopbackCallbackServer(port: nil, expectedState: "test-state")
+        try server.start()
+        defer { server.stop() }
+
+        let port = try #require(server.listeningPort)
+        try await connectAndCloseWithoutSendingHTTP(port: port)
+
+        let wrongStateURL = try #require(URL(string: "http://127.0.0.1:\(port)/callback?state=wrong-state&code=wrong-code"))
+        let callbackURL = try #require(URL(string: "http://127.0.0.1:\(port)/callback?state=test-state&code=test-code"))
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 5
+        let session = URLSession(configuration: configuration)
+        let (_, wrongStateResponse) = try await session.data(from: wrongStateURL)
+        #expect((wrongStateResponse as? HTTPURLResponse)?.statusCode == 400)
+
+        var request = URLRequest(url: callbackURL)
+        request.setValue(String(repeating: "a", count: 5_000), forHTTPHeaderField: "X-Fragmentation-Test")
+        let (data, response) = try await session.data(for: request)
+        // A callback can finish before the UI task registers its waiter.
+        // The server must retain that single terminal result for the waiter.
+        let components = try await server.waitForCallback()
+        let queryItems = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(String(decoding: data, as: UTF8.self).contains("Grok sign-in is complete."))
+        #expect(queryItems["state"] == "test-state")
+        #expect(queryItems["code"] == "test-code")
+    }
+
+    private func connectAndCloseWithoutSendingHTTP(port: UInt16) async throws {
+        let endpointPort = try #require(NWEndpoint.Port(rawValue: port))
+        let connection = NWConnection(host: "127.0.0.1", port: endpointPort, using: .tcp)
+        let queue = DispatchQueue(label: "app.timestamps-summaries.tests.empty-oauth-probe")
+
+        try await withCheckedThrowingContinuation { continuation in
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    connection.stateUpdateHandler = nil
+                    connection.cancel()
+                    continuation.resume()
+                case .failed(let error):
+                    connection.stateUpdateHandler = nil
+                    connection.cancel()
+                    continuation.resume(throwing: error)
+                default:
+                    break
+                }
+            }
+            connection.start(queue: queue)
         }
 
-        #expect(appSettingsSource.contains(#""id": defaultGrokModelID"#))
-        #expect(extensionSettingsSource.contains(#""id": defaultGrokModelID"#))
-        #expect(appSettingsSource.contains(#""id": "grok-4.3""#))
-        #expect(extensionSettingsSource.contains(#""id": "grok-4.3""#))
-        #expect(appSettingsSource.contains(#""id": "grok-build-0.1""#) == false)
-        #expect(extensionSettingsSource.contains(#""id": "grok-build-0.1""#) == false)
-        #expect(appSettingsSource.contains(#"? defaultGrokModelID"#))
-        #expect(extensionSettingsSource.contains(#"? defaultGrokModelID"#))
-        #expect(appSettingsSource.contains(#"!modelID.hasPrefix("grok-4.20")"#))
-        #expect(extensionSettingsSource.contains(#"!modelID.hasPrefix("grok-4.20")"#))
-        #expect(appSettingsSource.contains(#"!modelID.hasPrefix("grok-420")"#))
-        #expect(extensionSettingsSource.contains(#"!modelID.hasPrefix("grok-420")"#))
-        #expect(appSettingsSource.contains(#"modelID.hasPrefix("gpt-")"#))
-        #expect(extensionSettingsSource.contains(#"modelID.hasPrefix("gpt-")"#))
+        try await Task.sleep(nanoseconds: 100_000_000)
     }
 
-    @Test func summaryModelCanBeIndependentFromTimestampModel() throws {
-        let appSettingsSource = try source(appPath("GenerationSettings.swift"))
-        let extensionSettingsSource = try source(extensionPath("GenerationSettings.swift"))
-        let viewControllerSource = try source(appPath("ViewController.swift"))
+    @Test func sharedCredentialStoreUsesDataProtectionAndMigratesACompleteLegacyPairTransactionally() throws {
+        let identifier = UUID().uuidString
+        let suiteName = "Matuko.YouTube-Timestamps-and-Summaries.tests.\(identifier)"
+        let service = "Matuko.YouTube-Timestamps-and-Summaries.tests.\(identifier)"
+        let accessKey = "test.access"
+        let refreshKey = "test.refresh"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let store = SharedCredentialStore(service: service)
+        defaults.set("legacy-access", forKey: accessKey)
+        defaults.set("legacy-refresh", forKey: refreshKey)
 
-        #expect(appSettingsSource.contains(#"static let appleIntelligenceModelID = "appleIntelligence""#))
-        #expect(appSettingsSource.contains(#"let summaryModelID: String"#))
-        #expect(extensionSettingsSource.contains(#"let summaryModelID: String"#))
-        #expect(viewControllerSource.contains(#"private func modelOptions("#))
-        #expect(viewControllerSource.contains(#"xaiAuthService.modelOptions()"#))
-        #expect(viewControllerSource.contains(#"] + providerModels"#))
+        defer {
+            try? store.remove(accessKey)
+            try? store.remove(refreshKey)
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        try store.migrateLegacyPair(
+            from: defaults,
+            accessTokenKey: accessKey,
+            refreshTokenKey: refreshKey
+        )
+        #expect(try store.string(for: accessKey) == "legacy-access")
+        #expect(try store.string(for: refreshKey) == "legacy-refresh")
+        #expect(defaults.string(forKey: accessKey) == nil)
+        #expect(defaults.string(forKey: refreshKey) == nil)
+        #expect(SharedCredentialStore.usesDataProtectionKeychain)
+
+        try store.set("updated-access", for: accessKey)
+        #expect(try store.string(for: accessKey) == "updated-access")
+        try store.remove(accessKey)
+        #expect(try store.string(for: accessKey) == nil)
     }
 
-    @Test func chatGPTModelPickerCanUseRemoteCatalog() throws {
-        let catalogServiceSource = try source(appPath("RemoteModelCatalogService.swift"))
-        let viewControllerSource = try source(appPath("ViewController.swift"))
-        let catalogJSON = try source("docs/model-catalog.json")
-        let catalogDocumentation = try source("docs/model-catalog.md")
-        let privacySource = try source("docs/privacy.md")
-
-        #expect(catalogServiceSource.contains(#"https://raw.githubusercontent.com/Hlbkomer/YouTube-Timestamps-and-Summaries/main/docs/model-catalog.json"#))
-        #expect(catalogServiceSource.contains(#"private let cacheDuration: TimeInterval = 60 * 60"#))
-        #expect(catalogServiceSource.contains(#"private let failureRetryDelay: TimeInterval = 15 * 60"#))
-        #expect(catalogServiceSource.contains(#"GenerationSettings.isUsableModelID(model.id, providerID: providerID)"#))
-        #expect(viewControllerSource.contains(#"private let remoteModelCatalogService = RemoteModelCatalogService()"#))
-        #expect(viewControllerSource.contains(#"providerID == GenerationSettings.chatGPTProviderID"#))
-        #expect(viewControllerSource.contains(#"remoteModelCatalogService.modelCatalog(for: providerID)"#))
-        #expect(catalogJSON.contains(#""openaiCodex""#))
-        #expect(catalogJSON.contains(#""id": "gpt-5.6""#))
-        #expect(catalogJSON.contains(#""id": "gpt-5.6-terra""#))
-        #expect(catalogJSON.contains(#""id": "gpt-5.6-luna""#))
-        #expect(catalogJSON.contains(#""id": "gpt-5.5""#))
-        #expect(catalogJSON.contains(#""id": "gpt-5.4""#))
-        #expect(catalogJSON.contains(#""id": "gpt-5.4-mini""#))
-        #expect(catalogDocumentation.contains("The catalog must be on `main`"))
-        #expect(catalogDocumentation.contains("one-hour in-memory cache"))
-        #expect(catalogDocumentation.contains("Grok 4.20, Grok Build, Imagine, and voice models are excluded"))
-        #expect(privacySource.contains("model catalog JSON file"))
-        #expect(privacySource.contains("does not include YouTube transcripts, video URLs, or provider sign-in tokens"))
+    @Test func appAndExtensionDeclareTheSameSharingEntitlements() throws {
+        let expectedKeychainGroup = "$(AppIdentifierPrefix)Matuko.YouTube-Timestamps-and-Summaries.shared"
+        let expectedAppGroup = GenerationSettings.appGroupIdentifier
+        for path in [
+            "YouTube Timestamps and Summaries/App.entitlements",
+            "YouTube Timestamps and Summaries Extension/Extension.entitlements",
+        ] {
+            let data = try Data(contentsOf: repositoryURL(path))
+            let entitlements = try #require(
+                PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+            )
+            #expect((entitlements["keychain-access-groups"] as? [String]) == [expectedKeychainGroup])
+            #expect((entitlements["com.apple.security.application-groups"] as? [String])?.contains(expectedAppGroup) == true)
+        }
+        #expect(SharedCredentialStore.accessGroup == "3PHWBNH53Z.Matuko.YouTube-Timestamps-and-Summaries.shared")
+        #expect(SharedCredentialStore.usesDataProtectionKeychain)
     }
 
-    @Test func selectedProviderIsOptionalWhenAppleIntelligenceCanSummarize() throws {
-        let viewControllerSource = try source(appPath("ViewController.swift"))
-        let extensionHandlerSource = try source(extensionPath("SafariWebExtensionHandler.swift"))
-
-        #expect(viewControllerSource.contains(#"if !selectedProviderConnected, appleIntelligenceAvailable"#))
-        #expect(viewControllerSource.contains(#"summaryEngine: "appleIntelligence""#))
-        #expect(viewControllerSource.contains(#"if !selectedProviderConnected {"#))
-        #expect(extensionHandlerSource.contains(#"if !selectedProviderConnected, appleConfigured {"#))
-        #expect(extensionHandlerSource.contains(#""timestampsAvailable": selectedProviderConnected"#))
-        #expect(extensionHandlerSource.contains(#""summaryAvailable": summaryAvailable"#))
+    @Test func hostAppEmbedsTheExpectedSafariExtension() throws {
+        let pluginsURL = try #require(Bundle.main.builtInPlugInsURL)
+        let extensionURL = pluginsURL.appending(path: "YouTube Timestamps and Summaries Extension.appex")
+        let extensionBundle = try #require(Bundle(url: extensionURL))
+        #expect(extensionBundle.bundleIdentifier == "Matuko.YouTube-Timestamps-and-Summaries.Extension")
     }
 
-    @Test func grokProviderUsesDirectOAuthResponsesWithoutExternalProcess() throws {
-        let grokSource = try source(extensionPath("GrokGenerationService.swift"))
-        let appAuthSource = try source(appPath("XAIAuthService.swift"))
-        let extensionAuthSource = try source(extensionPath("XAIAuthService.swift"))
-        let viewControllerSource = try source(appPath("ViewController.swift"))
-        let mainHTMLSource = try source(appPath("Resources/Base.lproj/Main.html"))
-
-        #expect(grokSource.contains(#"https://api.x.ai/v1/responses"#))
-        #expect(grokSource.contains(#"authService.accessToken()"#))
-        #expect(grokSource.contains(#"output_text.delta"#))
-        #expect(grokSource.contains(#"GenerationSettings.isUsableModelID(safeModel, providerID: Self.providerID)"#))
-        #expect(grokSource.contains("Process(") == false)
-        #expect(appAuthSource.contains(#"https://auth.x.ai/.well-known/openid-configuration"#))
-        #expect(appAuthSource.contains(#"https://api.x.ai/v1/language-models"#))
-        #expect(appAuthSource.contains(#"input_modalities"#))
-        #expect(appAuthSource.contains(#"output_modalities"#))
-        #expect(appAuthSource.contains(#"grok-cli:access api:access"#))
-        #expect(appAuthSource.contains(#"code_challenge_method", value: "S256""#))
-        #expect(appAuthSource.contains(#"plan", value: "generic""#))
-        #expect(appAuthSource.contains("completeManualSignIn"))
-        #expect(appAuthSource.contains(#"127.0.0.1"#))
-        #expect(appAuthSource.contains(#"requiredInterfaceType = .loopback"#))
-        #expect(appAuthSource.contains(#"listener.port?.rawValue == Self.port"#))
-        #expect(extensionAuthSource.contains(#"xaiOAuth.accessToken"#))
-        #expect(viewControllerSource.contains(#"case "completeGrokLogin":"#))
-        #expect(mainHTMLSource.contains(#"id="grok-callback""#))
-    }
-
-    @Test func grokOAuthKeepsAppAndExtensionSandboxedWithoutBridgeBuildSettings() throws {
-        let appEntitlements = try source(appPath("App.entitlements"))
-        let extensionEntitlements = try source(extensionPath("Extension.entitlements"))
-        let projectSource = try source("YouTube Timestamps and Summaries.xcodeproj/project.pbxproj")
-
-        #expect(appEntitlements.contains("com.apple.security.app-sandbox"))
-        #expect(appEntitlements.contains("com.apple.security.network.server"))
-        #expect(extensionEntitlements.contains("com.apple.security.app-sandbox"))
-        #expect(extensionEntitlements.contains("com.apple.security.network.server") == false)
-        #expect(projectSource.contains("ENABLE_APP_SANDBOX = YES"))
-        #expect(projectSource.contains("App.Debug.entitlements") == false)
-        #expect(projectSource.contains("Extension.Debug.entitlements") == false)
-        #expect(projectSource.contains("GROK_BRIDGE") == false)
-        #expect(projectSource.contains("Embed Grok Bridge") == false)
-    }
-
-    @Test func invalidatedChatGPTTokensAreCleared() throws {
-        let codexGenerationSource = try source(extensionPath("CodexGenerationService.swift"))
-
-        #expect(codexGenerationSource.contains(#"Your authentication token has been invalidated"#) == false)
-        #expect(codexGenerationSource.contains(#"ChatGPT sign-in expired. Open the companion app and sign in again."#))
-        #expect(codexGenerationSource.contains(#"authService.signOut()"#))
-        #expect(codexGenerationSource.contains(#"lowercasedMessage.contains("authentication token")"#))
-        #expect(codexGenerationSource.contains(#"lowercasedMessage.contains("invalidated")"#))
-    }
-
-    @Test func macOS27AppleIntelligenceSummaryUsesTheOnDevicePath() throws {
-        let appleIntelligenceSource = try source(extensionPath("AppleIntelligenceService.swift"))
-
-        #expect(appleIntelligenceSource.contains(#"#if compiler(>=6.4)"#))
-        #expect(appleIntelligenceSource.contains(#"if #available(macOS 27.0, *)"#))
-        #expect(appleIntelligenceSource.contains(#"if kind == "summaryFull""#))
-        #expect(appleIntelligenceSource.contains(#"generateMacOS27FullSummary"#))
-        #expect(appleIntelligenceSource.contains(#"tokenAwareFullSummaryChunkPlan"#))
-        #expect(appleIntelligenceSource.contains(#"model.tokenCount(for:"#))
-        #expect(appleIntelligenceSource.contains(#"session.prewarm(promptPrefix:"#))
-        #expect(appleIntelligenceSource.contains(#""summaryPath""#))
-    }
-
-    @Test func macOS27SummaryReplacesTheExperimentalSidebarTabs() throws {
-        let contentSource = try source(extensionPath("Resources/content.js"))
-        let backgroundSource = try source(extensionPath("Resources/background.js"))
-        let appleIntelligenceSource = try source(extensionPath("AppleIntelligenceService.swift"))
-
-        #expect(contentSource.contains(#"data-tab="summaryBeta""#) == false)
-        #expect(contentSource.contains(#"data-tab="timestampsBeta""#) == false)
-        #expect(contentSource.contains(#"summaryFullBeta"#) == false)
-        #expect(contentSource.contains(#"timestampsBeta"#) == false)
-        #expect(contentSource.contains(#"T27"#) == false)
-        #expect(backgroundSource.contains(#"summaryFullBeta"#) == false)
-        #expect(backgroundSource.contains(#"timestampsBeta"#) == false)
-        #expect(contentSource.contains(#"SHOW_GENERATION_TIMING_IN_RESULT_CAPTIONS"#))
-        #expect(contentSource.contains(#"function resultCaption(kind)"#))
-        #expect(contentSource.contains(#"? "Apple Intelligence""#))
-        #expect(contentSource.contains(#"` in ${formatGenerationDuration(durationMs)}`"#))
-        #expect(contentSource.contains(#"`Generated with ${engineLabel}${durationSuffix}."#))
-        #expect(contentSource.contains(#"return kind === "timestamps" ? "Timestamps" : "Summary";"#))
-        #expect(contentSource.contains(#"function readNativeTranscriptPanel()"#))
-        #expect(contentSource.contains(#"transcript: track failed (${trackLabel(track)}: ${lastError})"#))
-        #expect(contentSource.contains(#"function nativeTranscriptDOMSummary()"#))
-        #expect(contentSource.contains(#"roots=${roots.length}"#))
-        #expect(appleIntelligenceSource.contains(#"kind == "summaryFull""#))
-        #expect(appleIntelligenceSource.contains(#"generateMacOS27FullSummary"#))
-        #expect(appleIntelligenceSource.contains(#"legacyFullSummaryChunkPlan("#))
-    }
-
-    @Test func nativeYouTubeChaptersPopulateTimestampsBeforeGeneration() throws {
-        let contentSource = try source(extensionPath("Resources/content.js"))
-
-        #expect(contentSource.contains(#"parseNativeYouTubeChapters,"#))
-        #expect(contentSource.contains(#"function applyNativeChaptersIfAvailable("#))
-        #expect(contentSource.contains(#"function hasNativeYouTubeChapters("#))
-        #expect(contentSource.contains(#"function shouldGenerateChaptersInsteadOfNative("#))
-        #expect(contentSource.contains(#"function effectiveChapterSource("#))
-        #expect(contentSource.contains(#"nativeChapterCache"#))
-        #expect(contentSource.contains(#"function nativeChaptersForVideo("#))
-        #expect(contentSource.contains(#"state.timestampsSource === "youtubeChapters""#))
-        #expect(contentSource.contains(#"chapterSourceOverrideByVideoKey"#))
-        #expect(contentSource.contains(#"const chapters = parseNativeYouTubeChapters(getInitialData(videoKey));"#))
-        #expect(contentSource.contains(#"state.timestampsSource = "youtubeChapters";"#))
-        #expect(contentSource.contains(#"clearPendingGeneration(videoKey, "timestamps");"#))
-        #expect(contentSource.contains(#"return "Using chapters already available on YouTube.";"#))
-        #expect(contentSource.contains(#"!canGenerateTimestamps() && !state.timestampsText"#))
-        #expect(contentSource.contains(#"if (applyNativeChaptersIfAvailable())"#))
-        #expect(contentSource.contains(#"kind === "timestamps" && applyNativeChaptersIfAvailable(videoKey)"#))
-        #expect(contentSource.contains(#"nativeChaptersAvailable: hasNativeYouTubeChapters(videoKey)"#))
-        #expect(contentSource.contains(#"state.didAutogenerateAnalysis = false;"#))
-        #expect(contentSource.contains(#"void maybeGenerateTimestamps();"#))
-        let backgroundSource = try source(extensionPath("Resources/background.js"))
-        #expect(backgroundSource.contains(#"nativeChaptersAvailable: Boolean(response?.nativeChaptersAvailable)"#))
-        #expect(backgroundSource.contains(#"pageActionStateByVideoKey"#))
-        #expect(backgroundSource.contains(#"function rememberedEffectiveChapterSource("#))
-        #expect(backgroundSource.contains(#"rememberPageActions(tab, response);"#))
-    }
-
-    @Test func nativeYouTubeInThisVideoPanelReceivesExtensionTabs() throws {
-        let contentSource = try source(extensionPath("Resources/content.js"))
-        let nativePanelSource = try source(extensionPath("Resources/native-panel.js"))
-
-        #expect(nativePanelSource.contains(#"function getNativeInThisVideoPanel()"#))
-        #expect(nativePanelSource.contains(#"nativePanelTitle(panel) === "In this video""#))
-        #expect(nativePanelSource.contains(#"function syncTabs("#))
-        #expect(nativePanelSource.contains(#"NATIVE_PANEL_TAB_WRAPPER_ATTRIBUTE"#))
-        #expect(nativePanelSource.contains(#"currentState.timestampsSource !== "youtubeChapters""#))
-        #expect(nativePanelSource.contains(#"return state().isLoading.timestamps ? "Chapters..." : "Chapters";"#))
-        #expect(nativePanelSource.contains(#"async function handleExtensionTabSelection(kind)"#))
-        #expect(contentSource.contains(#"data-yts-placement="native""#))
-        #expect(nativePanelSource.contains(#"function isNativePanelVisible(panel)"#))
-        #expect(nativePanelSource.contains(#"function open(mount)"#))
-        #expect(contentSource.contains(#"if (nativePanel.open(nativeMount))"#))
-        #expect(nativePanelSource.contains(#"state().nativePanelDismissed"#))
-        #expect(contentSource.contains(#"const nativeMount = nativePanel.getMount();"#))
-        #expect(nativePanelSource.contains(#"panel.setAttribute("visibility", NATIVE_PANEL_VISIBILITY_EXPANDED);"#))
-        #expect(contentSource.contains(#"nativePanel.selectDefaultExtensionTab();"#))
-        #expect(nativePanelSource.contains(#"function handleYouTubeControlClick(event)"#))
-        #expect(contentSource.contains(#"document.addEventListener("click", nativePanel.handleYouTubeControlClick, true);"#))
-        #expect(nativePanelSource.contains(#"function syncOwnedTabPressedState("#))
-        #expect(nativePanelSource.contains(#"chip.classList.toggle("ytChipShapeSelected", selected);"#))
-        #expect(nativePanelSource.contains(#"NATIVE_PANEL_HEADER_ACTION_ATTRIBUTE"#))
-        #expect(nativePanelSource.contains(#"function syncHeaderCopyButton("#))
-        #expect(nativePanelSource.contains(#"closeControl.parentElement.insertBefore(host, closeControl);"#))
-        #expect(nativePanelSource.contains(#"button.addEventListener("click", (event) => {"#))
-        #expect(nativePanelSource.contains(#"button.addEventListener("pointerdown", stopHeaderCopyEvent, true);"#))
-        #expect(nativePanelSource.contains(#"function nativeOwnedTabButton(kind"#))
-        #expect(nativePanelSource.contains(#"function selectNativeOwnedTab(kind"#))
-        #expect(nativePanelSource.contains(#"const NATIVE_PANEL_TAB_ORDER = ["chapters", "summary", "transcript", "timeline"];"#))
-        #expect(nativePanelSource.contains(#"function reorderTabs("#))
-        #expect(nativePanelSource.contains(#"return kind === "timestamps" ? "chapters" : kind;"#))
-        #expect(nativePanelSource.contains(#"reorderTabs(mount);"#))
-        #expect(nativePanelSource.contains(#"currentState.timestampsSource === "youtubeChapters""#))
-        #expect(nativePanelSource.contains(#"selectNativeOwnedTab("chapters", mount, { preserveUserSelection: true })"#))
-        #expect(nativePanelSource.contains(#"currentState.nativeYouTubeTab = "chapters";"#))
-        #expect(contentSource.contains(#"nativePanel.selectDefaultExtensionTab(nativeMount);"#))
-        #expect(nativePanelSource.contains(#"function syncContentVisibility("#))
-        #expect(nativePanelSource.contains(#"ytd-transcript-search-panel-renderer"#))
-        #expect(nativePanelSource.contains(#"function headerCopyKind("#))
-        #expect(nativePanelSource.contains(#"return nativeKind === "transcript" ? "transcript" : "";"#))
-        #expect(contentSource.contains(#"function transcriptCopyText("#))
-        #expect(contentSource.contains(#"return "Copy transcript";"#))
-        #expect(contentSource.contains(#"function resultScrollSurface("#))
-        #expect(nativePanelSource.contains(#"function syncBodyViewport("#))
-        #expect(contentSource.contains(#"--yts-native-body-max-height"#))
-        #expect(contentSource.contains(#"window.addEventListener("resize", () => nativePanel.syncBodyViewport());"#))
-        #expect(contentSource.contains(#"requestAnimationFrame(() => nativePanel.syncBodyViewport());"#))
-        #expect(contentSource.contains(#".native-body"#))
-        #expect(!contentSource.contains(#"native-action-row"#))
-        #expect(contentSource.contains(#".native-wrap .timestamp-link"#))
-        #expect(contentSource.contains(#"padding: 0;"#))
-        #expect(contentSource.contains(#"type: "native""#))
-        #expect(contentSource.contains(#"type: "sidebar""#))
-        #expect(nativePanelSource.contains(#"function syncNativeOwnedTabVisibility("#))
-        #expect(nativePanelSource.contains(#"state().nativeChaptersOverridden"#))
-        #expect(nativePanelSource.contains(#"function shouldRespectYouTubeTimelineSurface()"#))
-        #expect(nativePanelSource.contains(#"function dismissNativePanel("#))
-        #expect(nativePanelSource.contains(#"function revealNativeOwnedTab("#))
-    }
-
-    private func source(_ path: String) throws -> String {
-        let root = URL(fileURLWithPath: #filePath)
+    private func repositoryURL(_ path: String) -> URL {
+        URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let url = root.appending(path: path)
-        return try String(contentsOf: url, encoding: .utf8)
-    }
-
-    private func appPath(_ filename: String) -> String {
-        let folder = ["YouTube", "Timestamps", "and", "Summaries"].joined(separator: " ")
-        return "\(folder)/\(filename)"
-    }
-
-    private func extensionPath(_ filename: String) -> String {
-        let folder = ["YouTube", "Timestamps", "and", "Summaries", "Extension"].joined(separator: " ")
-        return "\(folder)/\(filename)"
+            .appending(path: path)
     }
 }

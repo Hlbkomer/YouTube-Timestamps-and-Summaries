@@ -59,8 +59,9 @@ actor RemoteModelCatalogService {
                 else {
                     return nil
                 }
+                let modelID = GenerationSettings.normalizedModelID(model.id, providerID: providerID)
                 return [
-                    "id": model.id,
+                    "id": modelID,
                     "label": model.label,
                 ]
             }
