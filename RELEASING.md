@@ -104,13 +104,14 @@ The release script creates this stable filename by default. The website points t
 
 When notarization is enabled, a successful script exit guarantees that the ticket was stapled and validated and that the final app passed Gatekeeper assessment. The pre-notarization Gatekeeper result is informational because rejection is expected before a ticket exists.
 
-After the tested candidate is approved, committed, tagged as `v1.1`, pushed, and verified, publish it with the public title `1.1` and the prepared notes:
+After a tested candidate is approved, committed, tagged, pushed, and verified, publish it with the matching public title and prepared notes. For example:
 
 ```bash
-gh release create v1.1 \
+VERSION="1.2"
+gh release create "v$VERSION" \
   build/release/artifacts/Timestamps-and-Summaries-for-YT.zip \
-  --title "1.1" \
-  --notes-file docs/github-release-1.1.md \
+  --title "$VERSION" \
+  --notes-file "docs/github-release-$VERSION.md" \
   --verify-tag \
   --latest
 ```

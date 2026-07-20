@@ -54,17 +54,18 @@ The Grok and ChatGPT/Codex picker catalog behavior, model exclusions, and remote
 
 The repository-wide maintenance findings, justified Safari workarounds, and recommended cleanup order are documented in [code-complexity-review.md](code-complexity-review.md).
 
-The current version 1.1 behavior audit, automated validation, and remaining manual release gates are documented in [release-1.1-readiness.md](release-1.1-readiness.md).
+The completed version 1.1 behavior audit, automated validation, notarization, and publication record is documented in [release-1.1-readiness.md](release-1.1-readiness.md).
 
 ## Download And Support
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin: 1.5rem 0;">
   <section style="border: 1px solid #d8dee4; border-radius: 12px; padding: 1rem;">
     <h3 style="margin-top: 0;">Download</h3>
-    <p>Download the signed and notarized macOS app.</p>
+    <p>Download the signed and notarized macOS app. The current release is <strong>1.1</strong>, published July 20, 2026.</p>
     <p>
       <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip">Download Timestamps &amp; Summaries for YT</a>
     </p>
+    <p><a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.1">Read the 1.1 release notes</a></p>
     <p>After unzipping, move the app to <code>Applications</code>, open it and enable the Safari extension.</p>
   </section>
 

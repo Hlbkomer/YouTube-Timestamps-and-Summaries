@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Synchronize the README, GitHub Pages project site, App Store preparation notes, privacy/terms dates, and version 1.1 publication record after the GitHub release.
+
 ## v1.1 - 2026-07-20
 
 - Prepare the app and WebExtension metadata for public version 1.1 with internal build 7.

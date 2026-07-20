@@ -33,7 +33,7 @@ Primary Apple references used for this review:
 - Apple Intelligence can generate summaries without a cloud-provider sign-in when the reviewer selects it as the Summary model.
 - ChatGPT and Grok sign-in are optional and unlock generated chapters plus provider-powered summaries.
 - Existing YouTube creator chapters and automatic Key moments work without either provider and appear in the same compact Chapters view.
-- Developer signing and notarization work is already underway for outside-the-store distribution.
+- Version 1.1 is signed, notarized, and published on GitHub for outside-the-store distribution. The App Store update remains a separate, intentionally deferred release track.
 
 ## Likely App Review risks
 

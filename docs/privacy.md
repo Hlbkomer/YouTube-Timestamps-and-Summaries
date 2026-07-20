@@ -4,7 +4,7 @@ title: Privacy Policy
 
 # Privacy Policy
 
-Last updated: July 18, 2026
+Last updated: July 20, 2026
 
 This Privacy Policy explains how Timestamps & Summaries for YT handles data when generating timestamps and summaries.
 

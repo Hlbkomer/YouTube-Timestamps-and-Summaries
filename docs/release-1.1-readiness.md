@@ -1,8 +1,10 @@
-# Version 1.1 Release Readiness
+# Version 1.1 Release Record
 
 Review date: 2026-07-20
 
-This document is the release handoff for version 1.1. It complements the detailed implementation history in [CHANGELOG.md](../CHANGELOG.md), the system design in [ARCHITECTURE.md](../ARCHITECTURE.md), and the manual release procedure in [RELEASING.md](../RELEASING.md).
+Status: **Published on GitHub on 2026-07-20** — [release 1.1](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.1)
+
+This document is the completed release record for version 1.1. It complements the detailed implementation history in [CHANGELOG.md](../CHANGELOG.md), the system design in [ARCHITECTURE.md](../ARCHITECTURE.md), and the reusable release procedure in [RELEASING.md](../RELEASING.md).
 
 The ready-to-paste public GitHub description is in [github-release-1.1.md](github-release-1.1.md). It deliberately uses only the public version name `1.1`; Xcode's required internal build number is not exposed in the release title or notes.
 
@@ -78,28 +80,27 @@ The remaining complexity is documented and intentionally deferred:
 
 These items are maintenance opportunities, not version 1.1 release blockers.
 
-## Release Gates
+## Release Gates Completed
 
-Before cutting version 1.1:
+Version 1.1 completed the following release sequence:
 
-1. During iterative Safari validation, use only the signed Debug build from Xcode. Do not register Debug and Release host apps together; reserve Release builds for the final packaging gate.
-2. Complete the automated validation recorded below.
-3. Run the Safari manual matrix in [RELEASING.md](../RELEASING.md), especially repeated tab switching, copy feedback, native/generated switching, native-Chapters plus automatic-Summary behavior, delayed chapter discovery, transcript-free pages, and all four navigation routes.
-4. After explicit approval, build, sign, notarize, staple, and Gatekeeper-validate the release candidate.
-5. Test that exact notarized candidate as both a fresh install and an upgrade from version 1.0.5 so Safari extension visibility/enablement does not require deleting the app.
-6. If submitting to the Mac App Store, finish the provider-retention review called out in [APP_STORE_CONNECT_COPY.md](../APP_STORE_CONNECT_COPY.md) before finalizing App Privacy answers.
+1. Iterative Safari validation used only the signed Debug build from Xcode; Debug and Release hosts were not left registered together.
+2. The automated validation recorded below completed successfully.
+3. The user completed the Safari manual matrix without finding a release blocker, including tab switching, copy feedback, native/generated switching, native-Chapters plus automatic-Summary behavior, delayed chapter discovery, transcript-free pages, and navigation transitions.
+4. After explicit approval, the final candidate was built, Developer ID signed, notarized, stapled, and Gatekeeper validated.
+5. A clean extraction of the uploaded ZIP passed strict signature, stapler, version, architecture, entitlement, and embedded-resource verification. The public latest-download asset was downloaded again and matched the local candidate byte-for-byte.
+6. Every temporary Release registration was removed afterward and the single signed Debug 1.1 host was restored for continuing Safari development.
 
 The App Store update is intentionally deferred until the GitHub build has received additional real-world testing. GitHub publication does not imply that the App Store submission gate is complete.
 
-After the user approves the tested candidate:
+## Publication Completed
 
-1. Change the `Unreleased` heading in [CHANGELOG.md](../CHANGELOG.md) to `v1.1` with the release date.
-2. Run the full automated and manual release gates from a clean candidate commit.
-3. Run `NOTARIZE=1 NOTARY_PROFILE=yts-notary ./scripts/build-release.sh`; do not keep that Release host registered alongside the Debug test host.
-4. Verify the exported app's signature, notarization ticket, Gatekeeper acceptance, public version, embedded extension version, and SHA-256 checksum.
-5. Test that notarized artifact on a clean user account or Mac as a fresh install and as an upgrade over public version 1.0.5.
-6. Tag that exact candidate commit as `v1.1`, push the commit and tag, and create the GitHub release with the public title `1.1`, using [github-release-1.1.md](github-release-1.1.md) as its description and attaching `build/release/artifacts/Timestamps-and-Summaries-for-YT.zip`.
-7. Confirm the repository's `releases/latest/download/Timestamps-and-Summaries-for-YT.zip` URL downloads the new asset, then unregister the Release host before returning to Debug development.
+- release commit: `04e273ec75e8e15fb50dbcc4a0050d2568948210`
+- annotated tag: `v1.1`, resolving to the release commit
+- public title: `1.1`
+- release notes: [github-release-1.1.md](github-release-1.1.md)
+- public release: [github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.1](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.1)
+- stable latest download: [Timestamps-and-Summaries-for-YT.zip](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip)
 
 ## Automated Validation
 
@@ -119,10 +120,10 @@ The Release results above are one-time release-readiness checks, not the active 
 
 Release metadata is prepared as public version `1.1` in Xcode and the WebExtension manifest. Xcode uses internal build `7`; the build number is not part of the public release name.
 
-GitHub/package prerequisites were rechecked on 2026-07-20 without creating a Release build:
+GitHub/package prerequisites were rechecked on 2026-07-20 before the final Release build:
 
-- GitHub CLI authentication targets `Hlbkomer/YouTube-Timestamps-and-Summaries`, whose current latest release is `v1.0.5`.
-- The current public release includes the stable `Timestamps-and-Summaries-for-YT.zip` asset expected by the repository's latest-download links.
+- GitHub CLI authentication targeted `Hlbkomer/YouTube-Timestamps-and-Summaries`; the previous public release was `v1.0.5`.
+- The previous public release included the stable `Timestamps-and-Summaries-for-YT.zip` asset expected by the repository's latest-download links.
 - A Developer ID Application identity for team `3PHWBNH53Z` is installed.
 - The `yts-notary` keychain profile authenticates successfully with Apple's notary service.
 - Only the signed DerivedData Debug host and its embedded extension are registered with Launch Services.

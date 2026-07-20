@@ -17,6 +17,8 @@ Download the signed and notarized macOS app:
 
 [Download Timestamps & Summaries for YT](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip)
 
+Current release: **1.1** (July 20, 2026). See the [1.1 release notes](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.1).
+
 After unzipping, move the app to `Applications`, open it and enable the Safari extension.
 
 ## Preview
@@ -84,7 +86,7 @@ The `tests/js/manifest-routing.test.cjs` test protects this split.
 
 ## Releasing
 
-For Developer ID signing, notarization, and release packaging, see [RELEASING.md](RELEASING.md). The current version 1.1 behavior audit and remaining release gates are recorded in [docs/release-1.1-readiness.md](docs/release-1.1-readiness.md).
+For Developer ID signing, notarization, and release packaging, see [RELEASING.md](RELEASING.md). The completed version 1.1 behavior audit, validation, notarization, and publication record is in [docs/release-1.1-readiness.md](docs/release-1.1-readiness.md).
 
 ## Optional Grok Login
 

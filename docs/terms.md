@@ -4,7 +4,7 @@ title: Terms of Service
 
 # Terms of Service
 
-Last updated: April 26, 2026
+Last updated: July 20, 2026
 
 These Terms of Service govern the use of Timestamps & Summaries for YT.
 

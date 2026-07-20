@@ -219,14 +219,13 @@ If App Store Connect’s questionnaire wording changes, review the answers again
 
 ## Remaining App Store prep tasks
 
-1. Add visible support contact information to `https://hlbkomer.github.io/`
-2. Confirm the review build runs on macOS 26.4 or later
-3. Fill App Privacy in App Store Connect using the draft above
-4. Create screenshots for:
+1. Confirm the review build runs on macOS 26.4 or later
+2. Fill App Privacy in App Store Connect using the draft above
+3. Create screenshots for:
    - companion app
    - native `In this video` Chapters view
    - Summary view
    - optional YouTube/generated chapter-source switch
-5. Create the App Store Connect app record
-6. Decide whether App Review needs connected-provider credentials or whether the no-account YouTube chapter and Apple Intelligence paths are sufficient; Apple asks for working review access to account-based features when those features are part of the submitted experience.
-7. Upload an App Store build when ready
+4. Create the App Store Connect app record
+5. Decide whether App Review needs connected-provider credentials or whether the no-account YouTube chapter and Apple Intelligence paths are sufficient; Apple asks for working review access to account-based features when those features are part of the submitted experience.
+6. Upload an App Store build when ready
