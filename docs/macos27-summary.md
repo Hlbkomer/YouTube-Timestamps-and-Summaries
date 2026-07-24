@@ -27,25 +27,23 @@ On macOS 27, the existing `Summary model` picker exposes one Apple Intelligence 
 
 - `Apple Intelligence` uses a strict, reader-facing one-call Markdown contract when the complete transcript fits that request's measured input budget. Transcripts that exceed the one-call boundary use the grounded pipeline: it creates self-contained points per chunk, limits the handoff to unresolved continuity rather than facts, uses cue timing locally to find thought boundaries, and performs a final composition pass with explicit speaker and entity-binding rules.
 
-The persisted model IDs and their strategy mappings are:
+The persisted model ID and its production strategy are:
 
 | Saved summary-model ID | Runtime strategy |
 |---|---|
 | `appleIntelligence` | `adaptiveGrounded` |
-| Former `appleIntelligenceFast` | Migrated to `appleIntelligence` / `adaptiveGrounded` |
-| Former `appleIntelligenceQuality` | Migrated to `appleIntelligence` / `adaptiveGrounded` |
 
-Every Apple selection now normalizes to the canonical `appleIntelligence` ID and adaptive-grounded strategy. Former Fast, Quality, baseline, hierarchical, rolling-composed, rolling-joined, missing, and unknown user-facing values therefore migrate to the same production behavior. The strategy preference remains stored for compatibility and diagnostics, but it is no longer a user-facing setting.
+`appleIntelligence` is the only recognized, persisted, and routed Apple summary-model ID. Production does not store or accept a separate strategy preference; selecting that model always runs the adaptive-grounded strategy.
 
 The baseline, hierarchical, rolling-joined, and rolling-composed strategies remain callable by the Debug test runner for controlled comparisons. They are not production picker choices.
 
 ## Implementation Map
 
-- `Shared/GenerationSettings.swift` owns picker IDs, defaults, legacy migration, and production-versus-Debug strategy normalization.
+- `Shared/GenerationSettings.swift` owns the canonical picker ID, defaults, and Debug-only comparison strategy normalization.
 - `YouTube Timestamps and Summaries Extension/AppleIntelligenceService.swift` owns macOS routing, token-aware chunking, the production adaptive-grounded pipeline, Debug-only comparison pipelines, recovery policy, deterministic fallbacks, and metrics.
 - `Shared/AppleSummaryTranscriptUtilities.swift` applies native-boundary transcript redaction.
 - `Shared/AppleSummaryTextUtilities.swift` removes generic headings, validates strict reader-facing output, and detects narrow model-protocol signatures.
-- `YouTube Timestamps and Summaries Extension/SafariWebExtensionHandler.swift` validates the native request and returns strategy diagnostics.
+- `YouTube Timestamps and Summaries Extension/SafariWebExtensionHandler.swift` validates the native request and returns generation diagnostics.
 - `YouTube Timestamps and Summaries Extension/Resources/background.js` and `YouTube Timestamps and Summaries/Resources/Script.js` route the selected Summary model and display its label and elapsed time.
 
 ## Long-Transcript Architecture
@@ -256,7 +254,7 @@ Adaptive grounded is the sole production Apple Intelligence path because its qua
 
 ## Verification Snapshot
 
-At the latest implementation check, the signed Debug test suite passed 20 Swift tests and the JavaScript suite passed 85 tests. Automated coverage includes Apple picker/default/migration behavior, strict short-summary validation, complete-response cleanup and protocol-leak handling, native transcript redaction, provider refresh-failure policy, Grok callback ambiguity, safe model-label rendering, lightweight generation routing, and Grok model-to-reasoning mapping. The Debug runner also keeps all five Apple strategies available for real Foundation Models comparisons.
+At the latest implementation check, the signed Debug test suite passed 20 Swift tests and the JavaScript suite passed 85 tests. Automated coverage includes the canonical Apple picker/default behavior, strict short-summary validation, complete-response cleanup and protocol-leak handling, native transcript redaction, provider refresh-failure policy, Grok callback ambiguity, safe model-label rendering, lightweight generation routing, and Grok model-to-reasoning mapping. The Debug runner also keeps all five Apple strategies available for real Foundation Models comparisons.
 
 These tests validate routing and deterministic safeguards. Summary quality, Foundation Models nondeterminism, thermal behavior, and beta-OS regressions still require the real-video protocol above.
 

@@ -101,7 +101,7 @@ ChatGPT/Codex defaults to **GPT-5.6 Terra**, begins with tested local choices, a
 The visible `Summary` tab keeps one consistent workflow while choosing the local Apple Intelligence implementation for the installed macOS version:
 
 - macOS 26 uses the established character-based summary path.
-- On macOS 27, the Summary model picker contains one **Apple Intelligence** choice backed by the detailed adaptive-grounded pipeline. Former Fast and Quality selections migrate to it automatically.
+- On macOS 27, the Summary model picker contains one **Apple Intelligence** choice backed by the detailed adaptive-grounded pipeline.
 
 This applies only when Apple Intelligence is selected for summaries. ChatGPT and Grok summaries continue to use the selected provider on every macOS version. Private Cloud Compute is not active while its managed Apple entitlement is pending. See [docs/macos27-summary.md](docs/macos27-summary.md) for the technical and testing notes.
 

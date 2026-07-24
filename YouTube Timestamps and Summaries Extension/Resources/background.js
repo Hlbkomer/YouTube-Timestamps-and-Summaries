@@ -267,7 +267,6 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, m
     const summaryModel = settings.summaryModelID || timestampModel;
     const summaryModelLabel = settings.summaryModelLabel || settings.summaryEngineLabel || summaryModel;
     const summaryEngine = settings.summaryEngine || "selectedModel";
-    const appleSummaryStrategy = settings.appleSummaryStrategy || "adaptiveGrounded";
     const summaryEngineLabel = summaryEngine === "selectedModel"
         ? summaryModelLabel
         : (summaryModelLabel || "Apple Intelligence");
@@ -287,7 +286,6 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, m
         transcript: transcriptText,
         languageCode: metadata.languageCode || "",
         languageLabel: metadata.languageLabel || "",
-        appleSummaryStrategy,
     }, nativeTimeoutMs);
 }
 

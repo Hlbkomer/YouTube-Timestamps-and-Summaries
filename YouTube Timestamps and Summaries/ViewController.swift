@@ -523,14 +523,11 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             .isAppleIntelligenceSummaryModelID(settings.summaryModelID)
 
         if !selectedProviderConnected, appleIntelligenceAvailable {
-            let appleSummaryModelID = summaryUsesApple
-                ? effectiveAppleSummaryModelID(settings.summaryModelID)
-                : GenerationSettings.appleIntelligenceModelID
             return GenerationSettings(
                 providerID: settings.providerID,
                 modelID: settings.modelID,
                 summaryEngine: "appleIntelligence",
-                summaryModelID: appleSummaryModelID,
+                summaryModelID: GenerationSettings.appleIntelligenceModelID,
                 chapterPreference: settings.chapterPreference
             )
         }
@@ -544,7 +541,7 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
                 providerID: settings.providerID,
                 modelID: settings.modelID,
                 summaryEngine: "appleIntelligence",
-                summaryModelID: effectiveAppleSummaryModelID(settings.summaryModelID),
+                summaryModelID: GenerationSettings.appleIntelligenceModelID,
                 chapterPreference: settings.chapterPreference
             )
         }
@@ -555,13 +552,6 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             summaryEngine: "selectedModel",
             summaryModelID: settings.modelID,
             chapterPreference: settings.chapterPreference
-        )
-    }
-
-    private func effectiveAppleSummaryModelID(_ modelID: String) -> String {
-        GenerationSettings.normalizedAppleIntelligenceSummaryModelID(
-            modelID,
-            legacyStrategy: GenerationSettings.defaultAppleSummaryStrategy
         )
     }
 

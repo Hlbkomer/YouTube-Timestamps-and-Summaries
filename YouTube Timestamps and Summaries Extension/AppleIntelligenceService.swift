@@ -286,8 +286,41 @@ final class AppleIntelligenceService {
         kind: String,
         transcript: String = "",
         languageCode: String = "",
+        languageLabel: String = ""
+    ) async -> [String: Any] {
+        await generateUsingStrategy(
+            kind: kind,
+            transcript: transcript,
+            languageCode: languageCode,
+            languageLabel: languageLabel,
+            strategy: GenerationSettings.defaultAppleSummaryStrategy
+        )
+    }
+
+    #if DEBUG
+    func generate(
+        kind: String,
+        transcript: String = "",
+        languageCode: String = "",
         languageLabel: String = "",
-        strategy: String = GenerationSettings.defaultAppleSummaryStrategy
+        strategy: String
+    ) async -> [String: Any] {
+        await generateUsingStrategy(
+            kind: kind,
+            transcript: transcript,
+            languageCode: languageCode,
+            languageLabel: languageLabel,
+            strategy: GenerationSettings.normalizedAppleSummaryStrategyForTesting(strategy)
+        )
+    }
+    #endif
+
+    private func generateUsingStrategy(
+        kind: String,
+        transcript: String,
+        languageCode: String,
+        languageLabel: String,
+        strategy appleSummaryStrategy: String
     ) async -> [String: Any] {
         let model = SystemLanguageModel(useCase: .general, guardrails: .permissiveContentTransformations)
         let guardrailMode = "permissiveContentTransformations"
@@ -296,12 +329,6 @@ final class AppleIntelligenceService {
         let transcriptText = transcriptRedaction.text
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let languageContext = LanguageContext(code: languageCode, label: languageLabel)
-        #if DEBUG
-        let appleSummaryStrategy = GenerationSettings
-            .normalizedAppleSummaryStrategyForTesting(strategy)
-        #else
-        let appleSummaryStrategy = GenerationSettings.normalizedAppleSummaryStrategy(strategy)
-        #endif
 
         print("[AppleIntelligence] Starting generation. kind=\(kind) strategy=\(appleSummaryStrategy) language=\(languageContext.debugLabel)")
         logger.log("Starting local generation. kind=\(kind, privacy: .public) strategy=\(appleSummaryStrategy, privacy: .public) guardrails=\(guardrailMode, privacy: .public) language=\(languageContext.debugLabel, privacy: .public)")
@@ -342,19 +369,19 @@ final class AppleIntelligenceService {
                         languageContext: languageContext,
                         composeFinalSummary: true
                     )
-                #endif
-                case GenerationSettings.appleSummaryStrategyAdaptiveGrounded:
-                    result = try await generateMacOS27AdaptiveGroundedSummary(
-                        from: analysisTranscriptText,
-                        model: model,
-                        languageContext: languageContext
-                    )
                 case GenerationSettings.appleSummaryStrategyRollingJoined:
                     result = try await generateMacOS27RollingSummary(
                         from: modelTranscriptText,
                         model: model,
                         languageContext: languageContext,
                         composeFinalSummary: false
+                    )
+                #endif
+                case GenerationSettings.appleSummaryStrategyAdaptiveGrounded:
+                    result = try await generateMacOS27AdaptiveGroundedSummary(
+                        from: analysisTranscriptText,
+                        model: model,
+                        languageContext: languageContext
                     )
                 default:
                     result = try await generateMacOS27FullSummary(

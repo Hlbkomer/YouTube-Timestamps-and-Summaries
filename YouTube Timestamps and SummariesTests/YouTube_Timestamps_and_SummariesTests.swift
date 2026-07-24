@@ -25,15 +25,13 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(defaults.summaryModelID == GenerationSettings.defaultModelID)
         #expect(defaults.summaryEngine == GenerationSettings.defaultSummaryEngine)
         #expect(defaults.chapterPreference == GenerationSettings.preferNativeChapters)
-        #expect(defaults.appleSummaryStrategy == GenerationSettings.defaultAppleSummaryStrategy)
 
         let appleSummary = GenerationSettings(
             providerID: GenerationSettings.grokProviderID,
             modelID: "grok-4.3",
             summaryEngine: GenerationSettings.appleIntelligenceModelID,
             summaryModelID: GenerationSettings.appleIntelligenceModelID,
-            chapterPreference: GenerationSettings.alwaysGenerateChapters,
-            appleSummaryStrategy: GenerationSettings.appleSummaryStrategyAdaptiveGrounded
+            chapterPreference: GenerationSettings.alwaysGenerateChapters
         )
         #expect(appleSummary.modelID == "grok-4.3")
         #expect(
@@ -43,23 +41,16 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(appleSummary.summaryEngine == GenerationSettings.appleIntelligenceModelID)
         #expect(appleSummary.chapterPreference == GenerationSettings.alwaysGenerateChapters)
         #expect(
-            appleSummary.appleSummaryStrategy
-                == GenerationSettings.appleSummaryStrategyAdaptiveGrounded
+            GenerationSettings.isAppleIntelligenceSummaryModelID(
+                GenerationSettings.appleIntelligenceModelID
+            )
         )
-        #expect(
-            GenerationSettings.normalizedAppleSummaryStrategy("unknown")
-                == GenerationSettings.defaultAppleSummaryStrategy
-        )
-        #expect(
-            GenerationSettings.normalizedAppleSummaryStrategy(
-                GenerationSettings.appleSummaryStrategyBaseline
-            ) == GenerationSettings.appleSummaryStrategyAdaptiveGrounded
-        )
+        #expect(!GenerationSettings.isAppleIntelligenceSummaryModelID("unknown"))
         #expect(
             GenerationSettings.appleIntelligenceSummaryModelOptions == [
                 [
                     "id": GenerationSettings.appleIntelligenceModelID,
-                    "label": "Apple Intelligence",
+                    "label": GenerationSettings.appleIntelligenceLabel,
                 ],
             ]
         )
@@ -73,46 +64,9 @@ struct YouTube_Timestamps_and_SummariesTests {
             ]
         )
         #expect(
-            GenerationSettings.appleIntelligenceResultLabel(
-                for: GenerationSettings.appleIntelligenceModelID
-            ) == "Apple Intelligence"
-        )
-        #expect(
-            GenerationSettings.appleIntelligenceResultLabel(
-                for: "appleIntelligenceFast"
-            ) == "Apple Intelligence"
-        )
-        #expect(
             GenerationSettings.normalizedAppleSummaryStrategyForTesting(
                 GenerationSettings.appleSummaryStrategyRollingJoined
             ) == GenerationSettings.appleSummaryStrategyRollingJoined
-        )
-
-        let migratedFastAppleSummary = GenerationSettings(
-            providerID: GenerationSettings.chatGPTProviderID,
-            modelID: GenerationSettings.defaultModelID,
-            summaryEngine: GenerationSettings.appleIntelligenceModelID,
-            summaryModelID: "appleIntelligenceFast",
-            appleSummaryStrategy: GenerationSettings.appleSummaryStrategyRollingJoined
-        )
-        #expect(
-            migratedFastAppleSummary.summaryModelID
-                == GenerationSettings.appleIntelligenceModelID
-        )
-        #expect(
-            migratedFastAppleSummary.appleSummaryStrategy
-                == GenerationSettings.appleSummaryStrategyAdaptiveGrounded
-        )
-
-        let migratedQualityAppleSummary = GenerationSettings(
-            providerID: GenerationSettings.chatGPTProviderID,
-            modelID: GenerationSettings.defaultModelID,
-            summaryEngine: GenerationSettings.appleIntelligenceModelID,
-            summaryModelID: "appleIntelligenceQuality"
-        )
-        #expect(
-            migratedQualityAppleSummary.summaryModelID
-                == GenerationSettings.appleIntelligenceModelID
         )
     }
 

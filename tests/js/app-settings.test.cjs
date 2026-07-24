@@ -138,7 +138,7 @@ test("provider picker disables disconnected options without a connection hint", 
     assert.equal(elements.get("model-select").disabled, true);
 });
 
-test("Apple Intelligence uses one quality-backed Summary model choice", () => {
+test("Apple Intelligence uses one Summary model choice", () => {
     const elements = render({
         summaryOptions: [
             { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
@@ -157,8 +157,10 @@ test("Apple Intelligence uses one quality-backed Summary model choice", () => {
         elements.get("summary-select").innerHTML,
         /GPT-5\.6 Terra.*Apple Intelligence/
     );
-    assert.doesNotMatch(elements.get("summary-select").innerHTML, /Fast Mode|Quality Mode/);
-    assert.equal(elements.has("apple-summary-strategy-field"), false);
+    assert.equal(
+        (elements.get("summary-select").innerHTML.match(/<option/g) || []).length,
+        2
+    );
 });
 
 test("Grok 4.5 reasoning is enforced at the final request boundary", () => {

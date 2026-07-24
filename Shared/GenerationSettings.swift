@@ -12,7 +12,6 @@ nonisolated struct GenerationSettings {
     static let summaryEngineKey = "generation.summaryEngine"
     static let summaryModelIDKey = "generation.summaryModelID"
     static let chapterPreferenceKey = "generation.chapterPreference"
-    static let appleSummaryStrategyKey = "generation.appleSummaryStrategy"
 
     static let chatGPTProviderID = "openaiCodex"
     static let grokProviderID = "xaiOAuth"
@@ -29,14 +28,15 @@ nonisolated struct GenerationSettings {
     static let defaultGrokModelID = "grok-4.5"
     static let defaultSummaryEngine = "selectedModel"
     static let appleIntelligenceModelID = "appleIntelligence"
-    private static let legacyAppleIntelligenceFastModelID = "appleIntelligenceFast"
-    private static let legacyAppleIntelligenceQualityModelID = "appleIntelligenceQuality"
+    static let appleIntelligenceLabel = "Apple Intelligence"
+    static let appleSummaryStrategyAdaptiveGrounded = "adaptiveGrounded"
+    static let defaultAppleSummaryStrategy = appleSummaryStrategyAdaptiveGrounded
+    #if DEBUG
     static let appleSummaryStrategyBaseline = "baseline"
     static let appleSummaryStrategyHierarchical = "hierarchical"
     static let appleSummaryStrategyRollingJoined = "rollingJoined"
     static let appleSummaryStrategyRollingComposed = "rollingComposed"
-    static let appleSummaryStrategyAdaptiveGrounded = "adaptiveGrounded"
-    static let defaultAppleSummaryStrategy = appleSummaryStrategyAdaptiveGrounded
+    #endif
     private static let legacyGrok45QualityModelID = "grok-4.5-quality"
     static let preferNativeChapters = "preferNative"
     static let alwaysGenerateChapters = "alwaysGenerate"
@@ -47,30 +47,22 @@ nonisolated struct GenerationSettings {
     let summaryModelID: String
     let summaryEngine: String
     let chapterPreference: String
-    let appleSummaryStrategy: String
 
     init(
         providerID: String,
         modelID: String,
         summaryEngine: String,
         summaryModelID: String? = nil,
-        chapterPreference: String = defaultChapterPreference,
-        appleSummaryStrategy: String = defaultAppleSummaryStrategy
+        chapterPreference: String = defaultChapterPreference
     ) {
         let normalizedProviderID = Self.normalizedProviderID(providerID)
         let normalizedModelID = Self.normalizedModelID(modelID, providerID: normalizedProviderID)
-        let normalizedLegacyAppleStrategy = Self.normalizedAppleSummaryStrategy(
-            appleSummaryStrategy
-        )
         let requestedSummaryModelID = summaryModelID
             ?? (summaryEngine == Self.appleIntelligenceModelID ? Self.appleIntelligenceModelID : normalizedModelID)
         let appleSummaryModelID = Self.isAppleIntelligenceSummaryModelID(
             requestedSummaryModelID
         )
-            ? Self.normalizedAppleIntelligenceSummaryModelID(
-                requestedSummaryModelID,
-                legacyStrategy: normalizedLegacyAppleStrategy
-            )
+            ? Self.appleIntelligenceModelID
             : nil
 
         self.providerID = normalizedProviderID
@@ -85,9 +77,6 @@ nonisolated struct GenerationSettings {
             ? Self.defaultSummaryEngine
             : Self.appleIntelligenceModelID
         self.chapterPreference = Self.normalizedChapterPreference(chapterPreference)
-        self.appleSummaryStrategy = appleSummaryModelID.map {
-            Self.appleSummaryStrategy(for: $0)
-        } ?? normalizedLegacyAppleStrategy
     }
 
     static var sharedDefaults: UserDefaults {
@@ -101,8 +90,7 @@ nonisolated struct GenerationSettings {
             modelID: defaults.string(forKey: modelIDKey) ?? defaultModelID,
             summaryEngine: defaults.string(forKey: summaryEngineKey) ?? defaultSummaryEngine,
             summaryModelID: defaults.string(forKey: summaryModelIDKey),
-            chapterPreference: defaults.string(forKey: chapterPreferenceKey) ?? defaultChapterPreference,
-            appleSummaryStrategy: defaults.string(forKey: appleSummaryStrategyKey) ?? defaultAppleSummaryStrategy
+            chapterPreference: defaults.string(forKey: chapterPreferenceKey) ?? defaultChapterPreference
         )
     }
 
@@ -113,7 +101,6 @@ nonisolated struct GenerationSettings {
         defaults.set(summaryModelID, forKey: Self.summaryModelIDKey)
         defaults.set(summaryEngine, forKey: Self.summaryEngineKey)
         defaults.set(chapterPreference, forKey: Self.chapterPreferenceKey)
-        defaults.set(appleSummaryStrategy, forKey: Self.appleSummaryStrategyKey)
     }
 
     var payload: [String: Any] {
@@ -123,7 +110,6 @@ nonisolated struct GenerationSettings {
             "summaryModelID": summaryModelID,
             "summaryEngine": summaryEngine,
             "chapterPreference": chapterPreference,
-            "appleSummaryStrategy": appleSummaryStrategy,
         ]
     }
 
@@ -131,7 +117,7 @@ nonisolated struct GenerationSettings {
         [
             [
                 "id": appleIntelligenceModelID,
-                "label": "Apple Intelligence",
+                "label": appleIntelligenceLabel,
             ],
         ]
     }
@@ -302,31 +288,8 @@ nonisolated struct GenerationSettings {
             : defaultChapterPreference
     }
 
-    static func normalizedAppleSummaryStrategy(_ strategy: String) -> String {
-        defaultAppleSummaryStrategy
-    }
-
     static func isAppleIntelligenceSummaryModelID(_ modelID: String) -> Bool {
-        [
-            appleIntelligenceModelID,
-            legacyAppleIntelligenceFastModelID,
-            legacyAppleIntelligenceQualityModelID,
-        ].contains(modelID)
-    }
-
-    static func appleSummaryStrategy(for summaryModelID: String) -> String {
-        appleSummaryStrategyAdaptiveGrounded
-    }
-
-    static func appleIntelligenceResultLabel(for summaryModelID: String) -> String {
-        "Apple Intelligence"
-    }
-
-    static func normalizedAppleIntelligenceSummaryModelID(
-        _ modelID: String,
-        legacyStrategy: String
-    ) -> String {
-        appleIntelligenceModelID
+        modelID == appleIntelligenceModelID
     }
 
     #if DEBUG

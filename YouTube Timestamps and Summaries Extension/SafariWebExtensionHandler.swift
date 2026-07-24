@@ -86,14 +86,11 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             let transcript = payload["transcript"] as? String ?? ""
             let languageCode = payload["languageCode"] as? String ?? ""
             let languageLabel = payload["languageLabel"] as? String ?? ""
-            let appleSummaryStrategy = payload["appleSummaryStrategy"] as? String
-                ?? GenerationSettings.defaultAppleSummaryStrategy
             return await service.generate(
                 kind: kind,
                 transcript: transcript,
                 languageCode: languageCode,
-                languageLabel: languageLabel,
-                strategy: appleSummaryStrategy
+                languageLabel: languageLabel
             )
 
         case "generateCodexTimestamps":
@@ -235,28 +232,21 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             : codexConnected
         let effectiveSummaryModelID: String
         if !selectedProviderConnected, appleConfigured {
-            effectiveSummaryModelID = effectiveAppleSummaryModelID(
-                GenerationSettings.isAppleIntelligenceSummaryModelID(settings.summaryModelID)
-                    ? settings.summaryModelID
-                    : GenerationSettings.appleIntelligenceModelID
-            )
+            effectiveSummaryModelID = GenerationSettings.appleIntelligenceModelID
         } else if
             GenerationSettings.isAppleIntelligenceSummaryModelID(settings.summaryModelID),
             !appleConfigured
         {
             effectiveSummaryModelID = settings.modelID
         } else {
-            effectiveSummaryModelID = GenerationSettings
-                .isAppleIntelligenceSummaryModelID(settings.summaryModelID)
-                ? effectiveAppleSummaryModelID(settings.summaryModelID)
-                : settings.summaryModelID
+            effectiveSummaryModelID = settings.summaryModelID
         }
         let summaryUsesApple = GenerationSettings
             .isAppleIntelligenceSummaryModelID(effectiveSummaryModelID)
         let summaryAvailable = summaryUsesApple ? appleConfigured : selectedProviderConnected
         let modelLabel = GenerationSettings.modelLabel(for: settings.modelID, providerID: settings.providerID)
         let summaryModelLabel = summaryUsesApple
-            ? appleSummaryModelLabel(for: effectiveSummaryModelID)
+            ? GenerationSettings.appleIntelligenceLabel
             : GenerationSettings.modelLabel(for: effectiveSummaryModelID, providerID: settings.providerID)
         var settingsPayload = settings.payload
         settingsPayload["summaryModelID"] = effectiveSummaryModelID
@@ -264,11 +254,6 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         settingsPayload["modelLabel"] = modelLabel
         settingsPayload["summaryModelLabel"] = summaryModelLabel
         settingsPayload["summaryEngineLabel"] = summaryModelLabel
-        if summaryUsesApple {
-            settingsPayload["appleSummaryStrategy"] = GenerationSettings.appleSummaryStrategy(
-                for: effectiveSummaryModelID
-            )
-        }
         settingsPayload["providerLabel"] = settings.providerID == GenerationSettings.grokProviderID
             ? "Grok (SuperGrok)"
             : "ChatGPT / Codex"
@@ -288,14 +273,4 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         ]
     }
 
-    private func effectiveAppleSummaryModelID(_ modelID: String) -> String {
-        GenerationSettings.normalizedAppleIntelligenceSummaryModelID(
-            modelID,
-            legacyStrategy: GenerationSettings.defaultAppleSummaryStrategy
-        )
-    }
-
-    private func appleSummaryModelLabel(for modelID: String) -> String {
-        GenerationSettings.appleIntelligenceResultLabel(for: modelID)
-    }
 }
