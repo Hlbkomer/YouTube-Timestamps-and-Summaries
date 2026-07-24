@@ -5,3 +5,7 @@ build/
 Store Screenshot*.png
 github-pages-root-site/
 _Icons/
+
+# Local full-transcript corpora used by provider prompt comparisons.
+test-results/provider-prompt-comparisons/**/sources/
+test-results/provider-prompt-comparisons/**/input-transcript.txt

@@ -114,7 +114,8 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 transcript: transcript,
                 model: model,
                 languageCode: languageCode,
-                languageLabel: languageLabel
+                languageLabel: languageLabel,
+                videoContext: providerVideoContext(from: payload)
             )
 
         case "generateGrokTimestamps":
@@ -138,7 +139,8 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 transcript: transcript,
                 model: model,
                 languageCode: languageCode,
-                languageLabel: languageLabel
+                languageLabel: languageLabel,
+                videoContext: providerVideoContext(from: payload)
             )
 
         default:
@@ -147,6 +149,18 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 "error": "Unsupported native action: \(action)"
             ]
         }
+    }
+
+    private func providerVideoContext(from payload: [String: Any]) -> ProviderVideoContext {
+        ProviderVideoContext(
+            title: payload["videoTitle"] as? String ?? "",
+            channelName: payload["channelName"] as? String ?? "",
+            description: payload["videoDescription"] as? String ?? "",
+            durationSeconds: (payload["durationSeconds"] as? NSNumber)?.intValue
+                ?? payload["durationSeconds"] as? Int
+                ?? 0,
+            captionKind: payload["captionKind"] as? String ?? ""
+        )
     }
 
     private func openContainerApp(from context: NSExtensionContext) async -> [String: Any] {

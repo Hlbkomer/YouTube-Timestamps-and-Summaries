@@ -279,6 +279,11 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, m
             model: summaryModel,
             languageCode: metadata.languageCode || "",
             languageLabel: metadata.languageLabel || "",
+            videoTitle: metadata.videoTitle || "",
+            channelName: metadata.channelName || "",
+            videoDescription: metadata.videoDescription || "",
+            durationSeconds: diagnosticInteger(metadata.durationSeconds) || 0,
+            captionKind: metadata.trackKind || "",
         }, nativeTimeoutMs);
     }
 

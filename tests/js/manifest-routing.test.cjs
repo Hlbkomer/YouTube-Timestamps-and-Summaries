@@ -92,6 +92,10 @@ test("watch-page integration survives YouTube SPA video switches", () => {
     assert.match(contentSource, /response\?\.videoDetails\?\.videoId === videoKey/);
     assert.match(contentSource, /itemVideoKey[\s\S]{0,120}itemVideoKey === videoKey[\s\S]{0,120}Boolean\(playerResponse\)/);
     assert.match(contentSource, /parseNativeYouTubeChapters\(playerResponseForVideo\(videoKey\)\)/);
+    assert.match(
+        contentSource,
+        /\.\.\.providerVideoMetadata\(playerResponseForVideo\(videoKey\)\)/
+    );
     assert.match(contentSource, /const NATIVE_PANEL_DISCOVERY_GRACE_MS = 5 \* 1000/);
     assert.match(contentSource, /function scheduleNavigationReconciliation\(expectedURL/);
     assert.match(contentSource, /NAVIGATION_RECONCILE_DELAYS_MS/);

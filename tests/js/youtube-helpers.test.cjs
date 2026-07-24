@@ -56,6 +56,29 @@ test("getNavigationResponseVideoKey validates SPA data ownership", () => {
     assert.equal(helpers.getNavigationResponseVideoKey({}), "");
 });
 
+test("providerVideoMetadata reads bounded provider context from video details", () => {
+    assert.deepEqual(helpers.providerVideoMetadata({
+        videoDetails: {
+            title: "  A Test Video  ",
+            author: "  Example Channel ",
+            shortDescription: "  Useful context.  ",
+            lengthSeconds: "3723",
+        },
+    }), {
+        videoTitle: "A Test Video",
+        channelName: "Example Channel",
+        videoDescription: "Useful context.",
+        durationSeconds: 3723,
+    });
+
+    assert.deepEqual(helpers.providerVideoMetadata(null), {
+        videoTitle: "",
+        channelName: "",
+        videoDescription: "",
+        durationSeconds: 0,
+    });
+});
+
 test("extractVideoKey resolves watch, live, canonical, and player-response sources", () => {
     assert.equal(helpers.extractVideoKey({
         currentUrl: "https://www.youtube.com/watch?v=abc123",

@@ -204,3 +204,45 @@ test("transcript input combines length and language in one log line", () => {
         "input: unavailable"
     );
 });
+
+test("selected-provider summaries forward video context without changing timestamp requests", async () => {
+    const messages = [];
+    const sandbox = loadBackgroundSandbox(async (_appID, message) => {
+        messages.push(message);
+        if (message.action === "getGenerationSettings") {
+            return {
+                ok: true,
+                settings: {
+                    providerID: "openaiCodex",
+                    modelID: "gpt-5.6-terra",
+                    summaryModelID: "gpt-5.6-terra",
+                    summaryEngine: "selectedModel",
+                },
+            };
+        }
+        return { ok: true, text: "Summary", debug: {} };
+    });
+
+    const started = sandbox.startGenerateJob(
+        "selectedProviderSummary",
+        "A complete transcript",
+        6 * 60 * 1000,
+        {
+            languageCode: "en",
+            languageLabel: "English",
+            trackKind: "asr",
+            videoTitle: "A Test Video",
+            channelName: "Example Channel",
+            videoDescription: "Useful context.",
+            durationSeconds: 3723,
+        }
+    );
+    await waitForBackgroundJob(sandbox, started.jobId);
+
+    assert.equal(messages[1].action, "generateCodexSummary");
+    assert.equal(messages[1].videoTitle, "A Test Video");
+    assert.equal(messages[1].channelName, "Example Channel");
+    assert.equal(messages[1].videoDescription, "Useful context.");
+    assert.equal(messages[1].durationSeconds, 3723);
+    assert.equal(messages[1].captionKind, "asr");
+});

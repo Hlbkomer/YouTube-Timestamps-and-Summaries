@@ -1,0 +1,21 @@
+{
+  "cachedInputTokens": 0,
+  "durationMs": 12728,
+  "error": "",
+  "inputCharacters": 31807,
+  "inputTokens": 8001,
+  "model": "gpt-5.6-terra",
+  "outputCharacters": 3270,
+  "outputTokens": 619,
+  "outputWords": 502,
+  "promptVersion": "prompt1",
+  "provider": "chatgpt",
+  "reasoningTokens": 0,
+  "serviceTier": "default",
+  "startedAt": "2026-07-24T19:52:12Z",
+  "status": "succeeded",
+  "text": "The video is a highly partisan, inflammatory commentary praising the Trump administration’s alleged military pressure on Iran, Cuba, Venezuela, and indirectly China. The host argues that the Iran conflict is part of a broader geopolitical strategy to weaken China by cutting off its oil supplies, while also attacking left-wing critics, Muslims, communists, and various online figures.\n\n**Main Topic**\n- The host supports expanded US military strikes on Iran following reported Iranian attacks that killed and injured US service members.\n- He argues that Iran should face overwhelming consequences for attacks on US forces and commercial shipping in the Strait of Hormuz.\n- He favors air and naval operations over deploying US ground troops, despite dismissing concerns about civilian casualties and war crimes.\n\n**Iran Conflict**\n- Cites statements attributed to Trump, Marco Rubio, and US military officials saying strikes are intended to degrade Iran’s ability to attack shipping and prevent it from obtaining nuclear weapons.\n- Claims Iran’s economy, energy infrastructure, food supply, and military capabilities are collapsing.\n- Argues diplomacy with Iran is futile because, in his view, Iran will not honor agreements.\n- Discusses reports of Iranian strikes on a US base in Jordan that killed two service members, injured others, and left one missing.\n\n**China as the Bigger Target**\n- The host’s central theory is that US actions against Iran, Venezuela, and Cuba are really a coordinated effort to weaken China.\n  - He argues China depends heavily on oil from Iran and Venezuela.\n  - He cites a claim that China’s crude imports fell sharply during the conflict and says this limits China’s ability to threaten Taiwan.\n- He speculates that China or Russia may have supplied Iran with targeting information for attacks on US forces.\n- He praises tariffs, industrial reshoring, and restrictions on Chinese student visas as tools against China.\n\n**Cuba and US Domestic Politics**\n- The host praises Marco Rubio and the State Department for releasing a report alleging Cuban influence, espionage, and support for radical left-wing movements in the United States.\n- He attacks named progressive commentators and activists, alleging they support terrorism or communist subversion.\n- He argues that communism is inherently violent and should not receive First Amendment protections, while portraying Cuban policy as hostile to Western civilization.\n\n**Israel, Gaza, and Regional Conflict**\n- The host claims Iran avoids directly attacking Israel because it fears a stronger US response.\n- He dismisses the Houthis’ announced blockade threats against Saudi Arabia and calls for forceful action against them.\n- He defends an online figure’s decision to visit Tel Aviv rather than Gaza, arguing Gaza is an active war zone and blaming Gaza’s conditions on its leaders and residents.\n\n**Tone and Other Content**\n- The commentary contains repeated derogatory, racist, anti-Muslim, anti-LGBTQ+, and otherwise offensive remarks.\n- The host repeatedly praises Trump as a geopolitical strategist and Rubio as a strong anti-communist leader.\n- The video ends with congratulations to JD Vance on the birth of his son, followed by promotions for Cashkick, Patreon, Rumble, and Kick.",
+  "timeToFirstOutputMs": 1254,
+  "totalTokens": 8620,
+  "videoID": "UvjW6qASU48"
+}

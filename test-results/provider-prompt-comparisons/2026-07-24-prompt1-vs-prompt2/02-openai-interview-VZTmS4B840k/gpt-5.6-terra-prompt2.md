@@ -1,0 +1,57 @@
+OpenAI President Greg Brockman describes the company’s goal as moving beyond a conversational chatbot toward a persistent “personal AGI”: an agent that understands a user’s context, accepts goals, and safely performs work across applications. He argues that continued model scaling, vast demand for compute, and deeper domain expertise will drive AI progress, while health care may become one of AI’s most consequential applications.
+
+**From chat to agents**
+
+- Brockman says ChatGPT began in 2022 as a language model without memory, tool access, or user context. OpenAI’s longer-term aim is an AI that can continuously help users pursue goals—from organizing an inbox to researching medical options—rather than merely answering prompts.
+- He expects the interface to “melt away” into something closer to conversing with a capable assistant or coworker. Users should need fewer menus, mode switches, files, and folders; the AI should adapt technology to human intent rather than forcing people to adapt to software’s structure.
+- In the envisioned workflow, a user might discuss health care and approve a suggestion to see a specialist; the agent could then research options or arrange an appointment. The same pattern could apply to travel, calendars, email, and work systems.
+
+**Codex as an early general-purpose agent**
+
+- Brockman presents Codex as evidence that agentic systems are already practical, not science fiction. Although associated with coding, he says nontechnical OpenAI staff use it as a general-purpose tool connected to systems such as Slack, Gmail, calendars, and file systems.
+- He gives the example of an OpenAI communications employee organizing an event. The agent could find attendees, identify whose dietary restrictions were already known, draft messages to those whose information was missing, and help create a seating chart.
+- Depending on a user’s permissions, an agent might only draft emails, request approval before sending them, or eventually send them autonomously. Brockman calls trust the central challenge of the agentic era: users must decide what to delegate, while products need strong controls, oversight, and transparency.
+- He contrasts this with OpenAI’s 2023 plugins, which he says “didn’t work at all” because the models had too little context, memory, and tool-handling ability. He says current systems can access hundreds of tools and much larger context windows—he cites “52 million token context,” while noting that figure depends on how it is measured.
+
+**An ecosystem rather than a closed interface**
+
+- Asked whether agents will have to overcome resistance from today’s apps, Brockman says OpenAI wants a “vibrant and thriving” ecosystem. He says partner companies have welcomed OpenAI’s efforts to train models to use their software well, viewing agent use as a potential source of more activity rather than a threat.
+- Brockman resists describing ChatGPT as an operating system, though he accepts that framing is possible. He instead calls it a new way to interface with technology: an agent may have its own computer and accounts, limited access to a user’s computer or inbox, and carefully defined trust boundaries similar to those between human coworkers.
+- He does not discuss OpenAI’s reported devices beyond acknowledging they have been publicly reported. His focus is that the AI itself should be reachable through multiple interfaces, much as a person can be reached by phone, text, or email; a dedicated device would be one possible access point, not the AI itself.
+
+**Voice and evolving interaction**
+
+- Brockman says current voice assistants remain constrained by a turn-taking model: users speak, wait for the system to detect the end of a turn, and then wait for a full response. That differs sharply from natural human conversation, where people interrupt, overlap, and react in real time.
+- He says the desired direction is a system that can process incoming speech while producing output, enabling more fluid, human-like conversation. He does not confirm specific reported OpenAI voice-model projects.
+- Voice could be especially valuable for working with agents, he says. Speaking detailed feedback is often easier than typing a long instruction, and some OpenAI employees already use voice with Codex or third-party voice tools.
+
+**Why Brockman sees no imminent scaling wall**
+
+- Brockman argues that AI scaling laws continue to hold: more data, compute, and architectural improvement have repeatedly produced stronger models. When OpenAI has encountered apparent scaling problems, he says, the cause has generally been a correctable bug, mathematical issue, or implementation mismatch rather than a fundamental limit.
+- He places this in a longer historical arc, from neural-network ideas in the 1940s and the 1959 perceptron to decades of skepticism. In his view, landmark results have followed a smooth path as more compute is applied, and there is still “no wall in sight.”
+- The practical constraint, he says, is the difficulty and expense of building massive supercomputers. OpenAI has had to optimize every layer of the system, including developing its own network protocol. He also says the company has invested in its own chip program for multiple years and expects to announce more about it soon.
+
+**Compute scarcity, competition, and pricing**
+
+- Brockman predicts a compute-constrained economy in which demand exceeds available supply for years. He says today’s agent users may number roughly 10–20 million, far below ChatGPT’s roughly one billion users, and agent usage is also still shallow relative to what it could become.
+- For that reason, he believes there is room for multiple model vendors, open models, and cloud providers. He sees compute as the scarce input and expects virtually all available capacity to find use.
+- He disputes the idea that intelligence is one-dimensional. General capability matters, but a model also needs practice and specialization to excel in areas such as sales pitches, spreadsheets, scientific research, or regulated industry workflows. This leaves room for differentiation among model providers and domain-focused companies.
+- Drawing on AlphaGo’s “move 37,” Brockman argues that superior AI can deepen human engagement rather than end it: breakthroughs can expose new questions and spur more work, just as solving one scientific mystery can reveal many more.
+- Asked whether OpenAI’s spending could fail to pay off, he says compute must be planned years in advance and points to continuing demand, customer willingness to pay, and AI’s potential to address large parts of the economy. He cites a recently announced chemistry result involving an improved synthesis reaction as an example of domain-specific progress that has received relatively little attention.
+- On reported price cuts, Brockman says OpenAI’s general pattern is to make a fixed level of intelligence cheaper over time while introducing a newer, more expensive frontier model. He does not expect a dramatic short-term shift, but says today’s premium intelligence should be much cheaper within about a year.
+- He says enterprise customers are shifting from fear of missing out on agents to asking whether they deliver measurable ROI, observability, and spending controls. OpenAI, he says, is investing in enterprise readiness and had released spending controls that day.
+
+**Response to Microsoft and “commodity models”**
+
+- Responding to Microsoft CEO Satya Nadella’s view that models may become commoditized while company-specific systems and data loops create value, Brockman says no layer of the AI stack will disappear from the value chain.
+- He compares models to compute: compute can look like a commodity in the abstract, but it remains strategically valuable and supply constrained. He cites demand and pricing for Nvidia H100/Hopper chips as evidence that older-generation capacity can remain valuable when supply is tight.
+- Brockman says frontier models that can accelerate science are meaningfully different from systems that merely handle routine scheduling or travel. At the same time, he agrees that enterprises’ domain knowledge, workflows, regulated requirements, and relationships with customers remain important sources of value.
+- He avoids directly addressing the competitive tension with Microsoft, saying his focus is the broader goal of expanding AI use to transform the economy.
+
+**Health as a personal and societal priority**
+
+- Brockman says AI-assisted health analysis will become standard, not remain limited to headline-grabbing outliers. He says OpenAI has peer-reviewed literature describing doctors using its earlier o3 reasoning model to diagnose people whose conditions had gone unexplained for years, including one person with a mysterious ailment for 20 years.
+- He says roughly 230 million people use ChatGPT for health queries each week. People may upload scans, compare conflicting medical advice, or use models to interpret diagnostic information, though he emphasizes these are tools for insight rather than replacing the patient’s role in decisions.
+- Brockman says the issue is personal: his wife has several health conditions, and he believes ChatGPT has become important to managing them. In his view, even excellent medical teams can miss details or lack the capacity to synthesize all available information.
+- He expects AI to improve personalized medicine, rare-disease diagnosis, treatment ideas, drug discovery, and preventive care. He argues that better prevention and support could ease costs and strain in a health system where doctors and nurses are burned out.
+- He concludes that medicine is one of the most powerful motivations behind OpenAI’s work, provided AI is deployed “wisely and well.”

@@ -1,0 +1,21 @@
+{
+  "cachedInputTokens": 0,
+  "durationMs": 6540,
+  "error": "",
+  "inputCharacters": 3663,
+  "inputTokens": 925,
+  "model": "gpt-5.6-terra",
+  "outputCharacters": 1693,
+  "outputTokens": 313,
+  "outputWords": 255,
+  "promptVersion": "prompt1",
+  "provider": "chatgpt",
+  "reasoningTokens": 0,
+  "serviceTier": "default",
+  "startedAt": "2026-07-24T19:51:34Z",
+  "status": "succeeded",
+  "text": "The segment discusses President Trump’s renewed pledge to prevent Iran from obtaining a nuclear weapon, including the possibility of striking the deeply buried “Pickaxe Mountain” site. Guest Mark Wallace argues that the facility should be neutralized because it may support Iran’s nuclear program.\n\n**Main Topic**\n- Trump says Iran is being hit hard and may eventually seek a deal, but argues it is not yet prepared to negotiate reliably.\n- He reiterates that the U.S. cannot allow Iran to acquire a nuclear weapon.\n\n**Pickaxe Mountain Facility**\n- Wallace describes Pickaxe Mountain as a mysterious, deeply buried site that he believes is likely intended for nuclear purposes.\n- He says there are differing assessments over whether it is currently active or still being developed.\n- Satellite imagery reportedly shows suspicious activity around the facility.\n\n**Iran’s Nuclear Assets**\n- Wallace cites reporting that Iran may have moved centrifuges and other technical nuclear equipment to Pickaxe Mountain before “Midnight Hammer.”\n- It remains disputed whether those assets were being actively used or simply protected from potential bombing.\n\n**Military Options**\n- Wallace says the U.S. may be able to disable or seal off the site using bunker-busting weapons, without deploying ground troops.\n- He argues that burying the facility and preventing Iranian access could effectively limit its use.\n\n**Iran’s Intentions**\n- Wallace believes the current Iranian regime will not voluntarily abandon its nuclear ambitions.\n- He argues Iran uses its nuclear program, regional proxies, threats against shipping routes, and threats against Western countries and allies as leverage and intimidation.",
+  "timeToFirstOutputMs": 872,
+  "totalTokens": 1238,
+  "videoID": "Z1sUt6gAbUg"
+}

@@ -1,0 +1,21 @@
+{
+  "cachedInputTokens": 128,
+  "durationMs": 11078,
+  "error": "",
+  "inputCharacters": 3663,
+  "inputTokens": 1104,
+  "model": "grok-4.5",
+  "outputCharacters": 2152,
+  "outputTokens": 568,
+  "outputWords": 333,
+  "promptVersion": "prompt1",
+  "provider": "grok",
+  "reasoningTokens": 138,
+  "serviceTier": "default",
+  "startedAt": "2026-07-24T19:51:47Z",
+  "status": "succeeded",
+  "text": "**Overview**\n\nPresident Trump is reinforcing his commitment to stop Iran from obtaining a nuclear weapon and has threatened strikes on Iran’s Pickaxe Mountain facility. In a Fox News discussion, Mark Wallace, CEO of United Against Nuclear Iran, assesses the site’s significance, reported activity there, U.S. military options, and why the current Iranian regime is unlikely to abandon its nuclear goals.\n\n**Trump’s Stance**\n- Trump insists Iran must never acquire a nuclear weapon.\n- He describes the current conflict as a “skirmish” in which Iran is being hit hard and wants a deal, but he says Iran is not yet ready because it keeps trying to alter terms.\n- He expects Iran will be ready to negotiate “very soon.”\n\n**Pickaxe Mountain Facility**\n- The site is a deeply buried mountain facility long shrouded in mystery.\n- There is debate over whether it is currently active or planned for future use.\n- Wallace argues its only logical military purpose in Iran is nuclear-related, so destroying or sealing it removes remaining uncertainty.\n- Satellite imagery has shown suspicious activity around the site.\n- Reliable reporting indicates Iran moved centrifuges and other nuclear-related equipment there in the days before the Midnight Hammer operation; views differ on whether this was to activate the site or protect assets from bombing.\n\n**Military Options**\n- Wallace does not believe the facility is beyond the reach of U.S. bunker-busting bombs and deep-penetrating munitions.\n- The U.S. has previously destroyed other deeply buried sites this way.\n- Effectively burying or sealing the facility (and any material inside) would deny Iran access without needing ground forces or special mission units.\n\n**Iran’s Nuclear Ambitions**\n- Wallace states the current regime will not give up its nuclear program.\n- Nuclear capability serves as leverage: supporting proxies and terror groups, threatening assassinations, controlling key waterways (Bab al-Mandab and Strait of Hormuz), and holding out the threat of nuclear attack against U.S. allies.\n- The regime’s ideology centers on hostility toward America, Israel, Saudi Arabia, and neighboring states.",
+  "timeToFirstOutputMs": 3078,
+  "totalTokens": 1672,
+  "videoID": "Z1sUt6gAbUg"
+}

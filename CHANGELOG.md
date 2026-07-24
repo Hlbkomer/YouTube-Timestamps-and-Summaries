@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Consolidate the duplicate ChatGPT and Grok summary instructions into one shared, versioned provider prompt builder and one production-version switch. Carry verified title, channel, cleaned description, duration, and caption source through the selected-provider summary boundary while keeping production on the exact legacy Prompt 1 contract.
+- Add a gated signed-Debug provider prompt comparison runner that preserves the one-call full-transcript architecture, enforces Grok 4.5 low reasoning, captures latency/first-output/token metrics, resumes completed calls, and exports sandbox-safe Xcode attachments. Retain the full eight-video, 32-output Prompt 1/Prompt 2 corpus under `test-results/provider-prompt-comparisons`; Prompt 2 improved names and attribution but remained too verbose and slow for production.
 - Fix the background completion path so successful native Chapters and Summary responses cannot fail while formatting optional diagnostics. Add executable start-to-completion coverage for ChatGPT Chapters and Summary, Grok Chapters and Summary, and Apple Intelligence Summary jobs.
 - Keep one `Apple Intelligence` choice in the existing Summary model picker, backed by the more precise adaptive-grounded pipeline, with result captions using the same name.
 - Replace the legacy Apple Intelligence `<= 2`-chunk baseline branch: exactly one chunk now uses a strict one-call reader-facing Markdown contract, while two or more chunks use the grounded multi-chunk pipeline. Narrow protocol-leak detection to actual schema/tool markers so an ordinary JSON code fence is treated as an invalid output format rather than mislabeled as model-internal text.

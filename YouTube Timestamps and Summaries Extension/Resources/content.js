@@ -11,6 +11,7 @@ const {
     parseNativeYouTubeChapters,
     parseNativeYouTubeChaptersFromDOM,
     parseTimestamps: parseTimestampLines,
+    providerVideoMetadata,
     renderSummaryHTML: renderFormattedSummaryHTML,
 } = globalThis.YouTubeTimestampsHelpers;
 const chapterState = globalThis.YouTubeTimestampsChapterState;
@@ -4039,6 +4040,7 @@ async function generate(kind) {
         languageCode: transcript?.languageCode || "",
         languageLabel: transcript?.languageLabel || "",
         trackKind: transcript?.trackKind || "",
+        ...providerVideoMetadata(playerResponseForVideo(videoKey)),
     };
     const generationTimeoutMs = generationTimeoutForTranscript(requestTranscript);
 

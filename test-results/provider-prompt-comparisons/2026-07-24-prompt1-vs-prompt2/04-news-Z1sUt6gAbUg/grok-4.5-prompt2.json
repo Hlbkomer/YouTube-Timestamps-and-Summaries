@@ -1,0 +1,21 @@
+{
+  "cachedInputTokens": 128,
+  "durationMs": 13534,
+  "error": "",
+  "inputCharacters": 3663,
+  "inputTokens": 1544,
+  "model": "grok-4.5",
+  "outputCharacters": 2225,
+  "outputTokens": 703,
+  "outputWords": 338,
+  "promptVersion": "prompt2",
+  "provider": "grok",
+  "reasoningTokens": 275,
+  "serviceTier": "default",
+  "startedAt": "2026-07-24T19:51:58Z",
+  "status": "succeeded",
+  "text": "President Trump has reiterated that Iran must never obtain a nuclear weapon and has threatened action against the country’s Pickaxe Mountain site. United Against Nuclear Iran CEO Mark Wallace joined the discussion to assess remaining elements of Iran’s nuclear program, intelligence questions surrounding the facility, and the regime’s broader aims.\n\n**Trump’s stance on Iran**\n- Trump stated the United States cannot allow Iran a nuclear weapon, described the current clash as a “skirmish,” and said Iran is being hit hard and wants a deal.\n- He argued Iran is not yet ready because it repeatedly seeks to change terms after agreeing, though he predicted it would be ready “very soon.”\n\n**Pickaxe Mountain and nuclear concerns**\n- Wallace called Pickaxe Mountain a long-mysterious deep-buried site whose only logical military purpose in Iranian thinking is nuclear-related, whether currently active or planned.\n- He said the president is wise to eliminate the facility and end the uncertainty around it.\n- Reliable reporting indicates Iran moved centrifuges and other nuclear-related equipment from Fordow to Pickaxe Mountain in the days before the “Midnight Hammer” strikes; views differ on whether the site is active or was used to safeguard material.\n- Suspicious satellite imagery of activity around the mountain has been noted; its depth makes denying Iranian access a priority.\n\n**Military feasibility**\n- Wallace expressed doubt that the site is beyond the reach of U.S. bunker-busting bombs and deep-penetrating munitions already used against other buried facilities.\n- He argued the United States can effectively seal or bury the site and any material inside without ground troops, including special-mission forces.\n\n**Iran’s long-term goals**\n- Wallace said the current Iranian regime will not abandon nuclear ambitions; the program serves as leverage through support for regional terror groups and proxies, assassination threats against Americans and Westerners, potential closure of the Bab al-Mandab and Strait of Hormuz, and the ultimate threat of nuclear attack on U.S. allies.\n- He tied the regime’s ideology to “death to America,” “death to Israel,” and hostility toward Saudi Arabia and neighboring states.",
+  "timeToFirstOutputMs": 5048,
+  "totalTokens": 2247,
+  "videoID": "Z1sUt6gAbUg"
+}

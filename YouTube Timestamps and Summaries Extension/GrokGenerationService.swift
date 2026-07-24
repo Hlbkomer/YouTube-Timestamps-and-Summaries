@@ -38,6 +38,7 @@ final class GrokGenerationService {
     private let logger = Logger(subsystem: "Matuko.YouTube-Timestamps-and-Summaries", category: "GrokGeneration")
     private let endpoint = URL(string: "https://api.x.ai/v1/responses")!
     private let authService = XAIAuthService()
+    private let summaryPromptVersion = ProviderSummaryPromptVersion.production
 
     private struct LanguageContext {
         let code: String
@@ -69,7 +70,7 @@ final class GrokGenerationService {
         languageCode: String = "",
         languageLabel: String = ""
     ) async -> [String: Any] {
-        await generate(
+        return await generate(
             kind: "grokTimestamps",
             transcript: transcript,
             model: model,
@@ -105,26 +106,30 @@ final class GrokGenerationService {
         transcript: String,
         model: String,
         languageCode: String = "",
-        languageLabel: String = ""
+        languageLabel: String = "",
+        videoContext: ProviderVideoContext = ProviderVideoContext()
     ) async -> [String: Any] {
-        await generate(
+        let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let languageContext = LanguageContext(
+            code: languageCode,
+            label: languageLabel
+        )
+        let summaryRequest = ProviderSummaryPromptBuilder.makeRequest(
+            version: summaryPromptVersion,
+            transcript: transcriptText,
+            languageCode: languageContext.code,
+            languageLabel: languageContext.label,
+            videoContext: videoContext
+        )
+        return await generate(
             kind: "grokSummary",
-            transcript: transcript,
+            transcript: transcriptText,
             model: model,
-            languageCode: languageCode,
-            languageLabel: languageLabel,
-            instructions: "You summarize YouTube transcripts clearly and concisely.",
-            prompt: { transcript, languageContext in
-                """
-                Summarize this video transcript clearly and concisely.
-                \(Self.outputLanguageInstruction(languageContext: languageContext, outputName: "summary"))
-                Start with a short overview paragraph.
-                Then use bold section labels like **Main Topic** with useful bullet points.
-                Use one nested bullet level only when it adds helpful detail.
-
-                Transcript:
-                \(transcript)
-                """
+            languageCode: languageContext.code,
+            languageLabel: languageContext.label,
+            instructions: summaryRequest.instructions,
+            prompt: { _, _ in
+                summaryRequest.prompt
             },
             normalize: { rawText, _ in
                 rawText.trimmingCharacters(in: .whitespacesAndNewlines)

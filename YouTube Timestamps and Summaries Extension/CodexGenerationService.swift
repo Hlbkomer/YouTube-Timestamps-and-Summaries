@@ -30,6 +30,7 @@ final class CodexGenerationService {
     private let logger = Logger(subsystem: "Matuko.YouTube-Timestamps-and-Summaries", category: "CodexGeneration")
     private let endpoint = URL(string: "https://chatgpt.com/backend-api/codex/responses")!
     private let authService = CodexAuthService()
+    private let summaryPromptVersion = ProviderSummaryPromptVersion.production
 
     private struct LanguageContext {
         let code: String
@@ -123,7 +124,8 @@ final class CodexGenerationService {
         transcript: String,
         model: String,
         languageCode: String = "",
-        languageLabel: String = ""
+        languageLabel: String = "",
+        videoContext: ProviderVideoContext = ProviderVideoContext()
     ) async -> [String: Any] {
         let startedAt = Date()
         let transcriptText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -140,19 +142,17 @@ final class CodexGenerationService {
             }
 
             let accessToken = try await authService.accessToken()
+            let summaryRequest = ProviderSummaryPromptBuilder.makeRequest(
+                version: summaryPromptVersion,
+                transcript: transcriptText,
+                languageCode: languageContext.code,
+                languageLabel: languageContext.label,
+                videoContext: videoContext
+            )
             logger.log("Starting Codex summary generation. model=\(safeModel, privacy: .public) transcriptLength=\(transcriptText.count, privacy: .public)")
             let text = try await requestCodexText(
-                instructions: "You summarize YouTube transcripts clearly and concisely.",
-                prompt: """
-                Summarize this video transcript clearly and concisely.
-                \(outputLanguageInstruction(languageContext: languageContext, outputName: "summary"))
-                Start with a short overview paragraph.
-                Then use bold section labels like **Main Topic** with useful bullet points.
-                Use one nested bullet level only when it adds helpful detail.
-
-                Transcript:
-                \(transcriptText)
-                """,
+                instructions: summaryRequest.instructions,
+                prompt: summaryRequest.prompt,
                 accessToken: accessToken,
                 model: safeModel,
                 emptyResponseMessage: "ChatGPT returned an empty summary response."
@@ -170,6 +170,7 @@ final class CodexGenerationService {
                     "kind": "codexSummary",
                     "model": safeModel,
                     "inputMode": "transcript",
+                    "promptVersion": summaryRequest.version.rawValue,
                     "languageCode": languageContext.code,
                     "languageLabel": languageContext.label,
                     "durationMs": Int(Date().timeIntervalSince(startedAt) * 1000),

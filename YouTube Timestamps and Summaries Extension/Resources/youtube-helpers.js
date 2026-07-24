@@ -76,6 +76,30 @@
         return extractVideoKey({ currentUrl: endpointURL || "" });
     }
 
+    function providerVideoMetadata(playerResponse) {
+        const details = playerResponse?.videoDetails;
+        if (!details || typeof details !== "object") {
+            return {
+                videoTitle: "",
+                channelName: "",
+                videoDescription: "",
+                durationSeconds: 0,
+            };
+        }
+
+        const duration = Number(details.lengthSeconds);
+        return {
+            videoTitle: typeof details.title === "string" ? details.title.trim() : "",
+            channelName: typeof details.author === "string" ? details.author.trim() : "",
+            videoDescription: typeof details.shortDescription === "string"
+                ? details.shortDescription.trim()
+                : "",
+            durationSeconds: Number.isFinite(duration) && duration > 0
+                ? Math.floor(duration)
+                : 0,
+        };
+    }
+
     function extractVideoKey({
         currentUrl = "",
         canonicalHref = "",
@@ -616,6 +640,7 @@
         parseNativeYouTubeChapters,
         parseNativeYouTubeChaptersFromDOM,
         parseTimestamps,
+        providerVideoMetadata,
         renderSummaryHTML,
         renderSummaryInlineHTML,
         secondsToTimestamp,

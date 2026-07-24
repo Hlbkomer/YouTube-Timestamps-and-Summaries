@@ -99,6 +99,28 @@ When the selected summary engine is Apple Intelligence, the ordinary `Summary` t
 
 Selected-provider summaries are unchanged on both operating-system versions: they continue to use the selected Grok or ChatGPT model. Shared app settings persist only the canonical Apple Intelligence model selection. The fixed adaptive-grounded production strategy remains visible in Summary diagnostics.
 
+ChatGPT and Grok summaries now use one shared
+`ProviderSummaryPromptBuilder`, with one shared production-version constant,
+so their summary instructions cannot drift. Both providers remain one-call
+paths over the complete timestamp-stripped transcript; none of the Apple
+Intelligence chunking, handoffs, reducers, recovery prompts, retries, or broad
+output filters apply to them.
+
+The content script also resolves the current video's verified title, channel,
+short description, duration, and caption source from the player response
+already owned by that video ID, then carries that context through the
+background and native boundaries. The description cleaner retains only the
+first useful paragraph, removes URL/promotion/chapter boilerplate, and caps
+the result at 2,500 characters. Production currently stays on the exact legacy
+Prompt 1 contract, which deliberately ignores this context. Prompt 2 is a
+Debug comparison candidate that treats metadata as disambiguation context and
+the transcript as the only factual source, strengthens entity attribution,
+and requests whole-video coverage. The eight-video GPT-5.6 Terra/Grok 4.5
+comparison found better names and attribution but excessive verbosity and
+latency, so promotion was deferred. The exact inputs, 32 outputs, metrics, and
+review are retained in
+[`test-results/provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2`](test-results/provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2).
+
 Private Cloud Compute is intentionally not in any active app path while the managed `com.apple.developer.private-cloud-compute` entitlement is pending. The former T27/S27 tabs were removed because attempting PCC without that entitlement terminated the Safari extension process instead of returning a recoverable generation error. See [docs/macos27-summary.md](docs/macos27-summary.md) for the observed behavior and test plan.
 
 The production native request protocol accepts Apple Intelligence only for `summaryFull`; unknown generation kinds are rejected at both the WebExtension job and native-handler boundaries. Retired Apple timestamp, short-summary, video-analysis, and PCC implementations are compiler-excluded from the shipping target, reducing their exposure to Foundation Models SDK changes while retaining the investigation source for later removal or an entitlement-gated branch.
