@@ -254,7 +254,7 @@ Adaptive grounded is the sole production Apple Intelligence path because its qua
 
 ## Verification Snapshot
 
-At the latest implementation check, the signed Debug test suite passed 20 Swift tests and the JavaScript suite passed 85 tests. Automated coverage includes the canonical Apple picker/default behavior, strict short-summary validation, complete-response cleanup and protocol-leak handling, native transcript redaction, provider refresh-failure policy, Grok callback ambiguity, safe model-label rendering, lightweight generation routing, and Grok model-to-reasoning mapping. The Debug runner also keeps all five Apple strategies available for real Foundation Models comparisons.
+At the latest implementation check, the signed Debug test suite passed 20 Swift tests and the JavaScript suite passed 86 tests. Automated coverage includes the canonical Apple picker/default behavior, strict short-summary validation, complete-response cleanup and protocol-leak handling, native transcript redaction, complete background-generation jobs, provider refresh-failure policy, Grok callback ambiguity, safe model-label rendering, lightweight generation routing, and Grok model-to-reasoning mapping. The Debug runner also keeps all five Apple strategies available for real Foundation Models comparisons.
 
 These tests validate routing and deterministic safeguards. Summary quality, Foundation Models nondeterminism, thermal behavior, and beta-OS regressions still require the real-video protocol above.
 

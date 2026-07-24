@@ -34,7 +34,7 @@ later hardening commit, or create a temporary branch from the tag for comparison
 | Apple service maintenance | Production, comparison, PCC, and retired code coexist in one 4,000-line file | Remove small unused compiled helpers and isolate larger cleanup from behavior hardening | Modest reduction now; large rename/deletion deferred | Runtime unchanged | Keeps this change reviewable and reduces rollback risk | Safe subset completed |
 | Apple settings strategy plumbing | Unused model aliases and a stored strategy field crossed settings, JavaScript, and the native bridge even though production always chose one pipeline | Keep one canonical model ID, remove the stored/message strategy field and constant-result helpers, and expose alternate strategies only through a Debug service overload | Removes production branches and ignored arguments | Avoids a small amount of settings and message work | No intended output change | Completed in a separate reversible commit |
 | Apple redaction | JavaScript and Swift contain duplicated explicit-term patterns | Keep native Swift as the sole enforcement boundary and return its count in success diagnostics | Removes pattern drift | Avoids duplicate regex work | Keeps guardrail behavior consistent | Completed |
-| Deterministic coverage | Important Apple and provider failure policies were lightly covered | Add focused validation, routing, refresh-policy, picker, and callback regression tests | Test-only complexity | Test-only cost | Reduces regression risk | Completed |
+| Deterministic coverage | Important Apple and provider failure policies were lightly covered, and the background suite did not execute a native generation job through successful completion | Add focused validation, routing, refresh-policy, picker, callback, and start-to-completion background regression tests | Test-only complexity | Test-only cost | Prevents successful native results from being lost to completion/logging regressions | Completed |
 
 ## Deliberately deferred work
 
@@ -65,7 +65,7 @@ later hardening commit, or create a temporary branch from the tag for comparison
 
 ## Verification
 
-- JavaScript: 85/85 tests passed with
+- JavaScript: 86/86 tests passed with
   `node --test tests/js/*.test.cjs`.
 - Swift: 20/20 tests passed in the signed Debug configuration with the embedded
   Safari extension validated.

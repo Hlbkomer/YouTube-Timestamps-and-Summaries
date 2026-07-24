@@ -130,6 +130,14 @@ function appendJobMessage(job, message) {
     job.messages = [...(job.messages || []), line].slice(-JOB_MESSAGE_LIMIT);
 }
 
+function diagnosticInteger(value) {
+    if (value === null || typeof value === "undefined" || value === "") {
+        return null;
+    }
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0, Math.round(number)) : null;
+}
+
 function appendNativeGenerationDiagnostics(job, debug = {}) {
     if (typeof debug.reasoningEffort === "string" && debug.reasoningEffort) {
         appendJobMessage(job, `reasoning effort: ${debug.reasoningEffort}`);
@@ -143,13 +151,6 @@ function appendNativeGenerationDiagnostics(job, debug = {}) {
         appendJobMessage(job, `time to first output: ${label}`);
     }
 
-    const diagnosticInteger = (value) => {
-        if (value === null || typeof value === "undefined" || value === "") {
-            return null;
-        }
-        const number = Number(value);
-        return Number.isFinite(number) ? Math.max(0, Math.round(number)) : null;
-    };
     const inputTokens = diagnosticInteger(debug.inputTokens);
     const cachedInputTokens = diagnosticInteger(debug.cachedInputTokens);
     const outputTokens = diagnosticInteger(debug.outputTokens);
