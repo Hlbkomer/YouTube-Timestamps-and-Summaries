@@ -95,7 +95,6 @@ final class CodexGenerationService {
                     "inputMode": "transcript",
                     "languageCode": languageContext.code,
                     "languageLabel": languageContext.label,
-                    "step": "completed",
                     "durationMs": Int(Date().timeIntervalSince(startedAt) * 1000),
                     "textLength": cleanedText.count,
                 ],
@@ -113,7 +112,6 @@ final class CodexGenerationService {
                     "model": safeModel,
                     "languageCode": languageContext.code,
                     "languageLabel": languageContext.label,
-                    "step": "failed",
                     "durationMs": Int(Date().timeIntervalSince(startedAt) * 1000),
                     "detail": message,
                 ],
@@ -174,7 +172,6 @@ final class CodexGenerationService {
                     "inputMode": "transcript",
                     "languageCode": languageContext.code,
                     "languageLabel": languageContext.label,
-                    "step": "completed",
                     "durationMs": Int(Date().timeIntervalSince(startedAt) * 1000),
                     "textLength": text.count,
                 ],
@@ -192,7 +189,6 @@ final class CodexGenerationService {
                     "model": safeModel,
                     "languageCode": languageContext.code,
                     "languageLabel": languageContext.label,
-                    "step": "failed",
                     "durationMs": Int(Date().timeIntervalSince(startedAt) * 1000),
                     "detail": message,
                 ],
@@ -309,6 +305,7 @@ final class CodexGenerationService {
         var output = ""
         var fallbackOutput = ""
         var errorBody = ""
+        var receivedTerminalEvent = false
 
         for try await line in bytes.lines {
             if httpResponse.statusCode != 200 {
@@ -327,7 +324,11 @@ final class CodexGenerationService {
 
             let jsonText = String(line.dropFirst("data:".count))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !jsonText.isEmpty, jsonText != "[DONE]" else {
+            guard !jsonText.isEmpty else {
+                continue
+            }
+            if jsonText == "[DONE]" {
+                receivedTerminalEvent = true
                 continue
             }
 
@@ -344,14 +345,20 @@ final class CodexGenerationService {
             } else if eventType == "response.output_item.done", let item = event["item"] as? [String: Any] {
                 fallbackOutput += outputText(from: item)
             } else if eventType == "response.completed", let response = event["response"] as? [String: Any] {
+                receivedTerminalEvent = true
                 fallbackOutput += outputText(fromResponse: response)
-            } else if eventType == "response.failed" {
+            } else if eventType == "response.failed" || eventType == "response.incomplete" {
                 throw CodexGenerationError.generationFailed(errorMessage(from: event) ?? "ChatGPT failed to generate a response.")
             }
         }
 
         if httpResponse.statusCode != 200 {
             throw CodexGenerationError.generationFailed(errorMessage(from: errorBody) ?? "ChatGPT request failed with status \(httpResponse.statusCode).")
+        }
+        guard receivedTerminalEvent else {
+            throw CodexGenerationError.invalidResponse(
+                "ChatGPT's response stream ended before generation completed."
+            )
         }
 
         let text = output.trimmingCharacters(in: .whitespacesAndNewlines)

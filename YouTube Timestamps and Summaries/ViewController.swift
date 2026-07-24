@@ -27,6 +27,7 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
     private var codexLoginError: String?
     private var grokLoginSession: XAIOAuthLoginSession?
     private var grokLoginTask: Task<Void, Never>?
+    private var statePushGeneration = 0
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -448,7 +449,12 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             statusMessage = message
         }
 
+        statePushGeneration &+= 1
+        let generation = statePushGeneration
         let payload = await buildState(message: message)
+        guard generation == statePushGeneration else {
+            return
+        }
         guard
             let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
             let json = String(data: data, encoding: .utf8)
@@ -460,11 +466,16 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
     }
 
     private func buildState(message: String?) async -> [String: Any] {
-        let extensionEnabled = await fetchExtensionEnabled()
         let appleIntelligenceState = appleIntelligenceState()
         let settings = GenerationSettings.load()
-        let codexStatus = await codexAuthService.statusPayload(refresh: true)
-        let grokStatus = await xaiAuthService.statusPayload(refresh: true)
+        async let extensionEnabledResult = fetchExtensionEnabled()
+        async let codexStatusResult = codexAuthService.statusPayload(refresh: true)
+        async let grokStatusResult = xaiAuthService.statusPayload(refresh: true)
+        let (extensionEnabled, codexStatus, grokStatus) = await (
+            extensionEnabledResult,
+            codexStatusResult,
+            grokStatusResult
+        )
         let codexConnected = (codexStatus["connected"] as? Bool) == true
         let grokConnected = (grokStatus["connected"] as? Bool) == true
         let selectedProviderConnected = settings.providerID == GenerationSettings.grokProviderID

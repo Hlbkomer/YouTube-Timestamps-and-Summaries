@@ -7,12 +7,11 @@ nonisolated enum AppleSummaryTextUtilities {
         #"^(?:#+\s*)?summary of (?:the )?transcript[:.]?$"#,
     ]
 
-    private static let modelProtocolMarkers = [
-        "tool analysis:",
-        "detected_language",
-        "summary_points",
-        "tool call:",
-        "tool calls:",
+    private static let modelProtocolLinePatterns = [
+        #"^\s*(?:[-*]\s*)?tool analysis\s*:"#,
+        #"^\s*(?:`{1,3}(?:json)?\s*)?(?:\{\s*)?["']?detected_language["']?\s*:"#,
+        #"^\s*(?:`{1,3}(?:json)?\s*)?(?:\{\s*)?["']?summary_points["']?\s*:"#,
+        #"^\s*(?:[-*]\s*)?tool calls?\s*:"#,
     ]
 
     static func cleanedSummaryText(_ text: String) -> String {
@@ -70,8 +69,14 @@ nonisolated enum AppleSummaryTextUtilities {
     }
 
     static func containsModelMetaText(_ text: String) -> Bool {
-        let lowercased = text.lowercased()
-        return modelProtocolMarkers.contains { lowercased.contains($0) }
+        text.components(separatedBy: "\n").contains { line in
+            modelProtocolLinePatterns.contains { pattern in
+                line.range(
+                    of: pattern,
+                    options: [.regularExpression, .caseInsensitive]
+                ) != nil
+            }
+        }
     }
 
     static func cleanedReaderFacingText(_ text: String) -> String {
@@ -90,20 +95,21 @@ nonisolated enum AppleSummaryTextUtilities {
             return false
         }
 
-        let firstLine = cleaned
-            .components(separatedBy: "\n")
-            .first?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            ?? ""
-
-        if firstLine.hasPrefix("```")
-            || firstLine.hasPrefix("{")
-            || firstLine.range(
-                of: #"^"(?:overview|summary|sections|main_topic)"\s*:"#,
-                options: .regularExpression
-            ) != nil {
-            return false
+        let lines = cleaned.components(separatedBy: "\n")
+        for rawLine in lines {
+            let line = rawLine
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            if line.hasPrefix("```")
+                || line == "{"
+                || line == "}"
+                || line.hasPrefix("{\"")
+                || line.range(
+                    of: #"^(?:\{\s*)?["'](?:overview|summary|sections|main_topic)["']\s*:"#,
+                    options: .regularExpression
+                ) != nil {
+                return false
+            }
         }
 
         return true

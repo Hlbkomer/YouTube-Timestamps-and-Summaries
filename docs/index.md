@@ -54,6 +54,8 @@ The Grok and ChatGPT/Codex picker catalog behavior, model exclusions, and remote
 
 The repository-wide maintenance findings, justified Safari workarounds, and recommended cleanup order are documented in [code-complexity-review.md](code-complexity-review.md).
 
+The July 24 implementation tracker, rollback point, completed hardening changes, and deliberately deferred complexity are documented in [code-review-hardening-2026-07-24.md](code-review-hardening-2026-07-24.md).
+
 The completed version 1.1 behavior audit, automated validation, notarization, and publication record is documented in [release-1.1-readiness.md](release-1.1-readiness.md).
 
 ## Download And Support

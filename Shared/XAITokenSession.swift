@@ -228,7 +228,28 @@ final class XAITokenSession {
 
         let expiresAt = Date(timeIntervalSince1970: defaults.double(forKey: Keys.expiresAt))
         if refresh && expiresAt.timeIntervalSinceNow <= Self.refreshSkew {
-            try await refreshTokens(refreshToken: refreshToken)
+            let originalUpdatedAt = defaults.double(forKey: Keys.updatedAt)
+            await OAuthTokenRefreshGate.shared.acquire(provider: "xai")
+            do {
+                let latestAccessToken = try credentialStore.string(for: Keys.accessToken)
+                let latestRefreshToken = try credentialStore.string(for: Keys.refreshToken)
+                let latestUpdatedAt = defaults.double(forKey: Keys.updatedAt)
+                let credentialsChanged = latestAccessToken != accessToken
+                    || latestRefreshToken != refreshToken
+                    || latestUpdatedAt > originalUpdatedAt
+
+                if !credentialsChanged {
+                    try await refreshTokens(
+                        refreshToken: refreshToken,
+                        expectedAccessToken: accessToken,
+                        expectedUpdatedAt: originalUpdatedAt
+                    )
+                }
+                await OAuthTokenRefreshGate.shared.release(provider: "xai")
+            } catch {
+                await OAuthTokenRefreshGate.shared.release(provider: "xai")
+                throw error
+            }
             return try await tokens(refresh: false)
         }
         return XAITokenResponse(
@@ -238,7 +259,11 @@ final class XAITokenSession {
         )
     }
 
-    private func refreshTokens(refreshToken: String) async throws {
+    private func refreshTokens(
+        refreshToken: String,
+        expectedAccessToken: String,
+        expectedUpdatedAt: Double
+    ) async throws {
         let discovery = try await fetchDiscovery()
         let body = formBody([
             "grant_type": "refresh_token",
@@ -251,11 +276,21 @@ final class XAITokenSession {
             contentType: "application/x-www-form-urlencoded"
         )
         guard response.statusCode == 200 else {
-            signOut()
-            throw XAIAuthError.requestFailed(
-                XAITokenResponseParser.errorMessage(from: data)
-                    ?? "Grok sign-in expired. Open the companion app and sign in again."
-            )
+            let message = XAITokenResponseParser.errorMessage(from: data)
+                ?? "Grok token refresh failed."
+            let credentialsChanged = defaults.double(forKey: Keys.updatedAt) > expectedUpdatedAt
+                || (try? credentialStore.string(for: Keys.accessToken)) != expectedAccessToken
+                || (try? credentialStore.string(for: Keys.refreshToken)) != refreshToken
+            if credentialsChanged {
+                return
+            }
+            if OAuthRefreshFailurePolicy.shouldInvalidateCredentials(
+                statusCode: response.statusCode,
+                message: message
+            ) {
+                signOut()
+            }
+            throw XAIAuthError.requestFailed(message)
         }
         try saveTokens(from: data, existingRefreshToken: refreshToken)
     }

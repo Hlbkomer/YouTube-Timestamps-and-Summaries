@@ -4030,7 +4030,11 @@ async function generate(kind) {
 
     const usesSelectedProvider = state.generationMode === "selectedProvider" || state.generationMode === "codexChatGPT";
     const requestKind = generationKindForTab(kind, usesSelectedProvider);
-    const requestTranscript = transcriptForGeneration(kind, transcript?.text || "");
+    const requestTranscript = transcriptForGeneration(
+        kind,
+        transcript?.text || "",
+        usesSelectedProvider
+    );
     const transcriptMetadata = {
         languageCode: transcript?.languageCode || "",
         languageLabel: transcript?.languageLabel || "",
@@ -4048,9 +4052,7 @@ async function generate(kind) {
         jobID = pendingGeneration.jobId;
         generationStartedAt = pendingGeneration.createdAt || generationStartedAt;
         logDebug(kind, `requestId: ${jobID}`);
-        logDebug(kind, "step: reusing already running generation job");
     } else if (pendingGeneration) {
-        logDebug(kind, "step: waiting for already starting generation job");
         pendingGeneration = await waitForPendingGenerationJob(videoKey, kind, generationID);
         if (!isCurrentGeneration(videoKey, kind, generationID)) {
             return;
@@ -4066,7 +4068,6 @@ async function generate(kind) {
             jobID = pendingGeneration.jobId;
             generationStartedAt = pendingGeneration.createdAt || generationStartedAt;
             logDebug(kind, `requestId: ${jobID}`);
-            logDebug(kind, "step: reusing already running generation job");
         }
     }
 
@@ -4080,13 +4081,12 @@ async function generate(kind) {
             transcriptMetadata,
             timeoutMs: generationTimeoutMs,
         }, 20000).catch((error) => {
-            logDebug(kind, "step: start request failed", error);
+            logDebug(kind, "generation start request failed", error);
             return {
                 ok: false,
                 error: error?.message || "The extension could not start the background job.",
                 debug: {
                     layer: "content",
-                    step: "start-failed",
                     detail: error?.stack || error?.message || String(error),
                 },
             };
@@ -4101,9 +4101,6 @@ async function generate(kind) {
             const debugParts = [];
             if (startResponse?.debug?.layer) {
                 debugParts.push(`layer: ${startResponse.debug.layer}`);
-            }
-            if (startResponse?.debug?.step) {
-                debugParts.push(`step: ${startResponse.debug.step}`);
             }
             if (startResponse?.debug?.detail) {
                 debugParts.push(`detail: ${startResponse.debug.detail}`);
@@ -4152,9 +4149,6 @@ async function generate(kind) {
         if (response?.debug?.action) {
             debugParts.push(`action: ${response.debug.action}`);
         }
-        if (response?.debug?.step) {
-            debugParts.push(`step: ${response.debug.step}`);
-        }
         if (response?.debug?.durationMs) {
             debugParts.push(`duration: ${response.debug.durationMs}ms`);
         }
@@ -4173,7 +4167,6 @@ async function generate(kind) {
         return;
     }
 
-    logDebug(kind, "step: generation response received");
     const engineLabel = responseEngineLabel(kind, response);
     const cachedResult = cachedGenerationResult(videoKey, kind);
     if (cachedResult?.text) {

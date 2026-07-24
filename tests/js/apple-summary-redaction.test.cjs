@@ -33,18 +33,12 @@ function loadBackgroundSandbox() {
     return sandbox;
 }
 
-test("Apple summary redaction catches YouTube-censored captions", () => {
-    const { redactAppleSummaryTranscript } = loadBackgroundSandbox();
-    const transcript = [
-        "I think [ __ ] like this is inflammatory.",
-        "Fuck these guys.",
-    ].join("\n");
+test("Apple summary redaction has one native source of truth", () => {
+    const backgroundSource = fs.readFileSync(backgroundPath, "utf8");
 
-    const redacted = redactAppleSummaryTranscript(transcript);
-
-    assert.equal(redacted.count, 2);
-    assert.equal(redacted.text.includes("[ __ ]"), false);
-    assert.equal(/fuck/i.test(redacted.text), false);
+    assert.doesNotMatch(backgroundSource, /APPLE_SUMMARY_REDACTION_PATTERNS/);
+    assert.doesNotMatch(backgroundSource, /function redactAppleSummaryTranscript/);
+    assert.match(backgroundSource, /nativeTranscriptRedactions/);
 });
 
 test("native generation diagnostics expose xAI latency and token usage", () => {

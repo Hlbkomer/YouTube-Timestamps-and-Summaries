@@ -6,12 +6,6 @@ const MAX_NATIVE_TIMEOUT_MS = 20 * 60 * 1000;
 const JOB_RETENTION_MS = 30 * 60 * 1000;
 const JOB_MESSAGE_LIMIT = 80;
 const DEFAULT_SELECTED_MODEL = "gpt-5.6-terra";
-const ENABLE_APPLE_SUMMARY_TRANSCRIPT_REDACTION = true;
-const APPLE_SUMMARY_REDACTION_PATTERNS = [
-    /\[\s*_+\s*\]/g,
-    /\b(?:fuck(?:er|ing)?|fucking|fucked|shit(?:ty)?|bullshit|bitch(?:es)?|asshole|dick|pussy|cunt)\b/gi,
-    /\b(?:nigg(?:a|er)s?|fag(?:got)?s?|retard(?:ed)?|whore(?:s)?|slut(?:s)?)\b/gi,
-];
 const jobs = new Map();
 let nextJobID = 0;
 
@@ -180,29 +174,6 @@ function appendNativeGenerationDiagnostics(job, debug = {}) {
     }
 }
 
-function redactAppleSummaryTranscript(transcriptText) {
-    if (!ENABLE_APPLE_SUMMARY_TRANSCRIPT_REDACTION) {
-        return {
-            text: transcriptText,
-            count: 0,
-        };
-    }
-
-    let redactionCount = 0;
-    let redactedText = String(transcriptText || "");
-    for (const pattern of APPLE_SUMMARY_REDACTION_PATTERNS) {
-        redactedText = redactedText.replace(pattern, () => {
-            redactionCount += 1;
-            return "[redacted]";
-        });
-    }
-
-    return {
-        text: redactedText,
-        count: redactionCount,
-    };
-}
-
 function generationLabel(kind) {
     if (kind === "selectedProviderTimestamps") {
         return "timestamps";
@@ -256,6 +227,10 @@ async function statusPayload() {
     return await sendNative("getStatus");
 }
 
+async function generationSettingsPayload() {
+    return await sendNative("getGenerationSettings");
+}
+
 function selectedProviderAction(providerID, kind) {
     if (providerID === "xaiOAuth") {
         return kind === "timestamps"
@@ -269,7 +244,7 @@ function selectedProviderAction(providerID, kind) {
 }
 
 async function generateSelectedProviderTimestamps(job, transcriptText, nativeTimeoutMs, metadata = {}) {
-    const status = await statusPayload();
+    const status = await generationSettingsPayload();
     const settings = status?.settings || {};
     const providerID = settings.providerID || "openaiCodex";
     const model = settings.modelID || DEFAULT_SELECTED_MODEL;
@@ -285,7 +260,7 @@ async function generateSelectedProviderTimestamps(job, transcriptText, nativeTim
 }
 
 async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, metadata = {}) {
-    const status = await statusPayload();
+    const status = await generationSettingsPayload();
     const settings = status?.settings || {};
     const providerID = settings.providerID || "openaiCodex";
     const timestampModel = settings.modelID || DEFAULT_SELECTED_MODEL;
@@ -307,15 +282,9 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, m
         }, nativeTimeoutMs);
     }
 
-    const redactedTranscript = redactAppleSummaryTranscript(transcriptText);
-    if (redactedTranscript.count > 0) {
-        appendJobMessage(job, `redacted ${redactedTranscript.count} explicit transcript term${redactedTranscript.count === 1 ? "" : "s"} for Apple Intelligence`);
-    }
-
-    const appleTranscriptText = redactedTranscript.text;
     return await sendNative("generateContent", {
         kind: "summaryFull",
-        transcript: appleTranscriptText,
+        transcript: transcriptText,
         languageCode: metadata.languageCode || "",
         languageLabel: metadata.languageLabel || "",
         appleSummaryStrategy,
@@ -381,6 +350,15 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
             if (response.debug?.quotaStatus) {
                 appendJobMessage(job, `quota: ${response.debug.quotaStatus}`);
             }
+            const nativeRedactions = diagnosticInteger(
+                response.debug?.nativeTranscriptRedactions
+            );
+            if (nativeRedactions > 0) {
+                appendJobMessage(
+                    job,
+                    `redacted ${nativeRedactions} explicit transcript term${nativeRedactions === 1 ? "" : "s"} for Apple Intelligence`
+                );
+            }
             appendNativeGenerationDiagnostics(job, response.debug);
             appendJobMessage(job, `${label} completed with ${job.text.length} chars`);
         } else {
@@ -403,7 +381,6 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
         debug: {
             layer: "background",
             kind,
-            step: "started",
             messages: job.messages.join("\n"),
         },
     };

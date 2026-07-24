@@ -31,16 +31,50 @@ const contentSource = fs.readFileSync(
     "utf8"
 );
 
-function element() {
-    return {
+function escapedHTML(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;");
+}
+
+function element(tagName = "div") {
+    let rawInnerHTML = "";
+    const node = {
+        tagName: tagName.toUpperCase(),
+        children: [],
         dataset: {},
         disabled: false,
         hidden: false,
-        innerHTML: "",
         textContent: "",
         value: "",
         addEventListener() {},
+        append(...children) {
+            this.children.push(...children);
+            rawInnerHTML = "";
+        },
+        replaceChildren(...children) {
+            this.children = [...children];
+            rawInnerHTML = "";
+        },
     };
+    Object.defineProperty(node, "innerHTML", {
+        get() {
+            if (node.children.length > 0) {
+                return node.children.map((child) => (
+                    `<option value="${escapedHTML(child.value)}"${child.disabled ? " disabled" : ""}>`
+                    + `${escapedHTML(child.textContent)}</option>`
+                )).join("");
+            }
+            return rawInnerHTML;
+        },
+        set(value) {
+            rawInnerHTML = String(value);
+            node.children = [];
+        },
+    });
+    return node;
 }
 
 function render(state) {
@@ -51,6 +85,9 @@ function render(state) {
                 elements.set(id, element());
             }
             return elements.get(id);
+        },
+        createElement(tagName) {
+            return element(tagName);
         },
     };
     const window = {};
@@ -153,14 +190,26 @@ test("generation logs omit redundant asking and waiting lifecycle messages", () 
     assert.doesNotMatch(backgroundSource, /(?:summary|timestamps) failed:/);
     assert.doesNotMatch(backgroundSource, /caption language:/);
 
-    assert.doesNotMatch(contentSource, /step: asking /);
-    assert.doesNotMatch(contentSource, /step: waiting for (?:Apple Intelligence|\$\{.*\})/);
+    assert.doesNotMatch(contentSource, /step:/);
+    assert.doesNotMatch(backgroundSource, /["']step["']\s*:/);
     assert.doesNotMatch(contentSource, /generationStepDescription|generationWaitDescription/);
     assert.doesNotMatch(contentSource, /transcript: language /);
     assert.match(backgroundSource, /transcriptInputMessage\(transcriptText, metadata\)/);
     assert.equal(
         (contentSource.match(/timeout budget:/g) || []).length,
         1
+    );
+});
+
+test("generation routing reads settings without refreshing provider sessions", () => {
+    assert.match(backgroundSource, /sendNative\("getGenerationSettings"\)/);
+    assert.doesNotMatch(
+        backgroundSource,
+        /generateSelectedProviderTimestamps[\s\S]{0,250}await statusPayload\(\)/
+    );
+    assert.doesNotMatch(
+        backgroundSource,
+        /generateConfiguredSummary[\s\S]{0,250}await statusPayload\(\)/
     );
 });
 
@@ -194,6 +243,29 @@ test("connected selected provider keeps its model settings available", () => {
     assert.match(provider.innerHTML, /value="xaiOAuth" disabled/);
     assert.equal(provider.dataset.selectedUnavailable, "false");
     assert.equal(elements.get("model-select").disabled, false);
+});
+
+test("model option labels are rendered as text rather than executable markup", () => {
+    const elements = render({
+        codex: { connected: true },
+        modelOptions: [
+            {
+                id: "gpt-safe",
+                label: "<img src=x onerror=webkit.messageHandlers.controller.postMessage({action:'signOutCodex'})>",
+            },
+        ],
+        settings: {
+            providerID: "openaiCodex",
+            modelID: "gpt-safe",
+            chapterPreference: "preferNative",
+            summaryModelID: "appleIntelligence",
+        },
+    });
+    const modelOption = elements.get("model-select").children[0];
+
+    assert.equal(modelOption.tagName, "OPTION");
+    assert.match(modelOption.textContent, /^<img /);
+    assert.doesNotMatch(elements.get("model-select").innerHTML, /<img /);
 });
 
 test("missing ChatGPT model selection falls back to GPT-5.6 Terra", () => {

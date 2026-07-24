@@ -29,12 +29,10 @@ enum AppleIntelligenceError: LocalizedError {
 final class AppleIntelligenceService {
     private let logger = Logger(subsystem: "Matuko.YouTube-Timestamps-and-Summaries", category: "AppleIntelligence")
     private let maxTranscriptChunkCharacters = 3_500
-    private let maxAnalysisChunkCharacters = 3_000
     private let maxDirectSummaryCharacters = 10_000
     private let maxFullSummaryChunkCharacters = 10_000
     private let maxUnsupportedLanguageDirectSummaryCharacters = 6_000
     private let maxUnsupportedLanguageFullSummaryChunkCharacters = 6_000
-    private let maxParallelAnalysisRequests = 2
     private let maxParallelSummaryRequests = 3
 
     struct ExperimentalChunkDigest: Sendable {
@@ -96,7 +94,6 @@ final class AppleIntelligenceService {
         let inputTokens: Int
         let outputTokens: Int
         let reasoningTokens: Int
-        let skippedChunks: Int
         let deterministicFallbacks: Int
 
         var payload: [String: Any] {
@@ -119,7 +116,6 @@ final class AppleIntelligenceService {
                 "inputTokens": inputTokens,
                 "outputTokens": outputTokens,
                 "reasoningTokens": reasoningTokens,
-                "skippedChunks": skippedChunks,
                 "deterministicFallbacks": deterministicFallbacks,
             ]
         }
@@ -134,7 +130,6 @@ final class AppleIntelligenceService {
         private var inputTokens = 0
         private var outputTokens = 0
         private var reasoningTokens = 0
-        private var skippedChunks = 0
         private var deterministicFallbacks = 0
 
         func record(
@@ -159,10 +154,6 @@ final class AppleIntelligenceService {
             formatRecoveries += 1
         }
 
-        func recordSkippedChunks(_ count: Int = 1) {
-            skippedChunks += count
-        }
-
         func recordDeterministicFallback() {
             deterministicFallbacks += 1
         }
@@ -177,31 +168,14 @@ final class AppleIntelligenceService {
                 inputTokens: inputTokens,
                 outputTokens: outputTokens,
                 reasoningTokens: reasoningTokens,
-                skippedChunks: skippedChunks,
                 deterministicFallbacks: deterministicFallbacks
             )
         }
     }
-    private struct TranscriptChunk {
-        let text: String
-        let startSeconds: Int
-        let endSeconds: Int
-
-        var rangeLabel: String {
-            "\(AppleIntelligenceService.formatTimestamp(seconds: startSeconds))-\(AppleIntelligenceService.formatTimestamp(seconds: endSeconds))"
-        }
-    }
-
     private struct TranscriptCue {
         let time: String
         let seconds: Int
         let text: String
-    }
-
-    private struct TranscriptChunkAnalysis {
-        let index: Int
-        let chunk: TranscriptChunk
-        let response: String?
     }
 
     private struct SummaryChunkResult {
@@ -346,6 +320,7 @@ final class AppleIntelligenceService {
             }
 
             let analysisTranscriptText = lightlyMergedTranscript(transcriptText)
+            let modelTranscriptText = modelFacingTranscript(analysisTranscriptText)
             var text: String
             let chunkCount: Int
             var summaryChunkDebug: [String: Any] = [:]
@@ -356,13 +331,13 @@ final class AppleIntelligenceService {
                 #if DEBUG
                 case GenerationSettings.appleSummaryStrategyHierarchical:
                     result = try await generateMacOS27HierarchicalSummary(
-                        from: analysisTranscriptText,
+                        from: modelTranscriptText,
                         model: model,
                         languageContext: languageContext
                     )
                 case GenerationSettings.appleSummaryStrategyRollingComposed:
                     result = try await generateMacOS27RollingSummary(
-                        from: analysisTranscriptText,
+                        from: modelTranscriptText,
                         model: model,
                         languageContext: languageContext,
                         composeFinalSummary: true
@@ -376,14 +351,14 @@ final class AppleIntelligenceService {
                     )
                 case GenerationSettings.appleSummaryStrategyRollingJoined:
                     result = try await generateMacOS27RollingSummary(
-                        from: analysisTranscriptText,
+                        from: modelTranscriptText,
                         model: model,
                         languageContext: languageContext,
                         composeFinalSummary: false
                     )
                 default:
                     result = try await generateMacOS27FullSummary(
-                        from: analysisTranscriptText,
+                        from: modelTranscriptText,
                         localModel: model,
                         languageContext: languageContext
                     )
@@ -393,7 +368,7 @@ final class AppleIntelligenceService {
                 text = result.text
             } else {
                 let plan = legacyFullSummaryChunkPlan(
-                    from: analysisTranscriptText,
+                    from: modelTranscriptText,
                     languageContext: languageContext,
                     model: model,
                     fallbackReason: nil
@@ -404,7 +379,7 @@ final class AppleIntelligenceService {
             }
             #else
             let plan = legacyFullSummaryChunkPlan(
-                from: analysisTranscriptText,
+                from: modelTranscriptText,
                 languageContext: languageContext,
                 model: model,
                 fallbackReason: nil
@@ -440,7 +415,6 @@ final class AppleIntelligenceService {
                 "summaryStrategy": appleSummaryStrategy,
                 "chunks": chunkCount,
                 "nativeTranscriptRedactions": transcriptRedaction.count,
-                "step": "completed",
                 "textLength": text.count,
             ]
             debug.merge(summaryChunkDebug) { _, new in new }
@@ -468,7 +442,6 @@ final class AppleIntelligenceService {
                     "languageIsAppleSupported": languageContext.isAppleSupported(by: model),
                     "nativeTranscriptRedactions": transcriptRedaction.count,
                     "summaryStrategy": appleSummaryStrategy,
-                    "step": "failed",
                     "detail": message,
                 ],
             ]
@@ -986,6 +959,7 @@ final class AppleIntelligenceService {
         guard !transcriptText.isEmpty else {
             throw AppleIntelligenceError.missingTranscript
         }
+        let modelTranscriptText = modelFacingTranscript(transcriptText)
 
         let strictMaximumResponseTokens = 1_100
         let strictInputTokenBudget = summaryInputTokenBudget(
@@ -996,7 +970,7 @@ final class AppleIntelligenceService {
             model: model,
             instructions: strictSingleChunkSummaryInstructions(),
             prompt: strictSingleChunkSummaryPrompt(
-                for: transcriptText,
+                for: modelTranscriptText,
                 languageContext: languageContext,
                 model: model
             )
@@ -1004,7 +978,7 @@ final class AppleIntelligenceService {
 
         if strictRequestTokens <= strictInputTokenBudget {
             let result = try await generateMacOS27StrictSingleChunkSummary(
-                from: transcriptText,
+                from: modelTranscriptText,
                 model: model,
                 languageContext: languageContext
             )
@@ -1155,8 +1129,9 @@ final class AppleIntelligenceService {
                     ? "Treat the next chunk independently."
                     : nextHandoff
             } catch {
-                await metrics.recordSkippedChunks()
-                handoff = "The previous chunk could not be summarized. Treat the next chunk independently."
+                throw AppleIntelligenceError.generationFailed(
+                    "Apple Intelligence could not summarize transcript chunk \(index + 1) of \(sourceChunks.count). Retry the summary."
+                )
             }
         }
 
@@ -1208,7 +1183,7 @@ final class AppleIntelligenceService {
         var debug = (await metrics.snapshot()).payload
         debug["summaryEngine"] = "Apple Intelligence (macOS 27)"
         debug["chunkStrategy"] = "token-aware-thought-lines"
-        debug["timestampMode"] = "stripped-with-internal-source-ranges"
+        debug["timestampMode"] = "local-boundaries-stripped-from-prompts"
         debug["reductionLevels"] = reductionLevels
         debug["digestCount"] = composableNodes.count
         debug["contextSize"] = model.contextSize
@@ -1372,8 +1347,9 @@ final class AppleIntelligenceService {
                     ? "The previous chunk did not require additional context."
                     : nextHandoff
             } catch {
-                await metrics.recordSkippedChunks()
-                handoff = "The previous chunk could not be summarized. Treat the next chunk independently."
+                throw AppleIntelligenceError.generationFailed(
+                    "Apple Intelligence could not summarize rolling chunk \(index + 1) of \(sourceChunks.count): \(readableErrorMessage(error))"
+                )
             }
         }
         guard !sectionSummaries.isEmpty else {
@@ -1505,9 +1481,10 @@ final class AppleIntelligenceService {
             return results.sorted { $0.index < $1.index }
         }
 
-        let failedCount = results.filter { $0.node == nil }.count
-        if failedCount > 0 {
-            await metrics.recordSkippedChunks(failedCount)
+        if let failedResult = results.first(where: { $0.node == nil }) {
+            throw AppleIntelligenceError.generationFailed(
+                "Apple Intelligence could not summarize hierarchical chunk \(failedResult.index + 1) of \(chunks.count): \(failedResult.error ?? "unknown error")"
+            )
         }
         return results.compactMap(\.node)
     }
@@ -2241,16 +2218,8 @@ final class AppleIntelligenceService {
 
     private func experimentalEncodedNodes(_ nodes: [ExperimentalSummaryNode]) -> String {
         nodes.enumerated().map { index, node in
-            let start = node.startSeconds.map(Self.formatTimestamp)
-            let end = node.endSeconds.map(Self.formatTimestamp)
-            let range: String
-            if let start, let end {
-                range = " [\(start)-\(end)]"
-            } else {
-                range = ""
-            }
             let points = node.points.map { "- \($0)" }.joined(separator: "\n")
-            return "Digest \(index + 1)\(range)\nTopic: \(node.topic)\n\(points)"
+            return "Digest \(index + 1)\nTopic: \(node.topic)\n\(points)"
         }
         .joined(separator: "\n\n")
     }
@@ -3518,19 +3487,6 @@ final class AppleIntelligenceService {
         return instructionTokens + promptTokens
     }
 
-    #if false // Used only by the deferred Private Cloud Compute experiment.
-    @available(macOS 27.0, *)
-    private func privateCloudRequestTokenCount(
-        model: SystemLanguageModel,
-        instructions: String,
-        prompt: String
-    ) async throws -> Int {
-        let instructionTokens = try await model.tokenCount(for: Instructions(instructions))
-        let promptTokens = try await model.tokenCount(for: prompt)
-        return instructionTokens + promptTokens
-    }
-    #endif
-
     @available(macOS 27.0, *)
     private func summaryInputTokenBudget(contextSize: Int, maximumResponseTokens: Int) -> Int {
         let safetyMargin = min(max(contextSize / 8, 256), 1_024)
@@ -3608,47 +3564,6 @@ final class AppleIntelligenceService {
         return text
     }
 
-    #if compiler(>=6.4)
-    #if false // Used only by the deferred Private Cloud Compute experiment.
-    @available(macOS 27.0, *)
-    private func respondPrivateCloud(
-        model: PrivateCloudComputeLanguageModel,
-        instructions: String,
-        prompt: String,
-        maximumResponseTokens: Int,
-        reasoningLevel: ContextOptions.ReasoningLevel? = nil
-    ) async throws -> String {
-        let session = LanguageModelSession(
-            model: model,
-            tools: [],
-            instructions: instructions
-        )
-
-        let options = GenerationOptions(
-            samplingMode: .greedy,
-            temperature: nil,
-            maximumResponseTokens: maximumResponseTokens
-        )
-        let response: LanguageModelSession.Response<String>
-        if let reasoningLevel {
-            let contextOptions = ContextOptions(reasoningLevel: reasoningLevel)
-            response = try await session.respond(to: prompt, options: options, contextOptions: contextOptions)
-        } else {
-            response = try await session.respond(to: prompt, options: options)
-        }
-        logTokenUsage(response.usage)
-
-        let text = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !text.isEmpty else {
-            throw AppleIntelligenceError.generationFailed("Apple Intelligence 27 returned an empty response.")
-        }
-
-        return text
-    }
-    #endif
-    #endif
-
     private func prewarmPrefix(from prompt: String) -> String {
         if let transcriptRange = prompt.range(of: "Transcript:") {
             return String(prompt[..<transcriptRange.upperBound])
@@ -3672,57 +3587,6 @@ final class AppleIntelligenceService {
         )
     }
 
-    #if false // Deferred Private Cloud Compute diagnostics.
-    @available(macOS 27.0, *)
-    private func privateCloudAvailabilityDescription(_ availability: PrivateCloudComputeLanguageModel.Availability) -> String {
-        switch availability {
-        case .available:
-            return "Private Cloud Compute is available."
-        case .unavailable(let reason):
-            return "Private Cloud Compute is not available: \(String(describing: reason))."
-        @unknown default:
-            return "Private Cloud Compute is not available."
-        }
-    }
-
-    @available(macOS 27.0, *)
-    private func privateCloudStatusPayload() -> [String: Any] {
-        let model = PrivateCloudComputeLanguageModel()
-        var payload: [String: Any] = [
-            "isConfigured": model.isAvailable,
-            "availability": privateCloudAvailabilityDescription(model.availability),
-        ]
-
-        payload.merge(privateCloudQuotaDebugPayload(model.quotaUsage)) { _, new in new }
-        return payload
-    }
-
-    @available(macOS 27.0, *)
-    private func privateCloudQuotaDebugPayload(_ quotaUsage: PrivateCloudComputeLanguageModel.QuotaUsage) -> [String: Any] {
-        var payload: [String: Any] = [
-            "quotaLimitReached": quotaUsage.isLimitReached,
-            "quotaStatus": privateCloudQuotaStatusDescription(quotaUsage.status),
-        ]
-
-        if let resetDate = quotaUsage.resetDate {
-            payload["quotaResetDate"] = ISO8601DateFormatter().string(from: resetDate)
-        }
-
-        return payload
-    }
-
-    @available(macOS 27.0, *)
-    private func privateCloudQuotaStatusDescription(_ status: PrivateCloudComputeLanguageModel.QuotaUsage.Status) -> String {
-        switch status {
-        case .belowLimit(let info):
-            return info.isApproachingLimit ? "approaching limit" : "below limit"
-        case .limitReached:
-            return "limit reached"
-        @unknown default:
-            return "unknown"
-        }
-    }
-    #endif
     #endif
 
     private func readableErrorMessage(_ error: Error) -> String {
@@ -3862,6 +3726,27 @@ final class AppleIntelligenceService {
         return mergedLines.joined(separator: "\n")
     }
 
+    private func modelFacingTranscript(_ transcript: String) -> String {
+        transcript
+            .split(whereSeparator: \.isNewline)
+            .compactMap { rawLine in
+                let line = String(rawLine)
+                if let cue = transcriptCue(from: line) {
+                    return cue.text
+                }
+                let text = line
+                    .replacingOccurrences(
+                        of: #"^\[\d{1,2}:\d{2}(?::\d{2})?\]\s*"#,
+                        with: "",
+                        options: .regularExpression
+                    )
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return text.isEmpty ? nil : text
+            }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func transcriptCue(from line: String) -> TranscriptCue? {
         guard let match = line.range(of: #"^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.*)$"#, options: .regularExpression) else {
             return nil
@@ -3912,52 +3797,6 @@ final class AppleIntelligenceService {
         ]
 
         return starters.contains { lowercasedText.hasPrefix($0) }
-    }
-
-    private func chunkTranscriptSections(_ transcript: String, maxCharacters: Int) -> [TranscriptChunk] {
-        var chunks: [TranscriptChunk] = []
-        var currentLines: [String] = []
-        var currentLength = 0
-        var currentStartSeconds: Int?
-        var currentEndSeconds: Int?
-
-        func flushCurrentChunk() {
-            guard !currentLines.isEmpty else {
-                return
-            }
-
-            chunks.append(TranscriptChunk(
-                text: currentLines.joined(separator: "\n"),
-                startSeconds: currentStartSeconds ?? 0,
-                endSeconds: currentEndSeconds ?? currentStartSeconds ?? 0
-            ))
-            currentLines = []
-            currentLength = 0
-            currentStartSeconds = nil
-            currentEndSeconds = nil
-        }
-
-        for line in transcript.split(separator: "\n", omittingEmptySubsequences: true) {
-            let lineText = String(line)
-            let lineSeconds = transcriptTimestampSeconds(from: lineText)
-
-            if currentLength + lineText.count > maxCharacters, !currentLines.isEmpty {
-                flushCurrentChunk()
-            }
-
-            if currentStartSeconds == nil {
-                currentStartSeconds = lineSeconds
-            }
-            if let lineSeconds {
-                currentEndSeconds = lineSeconds
-            }
-
-            currentLines.append(lineText)
-            currentLength += lineText.count + 1
-        }
-
-        flushCurrentChunk()
-        return chunks
     }
 
     private func timestampLines(from text: String) -> [String] {

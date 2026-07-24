@@ -25,7 +25,7 @@ The sidebar has one `Summary` tab. When Apple Intelligence is selected as the su
 
 On macOS 27, the existing `Summary model` picker exposes one Apple Intelligence choice. There is no separate Apple-specific mode picker:
 
-- `Apple Intelligence` uses a strict, reader-facing one-call Markdown contract when the complete transcript fits that request's measured input budget. Transcripts that exceed the one-call boundary use the grounded pipeline: it creates self-contained points per chunk, limits the handoff to unresolved continuity rather than facts, preserves sparse source ranges internally, and performs a final composition pass with explicit speaker and entity-binding rules.
+- `Apple Intelligence` uses a strict, reader-facing one-call Markdown contract when the complete transcript fits that request's measured input budget. Transcripts that exceed the one-call boundary use the grounded pipeline: it creates self-contained points per chunk, limits the handoff to unresolved continuity rather than facts, uses cue timing locally to find thought boundaries, and performs a final composition pass with explicit speaker and entity-binding rules.
 
 The persisted model IDs and their strategy mappings are:
 
@@ -50,14 +50,14 @@ The baseline, hierarchical, rolling-joined, and rolling-composed strategies rema
 
 ## Long-Transcript Architecture
 
-The production pipeline and Debug comparison strategies begin with the same boundary:
+The production pipeline and Debug comparison strategies share these boundaries:
 
-1. Merge and normalize transcript cues.
-2. Apply transcript redaction at the native boundary, even if the JavaScript caller already applied it.
-3. Remove cue timestamps from model-facing text to spend the context window on spoken content.
-4. Form transcript-aware thought lines rather than cutting at an arbitrary character position.
+1. Preserve timed transcript cues until the native Apple boundary.
+2. Apply transcript redaction once at that native boundary.
+3. Use cue timing locally to merge neighboring speech and find natural thought boundaries.
+4. Remove cue timestamps from every model-facing prompt.
 5. Build chunks against the on-device model's measured token count and context limit, including prompt and response reserves.
-6. Prewarm requests and record per-stage calls, tokens, retries, recoveries, skipped chunks, and fallbacks.
+6. Prewarm requests and record per-stage calls, tokens, retries, recoveries, and fallbacks.
 
 The Debug-only rolling-joined strategy follows this flow:
 
@@ -86,19 +86,19 @@ complete transcript exceeds the strict one-call budget
 
 The single-chunk path does not create an unnecessary intermediate digest or final composition call. Its instructions treat the complete transcript only as source material and explicitly forbid JSON, schemas, code fences, tool text, and drafting commentary.
 
-Each multi-chunk grounded point must be self-contained and retain the relevant speaker or entity name. Two-chunk inputs may retain up to five points per chunk so the long-video compression policy does not discard too much of a short multi-chunk video. The handoff carries only unresolved continuity. Sparse source ranges remain available inside the pipeline for ordering and grounding even though raw timestamps are not sent as transcript text.
+Each multi-chunk grounded point must be self-contained and retain the relevant speaker or entity name. Two-chunk inputs may retain up to five points per chunk so the long-video compression policy does not discard too much of a short multi-chunk video. The handoff carries only unresolved continuity. Local cue timing improves ordering and chunk boundaries, but timestamps never enter summary prompts.
 
 ## Response Contract, Recovery, and Cleanup
 
-The macOS 27 pipelines use transcript-aware thought lines instead of fixed character cuts, then measure the actual Foundation Models token count before each request. Intermediate calls generate permissive `String` responses in small tagged formats such as `TOPIC:`, `POINT:`, `SUMMARY:`, and `HANDOFF:`. The native boundary applies the same transcript redaction safeguards as the JavaScript caller, so direct test runners and future native callers cannot bypass them. Tagged text, completed or nested JSON-shaped responses, and clean prose or bullets can be parsed locally without another model call or exposing model protocol text. Hierarchical and ordinary rolling calls retain one retry for genuinely unusable responses. Adaptive grounded goes directly to its proven extraction recovery after one unusable grounded response. A failed or truncated final writer immediately uses a deterministic rendering instead of repeating the same composition request.
+The macOS 27 pipelines use transcript-aware thought lines instead of fixed character cuts, then measure the actual Foundation Models token count before each request. Intermediate calls generate permissive `String` responses in small tagged formats such as `TOPIC:`, `POINT:`, `SUMMARY:`, and `HANDOFF:`. Native Swift is the single transcript-redaction enforcement boundary, so browser, Debug-runner, and future native callers receive the same protection without maintaining duplicate word lists. Tagged text, completed or nested JSON-shaped responses, and clean prose or bullets can be parsed locally without another model call or exposing model protocol text. Hierarchical and ordinary rolling calls retain one retry for genuinely unusable responses. Adaptive grounded goes directly to its proven extraction recovery after one unusable grounded response. If both grounded extraction attempts fail for a source chunk, the whole request fails instead of silently composing an incomplete summary. A failed or truncated final writer can still use deterministic rendering because every source chunk has completed extraction or explicitly yielded no substantive point.
 
 The single-chunk request accepts only a completed reader-facing summary; malformed JSON-like output is rejected rather than repaired. Multi-chunk internal requests remain strict so the common case is predictable. Their parser accepts deterministic tags, JSON field variants, or clean prose/bullets and records a local `formatRecovery`; this does not make another model call. Point-only tagged output remains useful even when the model adds an unrelated no-op tool preamble, because only recognized `POINT:` values enter the grounded representation. An adaptive grounded response that contains no recoverable points switches immediately to the simpler extraction prompt rather than repeating the identical failed request. Final composition is never retried with the same prompt.
 
-Debug metrics distinguish `retries` from `formatRecoveries`. They include `retryStages`, `retryReasons`, `stageCalls`, `modelCalls`, `skippedChunks`, `deterministicFallbacks`, and input/output token totals. Retry reasons include `malformedFormat`, `truncatedOutput`, `guardrail`, and `modelError`.
+Debug metrics distinguish `retries` from `formatRecoveries`. They include `retryStages`, `retryReasons`, `stageCalls`, `modelCalls`, `deterministicFallbacks`, and input/output token totals. Retry reasons include `malformedFormat`, `truncatedOutput`, `guardrail`, and `modelError`.
 
 The String format is important: Apple's `permissiveContentTransformations` guardrail option prevents guardrail violations for String generation, while non-String `@Generable` responses behave like the default guardrails. The original structured experiments therefore produced false sensitive-content failures that the String-based baseline did not.
 
-All paths remove the generic `Summary of Video Transcript` heading. The former broad substring filter is retired: code fences and conversational preambles alone are not classified as model protocol. Narrow signatures such as `detected_language`, `summary_points`, `Tool Analysis`, and `Tool Call` still prevent actual protocol text from reaching the reader. Strict final-output validation separately rejects JSON/code-fence formatting without claiming it is model-internal text.
+All paths remove the generic `Summary of Video Transcript` heading. The former broad substring filter is retired: code fences and ordinary prose mentioning a tool call are not automatically classified as model protocol. Line-anchored signatures such as `detected_language`, `summary_points`, `Tool Analysis`, and `Tool Call` still prevent actual protocol text from reaching the reader. Strict final-output validation scans the complete response and separately rejects JSON/code-fence formatting without claiming it is model-internal text.
 
 Selected-provider summaries are not affected by this switch. Grok and ChatGPT summaries continue to use the model selected in the companion app on all supported macOS versions.
 
@@ -143,7 +143,9 @@ Apple documents that PCC requires eligibility and the managed entitlement. See [
 4. Confirm the ordinary Summary tab generates successfully with `adaptiveGrounded`.
 5. Confirm the result says `Generated with Apple Intelligence` and includes elapsed time.
 6. Confirm the debug log records the selected strategy, chunk count, model-call count, stage calls, retries, and input/output token use.
-7. Confirm the sidebar contains only Timestamps and Summary, and the extension process does not crash.
+7. Test both a one-chunk transcript and a transcript that requires multiple chunks.
+8. Confirm an unrecoverable source-chunk response fails the generation instead of returning a summary with missing material.
+9. Confirm the sidebar contains only Timestamps and Summary, and the extension process does not crash.
 
 ## Ongoing Evaluation Protocol
 
@@ -254,7 +256,7 @@ Adaptive grounded is the sole production Apple Intelligence path because its qua
 
 ## Verification Snapshot
 
-At the latest implementation check, the signed Debug test suite passed 19 Swift tests and the JavaScript suite passed 83 tests. Automated coverage includes Apple picker/default/migration behavior, strict short-summary validation, text cleanup and protocol-leak handling, native transcript redaction, and Grok model-to-reasoning mapping. The Debug runner also keeps all five Apple strategies available for real Foundation Models comparisons.
+At the latest implementation check, the signed Debug test suite passed 20 Swift tests and the JavaScript suite passed 85 tests. Automated coverage includes Apple picker/default/migration behavior, strict short-summary validation, complete-response cleanup and protocol-leak handling, native transcript redaction, provider refresh-failure policy, Grok callback ambiguity, safe model-label rendering, lightweight generation routing, and Grok model-to-reasoning mapping. The Debug runner also keeps all five Apple strategies available for real Foundation Models comparisons.
 
 These tests validate routing and deterministic safeguards. Summary quality, Foundation Models nondeterminism, thermal behavior, and beta-OS regressions still require the real-video protocol above.
 

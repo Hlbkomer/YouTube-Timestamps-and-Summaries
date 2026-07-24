@@ -59,8 +59,8 @@ final class GrokGenerationService {
         let metrics: XAIResponseMetrics
     }
 
-    func statusPayload() async -> [String: Any] {
-        await authService.statusPayload(refresh: true)
+    func statusPayload(refresh: Bool = true) async -> [String: Any] {
+        await authService.statusPayload(refresh: refresh)
     }
 
     func generateTimestamps(
@@ -246,6 +246,7 @@ final class GrokGenerationService {
         var errorBody = ""
         var firstOutputAt: Date?
         var responseMetrics = XAIResponseMetrics()
+        var receivedTerminalEvent = false
 
         for try await line in bytes.lines {
             if httpResponse.statusCode != 200 {
@@ -260,7 +261,11 @@ final class GrokGenerationService {
             }
             let jsonText = String(line.dropFirst("data:".count))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !jsonText.isEmpty, jsonText != "[DONE]" else {
+            guard !jsonText.isEmpty else {
+                continue
+            }
+            if jsonText == "[DONE]" {
+                receivedTerminalEvent = true
                 continue
             }
             guard
@@ -283,13 +288,14 @@ final class GrokGenerationService {
                 }
                 fallbackOutput += itemText
             } else if eventType == "response.completed", let response = event["response"] as? [String: Any] {
+                receivedTerminalEvent = true
                 let responseText = Self.outputText(fromResponse: response)
                 if firstOutputAt == nil, !responseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     firstOutputAt = Date()
                 }
                 fallbackOutput += responseText
                 responseMetrics = XAIResponseMetrics.parse(response)
-            } else if eventType == "response.failed" {
+            } else if eventType == "response.failed" || eventType == "response.incomplete" {
                 throw GrokGenerationError.requestFailed(errorMessage(from: event) ?? "Grok failed to generate a response.")
             }
         }
@@ -300,6 +306,11 @@ final class GrokGenerationService {
         }
         if httpResponse.statusCode != 200 {
             throw GrokGenerationError.requestFailed(errorMessage(from: errorBody) ?? "Grok request failed with status \(httpResponse.statusCode).")
+        }
+        guard receivedTerminalEvent else {
+            throw GrokGenerationError.invalidResponse(
+                "Grok's response stream ended before generation completed."
+            )
         }
 
         let text = output.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -359,7 +370,6 @@ final class GrokGenerationService {
             "inputMode": "transcript",
             "languageCode": languageContext.code,
             "languageLabel": languageContext.label,
-            "step": "completed",
             "durationMs": Int(Date().timeIntervalSince(startedAt) * 1_000),
             "textLength": text.count,
         ]
@@ -395,7 +405,6 @@ final class GrokGenerationService {
             "providerModel": GenerationSettings.grokProviderModelID(for: model),
             "languageCode": languageContext.code,
             "languageLabel": languageContext.label,
-            "step": "failed",
             "durationMs": Int(Date().timeIntervalSince(startedAt) * 1_000),
             "detail": message,
         ]

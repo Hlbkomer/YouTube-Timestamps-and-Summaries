@@ -67,7 +67,8 @@ test("generation request preparation is deterministic", () => {
     assert.equal(generationKindForTab("timestamps", true), "selectedProviderTimestamps");
     assert.equal(generationKindForTab("summary", true), "selectedProviderSummary");
     assert.equal(generationKindForTab("summary", false), "summaryFull");
-    assert.equal(transcriptForGeneration("summary", sharedTranscript), "Hello\nWorld");
+    assert.equal(transcriptForGeneration("summary", sharedTranscript, true), "Hello\nWorld");
+    assert.equal(transcriptForGeneration("summary", sharedTranscript, false), sharedTranscript);
     assert.equal(transcriptForGeneration("timestamps", sharedTranscript), sharedTranscript);
     assert.equal(generationTimeoutForTranscript("x".repeat(30000)), 6 * 60 * 1000);
     assert.equal(generationTimeoutForTranscript("x".repeat(40001)), 7.5 * 60 * 1000);

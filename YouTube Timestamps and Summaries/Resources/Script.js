@@ -41,9 +41,14 @@ function renderChecklist() {
 
 function renderOptions(select, options, selectedID) {
     const currentValue = select.value || selectedID;
-    select.innerHTML = options
-        .map((option) => `<option value="${option.id}"${option.disabled ? " disabled" : ""}>${option.label}</option>`)
-        .join("");
+    select.replaceChildren();
+    for (const optionData of options) {
+        const option = document.createElement("option");
+        option.value = String(optionData.id || "");
+        option.textContent = String(optionData.label || optionData.id || "");
+        option.disabled = Boolean(optionData.disabled);
+        select.append(option);
+    }
     select.value = selectedID || currentValue;
 }
 

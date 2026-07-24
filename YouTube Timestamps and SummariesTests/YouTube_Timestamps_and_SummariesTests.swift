@@ -163,6 +163,14 @@ struct YouTube_Timestamps_and_SummariesTests {
 
         #expect(!AppleSummaryTextUtilities.containsModelMetaText(capturedResponse))
         #expect(!AppleSummaryTextUtilities.isStrictReaderFacingSummary(capturedResponse))
+        #expect(!AppleSummaryTextUtilities.isStrictReaderFacingSummary(
+            """
+            Here is the requested summary:
+            ```json
+            {"overview":"A malformed response behind a harmless preamble."}
+            ```
+            """
+        ))
         #expect(AppleSummaryTextUtilities.isStrictReaderFacingSummary(
             """
             President Trump discusses Iran's nuclear program.
@@ -170,6 +178,9 @@ struct YouTube_Timestamps_and_SummariesTests {
             **Pickaxe Mountain**
             - Mark Wallace describes the facility as deeply buried.
             """
+        ))
+        #expect(AppleSummaryTextUtilities.isStrictReaderFacingSummary(
+            "The host explains that a tool call can fail without invalidating the wider argument."
         ))
     }
 
@@ -448,6 +459,25 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(!XAITokenSession.isTrustedXAIURL(try #require(URL(string: "https://example.com/oauth/token"))))
     }
 
+    @Test func oauthRefreshFailurePolicyPreservesCredentialsForTransientErrors() {
+        #expect(!OAuthRefreshFailurePolicy.shouldInvalidateCredentials(
+            statusCode: 429,
+            message: "Too many requests"
+        ))
+        #expect(!OAuthRefreshFailurePolicy.shouldInvalidateCredentials(
+            statusCode: 500,
+            message: "Temporary server error"
+        ))
+        #expect(OAuthRefreshFailurePolicy.shouldInvalidateCredentials(
+            statusCode: 400,
+            message: "invalid_grant: refresh token revoked"
+        ))
+        #expect(OAuthRefreshFailurePolicy.shouldInvalidateCredentials(
+            statusCode: 401,
+            message: nil
+        ))
+    }
+
     @Test func xAILoopbackCallbackSurvivesBrowserProbeAndReturnsACompleteHTTPResponse() async throws {
         let server = try XAILoopbackCallbackServer(port: nil, expectedState: "test-state")
         try server.start()
@@ -457,6 +487,7 @@ struct YouTube_Timestamps_and_SummariesTests {
         try await connectAndCloseWithoutSendingHTTP(port: port)
 
         let wrongStateURL = try #require(URL(string: "http://127.0.0.1:\(port)/callback?state=wrong-state&code=wrong-code"))
+        let duplicateStateURL = try #require(URL(string: "http://127.0.0.1:\(port)/callback?state=test-state&state=other-state&code=wrong-code"))
         let callbackURL = try #require(URL(string: "http://127.0.0.1:\(port)/callback?state=test-state&code=test-code"))
 
         let configuration = URLSessionConfiguration.ephemeral
@@ -464,6 +495,8 @@ struct YouTube_Timestamps_and_SummariesTests {
         let session = URLSession(configuration: configuration)
         let (_, wrongStateResponse) = try await session.data(from: wrongStateURL)
         #expect((wrongStateResponse as? HTTPURLResponse)?.statusCode == 400)
+        let (_, duplicateStateResponse) = try await session.data(from: duplicateStateURL)
+        #expect((duplicateStateResponse as? HTTPURLResponse)?.statusCode == 400)
 
         var request = URLRequest(url: callbackURL)
         request.setValue(String(repeating: "a", count: 5_000), forHTTPHeaderField: "X-Fragmentation-Test")

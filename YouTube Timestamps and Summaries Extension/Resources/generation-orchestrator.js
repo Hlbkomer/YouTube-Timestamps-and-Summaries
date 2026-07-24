@@ -31,10 +31,11 @@
             .join("\n");
     }
 
-    function transcriptForGeneration(kind, transcriptText) {
-        return kind === "summary"
-            ? stripTranscriptTimestamps(transcriptText)
-            : transcriptText || "";
+    function transcriptForGeneration(kind, transcriptText, usesSelectedProvider = false) {
+        if (kind === "summary" && usesSelectedProvider) {
+            return stripTranscriptTimestamps(transcriptText);
+        }
+        return transcriptText || "";
     }
 
     function automaticGenerationKinds({
@@ -127,7 +128,6 @@
                         error: error?.message || "Polling the background job failed.",
                         debug: {
                             layer: "content",
-                            step: "poll-failed",
                             detail: error?.stack || error?.message || String(error),
                         },
                     };
@@ -170,7 +170,6 @@
                 error: timeoutError,
                 debug: {
                     layer: "content",
-                    step: "poll-timeout",
                     detail: `jobId=${jobID}`,
                 },
             };

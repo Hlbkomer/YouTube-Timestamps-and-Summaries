@@ -67,7 +67,10 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
 
         switch action {
         case "getStatus":
-            return await statusPayload()
+            return await statusPayload(refreshProviders: true)
+
+        case "getGenerationSettings":
+            return await statusPayload(refreshProviders: false)
 
         case "openContainerApp":
             return await openContainerApp(from: context)
@@ -203,13 +206,21 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         }
     }
 
-    private func statusPayload() async -> [String: Any] {
+    private func statusPayload(refreshProviders: Bool) async -> [String: Any] {
         let appleStatus = service.statusPayload()
         let settings = GenerationSettings.load()
-        let codexStatus = await codexAuthService.statusPayload(refresh: true)
+        let codexStatus: [String: Any]
+        if settings.providerID == GenerationSettings.chatGPTProviderID {
+            codexStatus = await codexAuthService.statusPayload(refresh: refreshProviders)
+        } else {
+            codexStatus = [
+                "connected": false,
+                "error": "",
+            ]
+        }
         let grokStatus: [String: Any]
         if settings.providerID == GenerationSettings.grokProviderID {
-            grokStatus = await grokGenerationService.statusPayload()
+            grokStatus = await grokGenerationService.statusPayload(refresh: refreshProviders)
         } else {
             grokStatus = [
                 "connected": false,

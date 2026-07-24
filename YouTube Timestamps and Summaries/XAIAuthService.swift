@@ -308,6 +308,12 @@ nonisolated final class XAILoopbackCallbackServer: @unchecked Sendable {
             throw XAIAuthError.requestFailed("Grok sign-in returned an unexpected local callback.")
         }
         let queryItems = components.queryItems ?? []
+        let queryItemNames = queryItems.map(\.name)
+        guard Set(queryItemNames).count == queryItemNames.count else {
+            throw XAIAuthError.requestFailed(
+                "Grok sign-in returned an ambiguous local callback."
+            )
+        }
         let callbackState = queryItems.first(where: { $0.name == "state" })?.value
         if let expectedState, callbackState != expectedState {
             throw XAIAuthError.requestFailed("Grok sign-in returned a callback for a different sign-in attempt.")
@@ -532,7 +538,15 @@ final class XAIAuthService {
         }
 
         let callback = try await callbackServer.waitForCallback()
-        let items = Dictionary(uniqueKeysWithValues: (callback.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        var items: [String: String] = [:]
+        for item in callback.queryItems ?? [] {
+            guard items[item.name] == nil else {
+                throw XAIAuthError.requestFailed(
+                    "Grok sign-in returned an ambiguous local callback."
+                )
+            }
+            items[item.name] = item.value ?? ""
+        }
         try await completeSignIn(session, callbackItems: items, requiresState: true)
     }
 

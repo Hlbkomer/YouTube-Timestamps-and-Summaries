@@ -44,6 +44,24 @@ Behavioral follow-up completed on 2026-07-20:
 - audited the complete Grok generation path and confirmed Grok 4.5 low reasoning is injected by the one shared xAI Responses request builder for Chapters, Summary, and retries
 - made compatible passive transcript prefetch idempotent and limited shared-request diagnostics to one line per request/result kind, removing reconciliation-driven log spam without weakening request sharing or active retry escalation
 
+Apple/provider hardening completed on 2026-07-24:
+
+- made unrecoverable Apple source-chunk failures fail the request instead of
+  returning an incomplete success
+- preserved cue timing for local Apple thought boundaries while stripping it
+  from every model prompt, and consolidated transcript redaction at the native
+  boundary
+- tightened complete-response validation without restoring the former broad
+  model-protocol filter
+- serialized provider refreshes, preserved credentials on transient failures,
+  and required terminal provider stream events
+- removed the pre-generation status network round trip, parallelized
+  companion-app state loading, and hardened model-label and OAuth callback
+  parsing
+- recorded the reversible checkpoint, detailed impact table, validation, and
+  deferred cleanup in
+  [code-review-hardening-2026-07-24.md](code-review-hardening-2026-07-24.md)
+
 Work deliberately left for focused follow-up:
 
 - share provider SSE parsing only after provider-specific error semantics have fixture coverage

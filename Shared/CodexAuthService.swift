@@ -193,14 +193,39 @@ final class CodexAuthService {
 
         let expiresAt = Date(timeIntervalSince1970: defaults.double(forKey: Keys.expiresAt))
         if refresh && expiresAt.timeIntervalSinceNow <= tokenRefreshSkew {
-            try await refreshTokens(refreshToken: refreshToken)
+            let originalUpdatedAt = defaults.double(forKey: Keys.updatedAt)
+            await OAuthTokenRefreshGate.shared.acquire(provider: "chatgpt")
+            do {
+                let latestAccessToken = try credentialStore.string(for: Keys.accessToken)
+                let latestRefreshToken = try credentialStore.string(for: Keys.refreshToken)
+                let latestUpdatedAt = defaults.double(forKey: Keys.updatedAt)
+                let credentialsChanged = latestAccessToken != accessToken
+                    || latestRefreshToken != refreshToken
+                    || latestUpdatedAt > originalUpdatedAt
+
+                if !credentialsChanged {
+                    try await refreshTokens(
+                        refreshToken: refreshToken,
+                        expectedAccessToken: accessToken,
+                        expectedUpdatedAt: originalUpdatedAt
+                    )
+                }
+                await OAuthTokenRefreshGate.shared.release(provider: "chatgpt")
+            } catch {
+                await OAuthTokenRefreshGate.shared.release(provider: "chatgpt")
+                throw error
+            }
             return try await tokens(refresh: false)
         }
 
         return (accessToken, refreshToken, expiresAt)
     }
 
-    private func refreshTokens(refreshToken: String) async throws {
+    private func refreshTokens(
+        refreshToken: String,
+        expectedAccessToken: String,
+        expectedUpdatedAt: Double
+    ) async throws {
         let url = authBaseURL.appending(path: "/oauth/token")
         let body = formBody([
             "grant_type": "refresh_token",
@@ -209,8 +234,21 @@ final class CodexAuthService {
         ])
         let (data, response) = try await post(url: url, body: body, contentType: "application/x-www-form-urlencoded")
         guard response.statusCode == 200 else {
-            signOut()
-            throw CodexAuthError.requestFailed(errorMessage(from: data) ?? "ChatGPT token refresh failed.")
+            let message = errorMessage(from: data) ?? "ChatGPT token refresh failed."
+            let defaults = GenerationSettings.sharedDefaults
+            let credentialsChanged = defaults.double(forKey: Keys.updatedAt) > expectedUpdatedAt
+                || (try? credentialStore.string(for: Keys.accessToken)) != expectedAccessToken
+                || (try? credentialStore.string(for: Keys.refreshToken)) != refreshToken
+            if credentialsChanged {
+                return
+            }
+            if OAuthRefreshFailurePolicy.shouldInvalidateCredentials(
+                statusCode: response.statusCode,
+                message: message
+            ) {
+                signOut()
+            }
+            throw CodexAuthError.requestFailed(message)
         }
 
         try saveTokens(from: data, existingRefreshToken: refreshToken)
