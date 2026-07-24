@@ -37,7 +37,6 @@ nonisolated struct GenerationSettings {
     static let appleSummaryStrategyRollingJoined = "rollingJoined"
     static let appleSummaryStrategyRollingComposed = "rollingComposed"
     #endif
-    private static let legacyGrok45QualityModelID = "grok-4.5-quality"
     static let preferNativeChapters = "preferNative"
     static let alwaysGenerateChapters = "alwaysGenerate"
     static let defaultChapterPreference = preferNativeChapters
@@ -246,7 +245,7 @@ nonisolated struct GenerationSettings {
     static func isGrok45ModelID(_ modelID: String) -> Bool {
         let candidate = canonicalModelID(modelID, providerID: grokProviderID)
             .lowercased()
-        return candidate == "grok-4.5" || candidate.hasPrefix("grok-4.5-")
+        return candidate == defaultGrokModelID
     }
 
     /// Every Grok 4.5 request must carry an explicit low-reasoning payload.
@@ -344,9 +343,13 @@ nonisolated struct GenerationSettings {
                 break
             }
         }
-        if normalizedProviderID(providerID) == grokProviderID,
-           candidate.lowercased() == legacyGrok45QualityModelID {
-            return defaultGrokModelID
+        if normalizedProviderID(providerID) == grokProviderID {
+            let lowercasedCandidate = candidate.lowercased()
+            if lowercasedCandidate == defaultGrokModelID
+                || lowercasedCandidate.hasPrefix("\(defaultGrokModelID)-")
+            {
+                return defaultGrokModelID
+            }
         }
         return candidate
     }

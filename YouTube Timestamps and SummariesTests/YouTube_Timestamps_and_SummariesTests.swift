@@ -248,9 +248,14 @@ struct YouTube_Timestamps_and_SummariesTests {
             $0["id"] == GenerationSettings.defaultGrokModelID
                 && $0["label"] == "Grok 4.5"
         })
-        #expect(!GenerationSettings.modelOptions(
-            for: GenerationSettings.grokProviderID
-        ).contains { $0["id"] == "grok-4.5-quality" })
+        #expect(
+            GenerationSettings.modelOptions(
+                for: GenerationSettings.grokProviderID
+            ).compactMap { $0["id"] } == [
+                "grok-4.5",
+                "grok-4.3",
+            ]
+        )
     }
 
     @Test func modelOptionsSortHigherVersionsBeforeLowerVersions() throws {
@@ -277,11 +282,21 @@ struct YouTube_Timestamps_and_SummariesTests {
         ])
     }
 
-    @Test func grok45UsesLowReasoningAndMigratesLegacyQualityVariant() {
+    @Test func grok45AlwaysUsesLowReasoning() {
         #expect(GenerationSettings.isGrok45ModelID("grok-4.5"))
         #expect(GenerationSettings.isGrok45ModelID("grok-4.5-latest"))
+        #expect(GenerationSettings.isGrok45ModelID("grok-4.5-preview"))
         #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5") == "low")
         #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5-latest") == "low")
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5-preview") == "low")
+        #expect(
+            GenerationSettings.grokProviderModelID(for: "grok-4.5-latest")
+                == GenerationSettings.defaultGrokModelID
+        )
+        #expect(
+            GenerationSettings.grokProviderModelID(for: "grok-4.5-preview")
+                == GenerationSettings.defaultGrokModelID
+        )
         #expect(
             GenerationSettings.grokReasoningRequestValue(for: "grok-4.5")
                 == ["effort": "low"]
@@ -291,19 +306,7 @@ struct YouTube_Timestamps_and_SummariesTests {
                 == ["effort": "low"]
         )
         #expect(
-            GenerationSettings.normalizedModelID(
-                "grok-4.5-quality",
-                providerID: GenerationSettings.grokProviderID
-            ) == GenerationSettings.defaultGrokModelID
-        )
-        #expect(
-            GenerationSettings.grokProviderModelID(for: "grok-4.5-quality")
-                == GenerationSettings.defaultGrokModelID
-        )
-        #expect(GenerationSettings.isGrok45ModelID("grok-4.5-quality"))
-        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5-quality") == "low")
-        #expect(
-            GenerationSettings.grokReasoningRequestValue(for: "grok-4.5-quality")
+            GenerationSettings.grokReasoningRequestValue(for: "grok-4.5-preview")
                 == ["effort": "low"]
         )
         #expect(!GenerationSettings.isGrok45ModelID("grok-4.3"))

@@ -50,19 +50,15 @@ This fallback was successfully tested: the pasted callback completed sign-in and
 
 xAI describes `grok-4.5` as its current frontier model for coding, agentic tasks, and knowledge work. This app exposes it as one `Grok 4.5` choice, keeps `grok-4.3` available, and refreshes the connected account's text-input/text-output Grok model list from `https://api.x.ai/v1/language-models` when possible.
 
-Grok 4.5 explicitly sends `reasoning: { "effort": "low" }`. This is a request invariant rather than a picker convention: exact `grok-4.5`, provider aliases such as `grok-4.5-latest`, version-suffixed Grok 4.5 IDs, and the former synthetic `grok-4.5-quality` selection are all classified as the same family. Grok 4.3 and other model families retain xAI's default until separately measured. Request diagnostics record the picker model, provider model, reasoning effort, time to first output, input/output/total tokens, cached input tokens, reasoning tokens, and service tier whenever xAI returns those fields.
+Grok 4.5 explicitly sends `reasoning: { "effort": "low" }`. This is a request invariant rather than a picker convention: exact `grok-4.5` and provider aliases such as `grok-4.5-latest` are canonicalized to the same built-in model before request serialization. Grok 4.3 and other model families retain xAI's default until separately measured. Request diagnostics record the picker model, provider model, reasoning effort, time to first output, input/output/total tokens, cached input tokens, reasoning tokens, and service tier whenever xAI returns those fields.
 
 A repository-wide request-path audit confirmed that Chapters and selected-provider Summary both route through the same `GrokGenerationService.requestText` builder and that no second xAI generation endpoint exists. The builder derives the reasoning object from the actual provider model immediately before JSON serialization; callers cannot pass or omit an effort independently. It also refuses to send a Grok 4.5 request unless the derived object is exactly `{"effort":"low"}`, so a mapping regression fails locally instead of silently falling through to xAI's potentially higher default. Every attempt re-enters that boundary.
 
-The signed Swift test covers exact, latest, version-family, and former Quality-ID classification plus the final reasoning-object value. A source-contract test verifies the single endpoint and final serializer guard. Native debug payloads expose the applied effort on success and failure.
+The signed Swift test covers exact, latest, and version-family classification plus the final reasoning-object value. A source-contract test verifies the single endpoint and final serializer guard. Native debug payloads expose the applied effort on success and failure.
 
-The runtime catalog is filtered to provider-shaped `grok-*` language models with text output. Provider entries for `grok-4.5` and `grok-4.5-latest` are represented by the curated Grok 4.5 choice rather than duplicated. Grok 4.20, Grok Build, Imagine, and voice models are not valid timestamp/summary choices. Former saved 4.20, `grok-build-0.1`, or experimental `grok-4.5-quality` settings automatically normalize to Grok 4.5 when the app or extension loads settings.
+The runtime catalog is filtered to provider-shaped `grok-*` language models with text output. Provider entries for `grok-4.5` and `grok-4.5-latest` are represented by the curated Grok 4.5 choice rather than duplicated. Grok 4.20, Grok Build, Imagine, and voice models are not valid timestamp/summary choices. Former saved 4.20 or `grok-build-0.1` settings automatically normalize to Grok 4.5 when the app or extension loads settings.
 
 For xAI's current model catalog and pricing, consult the official [models page](https://docs.x.ai/developers/models) and [pricing page](https://docs.x.ai/developers/pricing).
-
-### High-reasoning evaluation result — 2026-07-23
-
-Side-by-side testing of the temporary `Grok 4.5 Quality` high-reasoning choice did not show a noticeable benefit for the app's transcript Chapters or Summary tasks. The extra picker choice was therefore removed. The remaining entry is named `Grok 4.5` and keeps the established explicit low-reasoning configuration for its speed/quality balance. Existing saved Quality selections migrate to it automatically.
 
 ### Prompt-caching decision
 

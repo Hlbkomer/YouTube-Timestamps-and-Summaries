@@ -6,7 +6,7 @@ The companion app keeps its provider model pickers current through two deliberat
 
 When a Grok account is connected, the companion app requests the account-scoped catalog from xAI's `https://api.x.ai/v1/language-models` endpoint. It keeps only `grok-*` entries that accept text input and return text output, then merges them with the built-in Grok 4.5 and Grok 4.3 fallback choices. The provider's plain `grok-4.5` entry and `grok-4.5-latest` alias are represented by the curated Grok 4.5 choice instead of appearing as duplicates. The final picker is sorted by model version from highest to lowest rather than relying on xAI's response order. Grok 4.5 is the default and always uses explicit low reasoning.
 
-Grok 4.20, Grok Build, Imagine, and voice models are excluded because they are not suitable choices for transcript timestamps and summaries. A saved excluded model or the former experimental `grok-4.5-quality` ID is normalized to Grok 4.5 when settings load. If xAI's catalog cannot be reached, the static fallback remains available.
+Grok 4.20, Grok Build, Imagine, and voice models are excluded because they are not suitable choices for transcript timestamps and summaries. A saved excluded model is normalized to Grok 4.5 when settings load. If xAI's catalog cannot be reached, the static fallback remains available.
 
 ## ChatGPT / Codex
 
