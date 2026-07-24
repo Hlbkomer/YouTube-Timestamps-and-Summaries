@@ -73,8 +73,33 @@ test("native generation diagnostics expose xAI latency and token usage", () => {
     assert.match(messages, /service tier: default/);
 });
 
-test("successful native generation jobs reach completion for Grok Chapters, Grok Summary, and Apple Summary", async () => {
+test("successful native generation jobs reach completion for every production route", async () => {
     const cases = [
+        {
+            name: "ChatGPT Chapters",
+            kind: "selectedProviderTimestamps",
+            settings: {
+                providerID: "openaiCodex",
+                modelID: "gpt-5.6-terra",
+                modelLabel: "GPT-5.6 Terra",
+            },
+            expectedAction: "generateCodexTimestamps",
+            debug: {},
+        },
+        {
+            name: "ChatGPT Summary",
+            kind: "selectedProviderSummary",
+            settings: {
+                providerID: "openaiCodex",
+                modelID: "gpt-5.6-terra",
+                modelLabel: "GPT-5.6 Terra",
+                summaryModelID: "gpt-5.6-terra",
+                summaryModelLabel: "GPT-5.6 Terra",
+                summaryEngine: "selectedModel",
+            },
+            expectedAction: "generateCodexSummary",
+            debug: {},
+        },
         {
             name: "Grok Chapters",
             kind: "selectedProviderTimestamps",

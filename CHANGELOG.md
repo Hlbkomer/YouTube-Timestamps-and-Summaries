@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fix the background completion path so successful native Chapters and Summary responses cannot fail while formatting optional diagnostics. Add executable start-to-completion coverage for Grok Chapters, Grok Summary, and Apple Intelligence Summary jobs.
+- Fix the background completion path so successful native Chapters and Summary responses cannot fail while formatting optional diagnostics. Add executable start-to-completion coverage for ChatGPT Chapters and Summary, Grok Chapters and Summary, and Apple Intelligence Summary jobs.
 - Keep one `Apple Intelligence` choice in the existing Summary model picker, backed by the more precise adaptive-grounded pipeline, with result captions using the same name.
 - Replace the legacy Apple Intelligence `<= 2`-chunk baseline branch: exactly one chunk now uses a strict one-call reader-facing Markdown contract, while two or more chunks use the grounded multi-chunk pipeline. Narrow protocol-leak detection to actual schema/tool markers so an ordinary JSON code fence is treated as an invalid output format rather than mislabeled as model-internal text.
 - Rework long Apple Intelligence summaries around token-aware transcript thought lines with model-facing timestamps removed: the production pipeline extracts self-contained grounded points, recursively reduces only when required, and performs one final composition. Retain the concise rolling-joined pipeline only for Debug comparisons.

@@ -36,6 +36,74 @@ later hardening commit, or create a temporary branch from the tag for comparison
 | Apple redaction | JavaScript and Swift contain duplicated explicit-term patterns | Keep native Swift as the sole enforcement boundary and return its count in success diagnostics | Removes pattern drift | Avoids duplicate regex work | Keeps guardrail behavior consistent | Completed |
 | Deterministic coverage | Important Apple and provider failure policies were lightly covered, and the background suite did not execute a native generation job through successful completion | Add focused validation, routing, refresh-policy, picker, callback, and start-to-completion background regression tests | Test-only complexity | Test-only cost | Prevents successful native results from being lost to completion/logging regressions | Completed |
 
+## Reversible follow-up commits
+
+- `ce7c023` removes the unshipped Apple model aliases, stored strategy
+  preference, and production strategy message plumbing. Production recognizes
+  only `appleIntelligence`; comparison strategies remain available only through
+  the Debug service overload.
+- `83a46f7` removes the unshipped Grok model-variant alias and its dedicated
+  migration/tests. The built-in choices remain Grok 4.5 and Grok 4.3, while
+  every Grok 4.5 provider alias canonicalizes to `grok-4.5` and receives
+  explicit low reasoning at the final request boundary.
+- `f5ddc18` fixes the background generation-completion crash described below
+  and adds executable lifecycle coverage.
+
+Each commit is intentionally independent so it can be reverted without
+discarding the other cleanup or hardening work.
+
+## Background generation completion incident
+
+### Observed failure
+
+A real Grok 4.5 summary request returned from the native extension in about
+eight seconds, but the WebExtension background job then failed with:
+
+```text
+background exception: Can't find variable: diagnosticInteger
+```
+
+The issue was reproduced on video `xm0rGvvxVOM`. It was not a Grok API,
+reasoning, transcript, or timeout failure. Native generation had succeeded; the
+result was lost while the background script was formatting optional completion
+diagnostics.
+
+### Root cause and affected paths
+
+`diagnosticInteger` was scoped inside
+`appendNativeGenerationDiagnostics`. A later native-redaction logging change
+called that helper from the outer successful-job completion block, where it was
+not defined. Because the call occurred on the common success path, the bug
+could turn any successful Grok Chapters, Grok Summary, ChatGPT Chapters,
+ChatGPT Summary, or Apple Intelligence Summary response into a failed
+background job.
+
+The previous tests covered the diagnostic formatter directly and the
+content-side polling coordinator separately. They did not load the production
+`background.js`, start a real background job, route its native messages, and
+observe that job through terminal completion. Both narrower tests passed while
+the integrated runtime path was broken.
+
+### Fix and regression coverage
+
+The integer-normalization helper now lives at background-script scope, shared
+by token diagnostics and native-redaction diagnostics. The new
+`tests/js/background-generation.test.cjs` suite loads the actual production
+background script in a VM, stubs only the native bridge, calls
+`startGenerateJob`, and polls `getGenerateJob` to completion for:
+
+- ChatGPT Chapters
+- ChatGPT Summary
+- Grok Chapters
+- Grok Summary
+- Apple Intelligence Summary, including native redaction diagnostics
+
+The regression test fails on the previous implementation with the same
+`diagnosticInteger` exception. After the fix, all five jobs finish with their
+text and expected native action intact. The full checks passed 86/86 JavaScript
+tests and 20/20 signed Debug Swift tests. A subsequent real-video retry was
+confirmed successful on the affected Mac.
+
 ## Deliberately deferred work
 
 - About 770 lines of retired Apple timestamp/video-analysis/PCC experiments remain

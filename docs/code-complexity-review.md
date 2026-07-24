@@ -149,7 +149,7 @@ Recommended change:
 
 ### Replace source-string assertions with behavior tests
 
-Status: **Resolved for the reviewed suite.** Status reduction, refresh coordination, retention, popup messaging, chapter state, panel rules, control routing, transcript sharing, and generation polling have direct JavaScript tests. Swift tests now execute settings normalization, catalog validation, xAI token parsing and URL trust, a temporary shared-Keychain migration, entitlement parsing, and embedded-extension discovery instead of scanning production source strings.
+Status: **Resolved for the reviewed suite.** Status reduction, refresh coordination, retention, popup messaging, chapter state, panel rules, control routing, transcript sharing, generation polling, and native-to-background generation completion have direct JavaScript tests. The completion suite loads the production background script and follows ChatGPT Chapters and Summary, Grok Chapters and Summary, and Apple Intelligence Summary jobs to their terminal state. Swift tests now execute settings normalization, catalog validation, xAI token parsing and URL trust, a temporary shared-Keychain migration, entitlement parsing, and embedded-extension discovery instead of scanning production source strings.
 
 The Swift suite contains 260 expectations and almost all of them assert that source files contain particular strings. Several JavaScript routing tests also inspect source text. These checks are useful as temporary regression locks, but they do not execute the status reducer, settings normalization, native bridge contract, provider SSE parsing, or navigation state transitions. They also make safe renaming/extraction expensive.
 
