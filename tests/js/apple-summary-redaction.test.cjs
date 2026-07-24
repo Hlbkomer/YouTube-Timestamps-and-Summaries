@@ -68,3 +68,26 @@ test("native generation diagnostics expose xAI latency and token usage", () => {
     assert.match(messages, /tokens: 40030 input \(0 cached\), 420 output \(120 reasoning\), 40450 total/);
     assert.match(messages, /service tier: default/);
 });
+
+test("transcript input combines length and language in one log line", () => {
+    const { transcriptInputMessage } = loadBackgroundSandbox();
+
+    assert.equal(
+        transcriptInputMessage("x".repeat(61_222), {
+            languageCode: "en",
+            languageLabel: "English",
+        }),
+        "input: 61222 chars, English (en)"
+    );
+    assert.equal(
+        transcriptInputMessage("hello", {}),
+        "input: 5 chars"
+    );
+    assert.equal(
+        transcriptInputMessage("", {
+            languageCode: "en",
+            languageLabel: "English",
+        }),
+        "input: unavailable"
+    );
+});

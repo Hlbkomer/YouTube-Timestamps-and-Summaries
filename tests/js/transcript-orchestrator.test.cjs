@@ -44,8 +44,8 @@ test("simultaneous transcript consumers share one in-flight request", async () =
         },
     });
 
-    const first = orchestrator.get("video", "timestamps");
-    const second = orchestrator.get("video", "summary");
+    const first = orchestrator.get("video", "summary");
+    const second = orchestrator.get("video", "timestamps");
     assert.equal(resolveCount, 1);
     assert.equal(orchestrator.status("video"), "pending");
 
@@ -55,6 +55,33 @@ test("simultaneous transcript consumers share one in-flight request", async () =
     assert.equal(await second, transcript);
     assert.equal(orchestrator.status("video"), "available");
     assert.equal(requestCache.size, 0);
+});
+
+test("manual generated chapters reuse the transcript already fetched for Summary", async () => {
+    const transcript = {
+        text: "[00:01] Shared transcript",
+        lineCount: 1,
+    };
+    const completedCache = new Map();
+    let resolveCount = 0;
+    const orchestrator = createTranscriptOrchestrator({
+        completedCache,
+        requestCache: new Map(),
+        resolveTranscript: async (videoKey) => {
+            resolveCount += 1;
+            // Production transcript discovery stores the selected caption
+            // track before returning it to the first generation consumer.
+            completedCache.set(videoKey, transcript);
+            return transcript;
+        },
+    });
+
+    const summaryTranscript = await orchestrator.get("video", "summary");
+    const chapterTranscript = await orchestrator.get("video", "timestamps");
+
+    assert.equal(summaryTranscript, transcript);
+    assert.equal(chapterTranscript, transcript);
+    assert.equal(resolveCount, 1);
 });
 
 test("repeated consumers report one shared-wait diagnostic per kind", async () => {

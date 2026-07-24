@@ -4,9 +4,9 @@ The companion app keeps its provider model pickers current through two deliberat
 
 ## Grok
 
-When a Grok account is connected, the companion app requests the account-scoped catalog from xAI's `https://api.x.ai/v1/language-models` endpoint. It keeps only `grok-*` entries that accept text input and return text output, then merges them with the built-in Grok 4.5 and Grok 4.3 fallback choices. The final picker is sorted by model version from highest to lowest rather than relying on xAI's response order.
+When a Grok account is connected, the companion app requests the account-scoped catalog from xAI's `https://api.x.ai/v1/language-models` endpoint. It keeps only `grok-*` entries that accept text input and return text output, then merges them with the built-in Grok 4.5 and Grok 4.3 fallback choices. The provider's plain `grok-4.5` entry and `grok-4.5-latest` alias are represented by the curated Grok 4.5 choice instead of appearing as duplicates. The final picker is sorted by model version from highest to lowest rather than relying on xAI's response order. Grok 4.5 is the default and always uses explicit low reasoning.
 
-Grok 4.20, Grok Build, Imagine, and voice models are excluded because they are not suitable choices for transcript timestamps and summaries. A saved excluded model is normalized to Grok 4.5 when settings load. If xAI's catalog cannot be reached, the static fallback remains available.
+Grok 4.20, Grok Build, Imagine, and voice models are excluded because they are not suitable choices for transcript timestamps and summaries. A saved excluded model or the former experimental `grok-4.5-quality` ID is normalized to Grok 4.5 when settings load. If xAI's catalog cannot be reached, the static fallback remains available.
 
 ## ChatGPT / Codex
 
@@ -16,7 +16,9 @@ Instead, the companion app starts with a tested local fallback list and retrieve
 
 The public OpenAI Responses API documents `gpt-5.6` as an alias for Sol, but this extension sends ChatGPT OAuth requests to the separate Codex backend. The Codex backend catalog uses the explicit `gpt-5.6-sol` slug and rejects the family alias with HTTP 400. The picker therefore stores and sends `gpt-5.6-sol`; app settings, remote catalog entries, and the final native request boundary all migrate a legacy saved `gpt-5.6` selection to that explicit slug. `gpt-5.6-terra` and `gpt-5.6-luna` remain separate entries. The OpenAI [GPT-5.6 model guidance](https://developers.openai.com/api/docs/guides/model-guidance?model=gpt-5.6) remains the authority for public API naming and availability, while a representative request against this app's Codex endpoint is required before publishing a picker entry.
 
-GPT-5.6 Terra is the app's default ChatGPT model because testing found it the preferred quality/speed balance alongside the default Grok 4.5 low-reasoning configuration. This default applies when there is no valid saved ChatGPT selection, including fresh installs and reset settings. Upgrades preserve a person's existing valid Sol, Terra, Luna, or other supported choice rather than silently replacing it.
+GPT-5.6 Terra is the app's default ChatGPT model because testing found it the preferred quality/speed balance alongside the default low-reasoning Grok 4.5 configuration. This default applies when there is no valid saved ChatGPT selection, including fresh installs and reset settings. Upgrades preserve a person's existing valid Sol, Terra, Luna, or other supported choice rather than silently replacing it.
+
+GPT-5.4 Thinking and GPT-5.4 mini were removed from the picker after GPT-5.6 Sol, Terra, and Luna covered the quality, balanced, and efficient roles. Saved `gpt-5.4` selections normalize to `gpt-5.6-terra`; saved `gpt-5.4-mini` selections normalize to `gpt-5.6-luna`. GPT-5.5 remains available as the single older fallback. Both GPT-5.4 IDs stay in the published catalog's `excludedModelIDs` so refreshed older builds also stop offering them as ordinary fallback choices.
 
 ### Updating `model-catalog.json`
 

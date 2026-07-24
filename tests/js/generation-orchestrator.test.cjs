@@ -62,11 +62,13 @@ test("generation identity cannot collide across video resets", () => {
 });
 
 test("generation request preparation is deterministic", () => {
+    const sharedTranscript = "[00:01] Hello\n[01:02:03] World";
+
     assert.equal(generationKindForTab("timestamps", true), "selectedProviderTimestamps");
     assert.equal(generationKindForTab("summary", true), "selectedProviderSummary");
     assert.equal(generationKindForTab("summary", false), "summaryFull");
-    assert.equal(transcriptForGeneration("summary", "[00:01] Hello\n[01:02:03] World"), "Hello\nWorld");
-    assert.equal(transcriptForGeneration("timestamps", "[00:01] Hello"), "[00:01] Hello");
+    assert.equal(transcriptForGeneration("summary", sharedTranscript), "Hello\nWorld");
+    assert.equal(transcriptForGeneration("timestamps", sharedTranscript), sharedTranscript);
     assert.equal(generationTimeoutForTranscript("x".repeat(30000)), 6 * 60 * 1000);
     assert.equal(generationTimeoutForTranscript("x".repeat(40001)), 7.5 * 60 * 1000);
 });

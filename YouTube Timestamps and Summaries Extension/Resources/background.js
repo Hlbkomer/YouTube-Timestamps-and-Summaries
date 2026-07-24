@@ -7,12 +7,6 @@ const JOB_RETENTION_MS = 30 * 60 * 1000;
 const JOB_MESSAGE_LIMIT = 80;
 const DEFAULT_SELECTED_MODEL = "gpt-5.6-terra";
 const ENABLE_APPLE_SUMMARY_TRANSCRIPT_REDACTION = true;
-const APPLE_SUMMARY_CHUNK_CHARACTER_LIMIT = 10000;
-const APPLE_SUMMARY_UNSUPPORTED_LANGUAGE_CHUNK_CHARACTER_LIMIT = 6000;
-const APPLE_SUMMARY_PARALLEL_REQUESTS = 3;
-const APPLE_SUPPORTED_LANGUAGE_CODES = new Set([
-    "da", "de", "en", "es", "fr", "it", "ja", "ko", "nl", "no", "pt", "sv", "tr", "vi", "zh",
-]);
 const APPLE_SUMMARY_REDACTION_PATTERNS = [
     /\[\s*_+\s*\]/g,
     /\b(?:fuck(?:er|ing)?|fucking|fucked|shit(?:ty)?|bullshit|bitch(?:es)?|asshole|dick|pussy|cunt)\b/gi,
@@ -209,19 +203,6 @@ function redactAppleSummaryTranscript(transcriptText) {
     };
 }
 
-function normalizedLanguageCode(languageCode) {
-    return String(languageCode || "").trim().toLowerCase().split("-")[0];
-}
-
-function appleSummaryChunkLimit(metadata = {}) {
-    const languageCode = normalizedLanguageCode(metadata.languageCode);
-    if (languageCode && !APPLE_SUPPORTED_LANGUAGE_CODES.has(languageCode)) {
-        return APPLE_SUMMARY_UNSUPPORTED_LANGUAGE_CHUNK_CHARACTER_LIMIT;
-    }
-
-    return APPLE_SUMMARY_CHUNK_CHARACTER_LIMIT;
-}
-
 function generationLabel(kind) {
     if (kind === "selectedProviderTimestamps") {
         return "timestamps";
@@ -236,6 +217,20 @@ function generationLabel(kind) {
     }
 
     return kind;
+}
+
+function transcriptInputMessage(transcriptText, metadata = {}) {
+    if (!transcriptText) {
+        return "input: unavailable";
+    }
+
+    const languageLabel = String(metadata.languageLabel || "").trim();
+    const languageCode = String(metadata.languageCode || "").trim();
+    const language = languageLabel && languageCode
+        ? `${languageLabel} (${languageCode})`
+        : (languageLabel || languageCode);
+    const languageSuffix = language ? `, ${language}` : "";
+    return `input: ${transcriptText.length} chars${languageSuffix}`;
 }
 
 function jobResponse(job) {
@@ -281,24 +276,12 @@ async function generateSelectedProviderTimestamps(job, transcriptText, nativeTim
     const modelLabel = settings.modelLabel || model;
     job.engineLabel = modelLabel;
 
-    if (metadata.languageCode || metadata.languageLabel) {
-        appendJobMessage(job, `caption language: ${metadata.languageLabel || metadata.languageCode}${metadata.languageCode ? ` (${metadata.languageCode})` : ""}`);
-    }
-    appendJobMessage(job, `asking ${modelLabel} to create timestamps`);
-    const response = await sendNative(selectedProviderAction(providerID, "timestamps"), {
+    return await sendNative(selectedProviderAction(providerID, "timestamps"), {
         transcript: transcriptText,
         model,
         languageCode: metadata.languageCode || "",
         languageLabel: metadata.languageLabel || "",
     }, nativeTimeoutMs);
-
-    if (response?.ok) {
-        appendJobMessage(job, `${modelLabel} returned timestamps (${(response.text || "").length} chars)`);
-    } else {
-        appendJobMessage(job, `${modelLabel} timestamps failed: ${response?.error || "unknown error"}`);
-    }
-
-    return response;
 }
 
 async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, metadata = {}) {
@@ -309,28 +292,19 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, m
     const summaryModel = settings.summaryModelID || timestampModel;
     const summaryModelLabel = settings.summaryModelLabel || settings.summaryEngineLabel || summaryModel;
     const summaryEngine = settings.summaryEngine || "selectedModel";
-    const summaryEngineLabel = summaryEngine === "selectedModel" ? summaryModelLabel : "Apple Intelligence";
+    const appleSummaryStrategy = settings.appleSummaryStrategy || "adaptiveGrounded";
+    const summaryEngineLabel = summaryEngine === "selectedModel"
+        ? summaryModelLabel
+        : (summaryModelLabel || "Apple Intelligence");
     job.engineLabel = summaryEngineLabel;
 
     if (summaryEngine === "selectedModel") {
-        if (metadata.languageCode || metadata.languageLabel) {
-            appendJobMessage(job, `caption language: ${metadata.languageLabel || metadata.languageCode}${metadata.languageCode ? ` (${metadata.languageCode})` : ""}`);
-        }
-        appendJobMessage(job, `asking ${summaryEngineLabel} to create summary`);
-        const response = await sendNative(selectedProviderAction(providerID, "summary"), {
+        return await sendNative(selectedProviderAction(providerID, "summary"), {
             transcript: transcriptText,
             model: summaryModel,
             languageCode: metadata.languageCode || "",
             languageLabel: metadata.languageLabel || "",
         }, nativeTimeoutMs);
-
-        if (response?.ok) {
-            appendJobMessage(job, `${summaryEngineLabel} returned summary (${(response.text || "").length} chars)`);
-        } else {
-            appendJobMessage(job, `${summaryEngineLabel} summary failed: ${response?.error || "unknown error"}`);
-        }
-
-        return response;
     }
 
     const redactedTranscript = redactAppleSummaryTranscript(transcriptText);
@@ -339,29 +313,13 @@ async function generateConfiguredSummary(job, transcriptText, nativeTimeoutMs, m
     }
 
     const appleTranscriptText = redactedTranscript.text;
-    const chunkLimit = appleSummaryChunkLimit(metadata);
-    const estimatedChunks = Math.max(1, Math.ceil(appleTranscriptText.length / chunkLimit));
-    const estimatedWaves = Math.max(1, Math.ceil(estimatedChunks / APPLE_SUMMARY_PARALLEL_REQUESTS));
-    if (metadata.languageCode || metadata.languageLabel) {
-        appendJobMessage(job, `caption language: ${metadata.languageLabel || metadata.languageCode}${metadata.languageCode ? ` (${metadata.languageCode})` : ""}`);
-    }
-    appendJobMessage(job, estimatedChunks > 1
-        ? `asking Apple Intelligence to create summary (~${estimatedChunks} chunks, ${estimatedWaves} waves)`
-        : "asking Apple Intelligence to create summary");
-    const appleResponse = await sendNative("generateContent", {
+    return await sendNative("generateContent", {
         kind: "summaryFull",
         transcript: appleTranscriptText,
         languageCode: metadata.languageCode || "",
         languageLabel: metadata.languageLabel || "",
+        appleSummaryStrategy,
     }, nativeTimeoutMs);
-
-    if (appleResponse?.ok) {
-        appendJobMessage(job, `Apple Intelligence returned summary (${(appleResponse.text || "").length} chars)`);
-        return appleResponse;
-    }
-
-    appendJobMessage(job, `Apple Intelligence summary failed: ${appleResponse?.error || "unknown error"}`);
-    return appleResponse;
 }
 
 function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_MS, metadata = {}) {
@@ -382,9 +340,7 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
         nativeDebug: null,
         engineLabel: "",
     };
-    appendJobMessage(job, `${label} request started`);
-    appendJobMessage(job, transcriptText ? `input: transcript (${transcriptText.length} chars)` : "input: transcript unavailable");
-    appendJobMessage(job, `timeout budget: ${Math.round(nativeTimeoutMs / 1000)}s`);
+    appendJobMessage(job, transcriptInputMessage(transcriptText, metadata));
     jobs.set(job.id, job);
 
     void (async () => {
@@ -409,6 +365,18 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
             }
             if (response.debug?.chunkStrategy) {
                 appendJobMessage(job, `chunk strategy: ${response.debug.chunkStrategy}`);
+            }
+            if (response.debug?.summaryStrategy) {
+                appendJobMessage(job, `summary strategy: ${response.debug.summaryStrategy}`);
+            }
+            if (response.debug?.summaryPath) {
+                appendJobMessage(job, `summary path: ${response.debug.summaryPath}`);
+            }
+            if (response.debug?.modelCalls !== undefined) {
+                appendJobMessage(job, `model calls: ${response.debug.modelCalls}`);
+            }
+            if (response.debug?.stageCalls) {
+                appendJobMessage(job, `stage calls: ${response.debug.stageCalls}`);
             }
             if (response.debug?.quotaStatus) {
                 appendJobMessage(job, `quota: ${response.debug.quotaStatus}`);

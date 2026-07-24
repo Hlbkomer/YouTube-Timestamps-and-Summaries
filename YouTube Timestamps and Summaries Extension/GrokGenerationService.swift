@@ -160,13 +160,14 @@ final class GrokGenerationService {
                 throw GrokGenerationError.unsupportedModel
             }
 
+            let providerModel = GenerationSettings.grokProviderModelID(for: safeModel)
             let accessToken = try await authService.accessToken()
-            logger.log("Starting Grok generation. kind=\(kind, privacy: .public) model=\(safeModel, privacy: .public) transcriptLength=\(transcriptText.count, privacy: .public)")
+            logger.log("Starting Grok generation. kind=\(kind, privacy: .public) model=\(safeModel, privacy: .public) providerModel=\(providerModel, privacy: .public) transcriptLength=\(transcriptText.count, privacy: .public)")
             let response = try await requestText(
                 instructions: instructions,
                 prompt: prompt(transcriptText, languageContext),
                 accessToken: accessToken,
-                model: safeModel,
+                model: providerModel,
                 emptyResponseMessage: emptyResponseMessage
             )
             let text = normalize(response.text, transcriptText)
@@ -203,6 +204,7 @@ final class GrokGenerationService {
         model: String,
         emptyResponseMessage: String
     ) async throws -> TextResponse {
+        let reasoning = try Self.reasoningRequestValue(forProviderModel: model)
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 10 * 60
@@ -228,8 +230,8 @@ final class GrokGenerationService {
             "stream": true,
             "store": false,
         ]
-        if let reasoningEffort = GenerationSettings.grokReasoningEffort(for: model) {
-            body["reasoning"] = ["effort": reasoningEffort]
+        if let reasoning {
+            body["reasoning"] = reasoning
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
 
@@ -319,6 +321,22 @@ final class GrokGenerationService {
         )
     }
 
+    /// Derive reasoning at the final network boundary from the exact provider
+    /// model being serialized. This prevents a caller from omitting Grok 4.5's
+    /// explicit low effort and silently falling through to xAI's default.
+    private static func reasoningRequestValue(
+        forProviderModel model: String
+    ) throws -> [String: String]? {
+        let reasoning = GenerationSettings.grokReasoningRequestValue(for: model)
+        guard !GenerationSettings.isGrok45ModelID(model)
+            || reasoning == ["effort": "low"] else {
+            throw GrokGenerationError.requestFailed(
+                "Grok 4.5 request configuration is invalid."
+            )
+        }
+        return reasoning
+    }
+
     private func userFacingErrorMessage(_ error: Error) -> String {
         let message = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
         return message
@@ -337,6 +355,7 @@ final class GrokGenerationService {
             "kind": kind,
             "provider": Self.providerID,
             "model": model,
+            "providerModel": GenerationSettings.grokProviderModelID(for: model),
             "inputMode": "transcript",
             "languageCode": languageContext.code,
             "languageLabel": languageContext.label,
@@ -373,6 +392,7 @@ final class GrokGenerationService {
             "kind": kind,
             "provider": Self.providerID,
             "model": model,
+            "providerModel": GenerationSettings.grokProviderModelID(for: model),
             "languageCode": languageContext.code,
             "languageLabel": languageContext.label,
             "step": "failed",

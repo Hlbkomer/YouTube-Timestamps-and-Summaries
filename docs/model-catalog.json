@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-18",
+  "updatedAt": "2026-07-23",
   "providers": {
     "openaiCodex": {
       "models": [
@@ -19,18 +19,12 @@
         {
           "id": "gpt-5.5",
           "label": "GPT-5.5 Thinking"
-        },
-        {
-          "id": "gpt-5.4",
-          "label": "GPT-5.4 Thinking"
-        },
-        {
-          "id": "gpt-5.4-mini",
-          "label": "GPT-5.4 mini"
         }
       ],
       "excludedModelIDs": [
-        "gpt-5.6"
+        "gpt-5.6",
+        "gpt-5.4",
+        "gpt-5.4-mini"
       ],
       "excludedModelIDPrefixes": []
     }

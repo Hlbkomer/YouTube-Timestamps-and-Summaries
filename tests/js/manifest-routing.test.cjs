@@ -95,6 +95,18 @@ test("watch-page integration survives YouTube SPA video switches", () => {
     assert.match(contentSource, /const NATIVE_PANEL_DISCOVERY_GRACE_MS = 5 \* 1000/);
     assert.match(contentSource, /function scheduleNavigationReconciliation\(expectedURL/);
     assert.match(contentSource, /NAVIGATION_RECONCILE_DELAYS_MS/);
+    assert.match(
+        contentSource,
+        /function beginVideoDiscovery\(videoKey\)[\s\S]{0,300}prefetchTranscript\(videoKey, \{[\s\S]{0,100}force: true/
+    );
+    assert.match(
+        contentSource,
+        /const transcript = await transcriptOrchestrator\.get\(videoKey, kind\)/
+    );
+    assert.match(
+        contentSource,
+        /video: YouTube video detected \(\$\{videoKey\}\)/
+    );
     assert.match(contentSource, /createNavigationTransitionCoordinator/);
     assert.match(contentSource, /function handleNavigationStart\(event\) \{[\s\S]{0,180}navigationTransition\.begin\(\)/);
     assert.match(contentSource, /if \(navigationTransition\.shouldHoldUI\(\)\) \{\s*return;\s*\}/);
@@ -138,15 +150,17 @@ test("toolbar action exposes Settings while chapter switching stays in the sideb
     assert.match(backgroundSource, /navigator\.clipboard\.writeText\(value\)/);
 });
 
-test("chapter source action stays on one subtle caption line", () => {
+test("chapter source action uses a second caption line without terminal punctuation", () => {
     const chapterCaptionCSS = contentSource.match(/\.chapter-result-surface > \.caption \{([\s\S]*?)\n\s*\}/)?.[1] || "";
     const captionLinkCSS = contentSource.match(/\.caption-link \{([\s\S]*?)\n\s*\}/)?.[1] || "";
     const chapterResultCSS = contentSource.match(/\.chapter-result-surface \{([\s\S]*?)\n\s*\}/)?.[1] || "";
 
     assert.match(contentSource, /return "Chapters provided by YouTube\.";/);
-    assert.match(contentSource, />\$\{escapeHTML\(sourceSwitch\.label\)\}<\/button>\.`/);
+    assert.match(contentSource, />\$\{escapeHTML\(sourceSwitch\.label\)\}<\/button>`/);
+    assert.doesNotMatch(contentSource, />\$\{escapeHTML\(sourceSwitch\.label\)\}<\/button>\.`/);
     assert.match(contentSource, /return `<div class="caption">\$\{escapeHTML\(resultCaption\(kind\)\)\}\$\{sourceActionHTML\}<\/div>`/);
     assert.match(chapterCaptionCSS, /text-align: left/);
+    assert.match(captionLinkCSS, /display: block/);
     assert.match(captionLinkCSS, /font-weight: inherit/);
     assert.match(captionLinkCSS, /text-decoration: underline/);
     assert.match(chapterResultCSS, /gap: 10px/);

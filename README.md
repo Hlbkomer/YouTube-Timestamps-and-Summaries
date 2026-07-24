@@ -50,7 +50,7 @@ After unzipping, move the app to `Applications`, open it and enable the Safari e
 
 ## Chapter Sources And YouTube Navigation
 
-The companion app controls the default chapter policy: prefer chapters already available on YouTube, or always generate chapters from the transcript. YouTube creator chapters and automatic `Key moments` are imported into the same compact Chapters list as generated results. The small footer identifies the active source and, when another source is available, offers `Generate chapters from transcript`, `View generated chapters`, or `View YouTube chapters` without opening a separate menu.
+The companion app controls the default chapter policy: prefer chapters already available on YouTube, or always generate chapters from the transcript. YouTube creator chapters and automatic `Key moments` are imported into the same compact Chapters list as generated results. The small footer identifies the active source and, when another source is available, offers `Generate chapters from transcript`, `View generated chapters`, or `View YouTube chapters` on a second line without opening a separate menu.
 
 Native chapters satisfy only the Chapters result. Summary remains independent and starts automatically whenever its configured engine and a transcript are available. While a newly selected video is still resolving a lazy YouTube Chapters/Key moments source, the panel shows `Checking for YouTube chapters...` instead of briefly rendering an empty result. If a page has neither YouTube's native `In this video` shell nor a usable transcript, the extension leaves that page untouched; a transcript-confirmed standalone sidebar remains available when only the native shell is missing.
 
@@ -92,7 +92,7 @@ For Developer ID signing, notarization, and release packaging, see [RELEASING.md
 
 Choose **Sign in with Grok** in the companion app to use a SuperGrok subscription. The app opens the xAI browser sign-in flow and uses the resulting OAuth session directly from the sandboxed app and Safari extension. No command-line client, Login Item, background helper, or developer backend is involved.
 
-The app defaults Grok to **Grok 4.5** with explicit low reasoning for both Chapters and Summary, keeps **Grok 4.3** available with its provider-default reasoning as a fallback, and refreshes the connected account's text-capable Grok model catalog from xAI when possible. The hardened loopback listener has completed the normal Safari/xAI authorization flow on the Mac that previously reproduced the callback failure. If Safari still cannot open the temporary `127.0.0.1` callback page, copy the complete callback URL from Safari (or the one-time authorization code shown by xAI), paste it into the companion app's Grok sign-in panel, and choose **Complete Sign-In**. The manual path remains a recovery option; see [docs/grok-integration.md](docs/grok-integration.md).
+The Grok model pickers list **Grok 4.5** with explicit low reasoning as the default. A temporary high-reasoning Quality variant was removed after hands-on testing found no noticeable benefit for transcript Chapters or Summary. **Grok 4.3** remains available with its provider-default reasoning, and the app refreshes the connected account's text-capable Grok model catalog from xAI when possible. The hardened loopback listener has completed the normal Safari/xAI authorization flow on the Mac that previously reproduced the callback failure. If Safari still cannot open the temporary `127.0.0.1` callback page, copy the complete callback URL from Safari (or the one-time authorization code shown by xAI), paste it into the companion app's Grok sign-in panel, and choose **Complete Sign-In**. The manual path remains a recovery option; see [docs/grok-integration.md](docs/grok-integration.md).
 
 ChatGPT/Codex defaults to **GPT-5.6 Terra**, begins with tested local choices, and can receive new `gpt-*` picker options from the repository's remote catalog without a binary update. Existing valid saved model selections are preserved on upgrade. The catalog maintenance and provider model policy are documented in [docs/model-catalog.md](docs/model-catalog.md).
 
@@ -101,7 +101,7 @@ ChatGPT/Codex defaults to **GPT-5.6 Terra**, begins with tested local choices, a
 The visible `Summary` tab keeps one consistent workflow while choosing the local Apple Intelligence implementation for the installed macOS version:
 
 - macOS 26 uses the established character-based summary path.
-- macOS 27 uses a newer on-device, token-aware summary path and labels successful output accordingly.
+- On macOS 27, the Summary model picker contains one **Apple Intelligence** choice backed by the detailed adaptive-grounded pipeline. Former Fast and Quality selections migrate to it automatically.
 
 This applies only when Apple Intelligence is selected for summaries. ChatGPT and Grok summaries continue to use the selected provider on every macOS version. Private Cloud Compute is not active while its managed Apple entitlement is pending. See [docs/macos27-summary.md](docs/macos27-summary.md) for the technical and testing notes.
 

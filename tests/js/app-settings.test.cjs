@@ -9,6 +9,27 @@ const scriptSource = fs.readFileSync(
     path.join(root, "YouTube Timestamps and Summaries/Resources/Script.js"),
     "utf8"
 );
+const grokGenerationSource = fs.readFileSync(
+    path.join(
+        root,
+        "YouTube Timestamps and Summaries Extension/GrokGenerationService.swift"
+    ),
+    "utf8"
+);
+const backgroundSource = fs.readFileSync(
+    path.join(
+        root,
+        "YouTube Timestamps and Summaries Extension/Resources/background.js"
+    ),
+    "utf8"
+);
+const contentSource = fs.readFileSync(
+    path.join(
+        root,
+        "YouTube Timestamps and Summaries Extension/Resources/content.js"
+    ),
+    "utf8"
+);
 
 function element() {
     return {
@@ -78,6 +99,69 @@ test("provider picker disables disconnected options without a connection hint", 
     assert.equal(provider.dataset.selectedUnavailable, "true");
     assert.equal(elements.has("generation-setup-hint"), false);
     assert.equal(elements.get("model-select").disabled, true);
+});
+
+test("Apple Intelligence uses one quality-backed Summary model choice", () => {
+    const elements = render({
+        summaryOptions: [
+            { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
+            { id: "appleIntelligence", label: "Apple Intelligence" },
+        ],
+        settings: {
+            providerID: "openaiCodex",
+            modelID: "gpt-5.6-terra",
+            chapterPreference: "preferNative",
+            summaryModelID: "appleIntelligence",
+        },
+    });
+
+    assert.equal(elements.get("summary-select").value, "appleIntelligence");
+    assert.match(
+        elements.get("summary-select").innerHTML,
+        /GPT-5\.6 Terra.*Apple Intelligence/
+    );
+    assert.doesNotMatch(elements.get("summary-select").innerHTML, /Fast Mode|Quality Mode/);
+    assert.equal(elements.has("apple-summary-strategy-field"), false);
+});
+
+test("Grok 4.5 reasoning is enforced at the final request boundary", () => {
+    assert.equal(
+        (grokGenerationSource.match(/https:\/\/api\.x\.ai\/v1\/responses/g) || []).length,
+        1
+    );
+    assert.match(
+        grokGenerationSource,
+        /let reasoning = try Self\.reasoningRequestValue\(forProviderModel: model\)/
+    );
+    assert.match(grokGenerationSource, /body\["reasoning"\] = reasoning/);
+    assert.match(
+        grokGenerationSource,
+        /!GenerationSettings\.isGrok45ModelID\(model\)[\s\S]{0,100}reasoning == \["effort": "low"\]/
+    );
+    assert.doesNotMatch(
+        grokGenerationSource,
+        /requestText\([\s\S]{0,500}reasoningEffort:/
+    );
+});
+
+test("generation logs omit redundant asking and waiting lifecycle messages", () => {
+    assert.doesNotMatch(backgroundSource, /estimatedChunks|estimatedWaves|waves/);
+    assert.doesNotMatch(backgroundSource, /asking \$\{.*\} to create/);
+    assert.doesNotMatch(backgroundSource, /timeout budget:/);
+    assert.doesNotMatch(backgroundSource, /request started/);
+    assert.doesNotMatch(backgroundSource, /returned (?:summary|timestamps)/);
+    assert.doesNotMatch(backgroundSource, /(?:summary|timestamps) failed:/);
+    assert.doesNotMatch(backgroundSource, /caption language:/);
+
+    assert.doesNotMatch(contentSource, /step: asking /);
+    assert.doesNotMatch(contentSource, /step: waiting for (?:Apple Intelligence|\$\{.*\})/);
+    assert.doesNotMatch(contentSource, /generationStepDescription|generationWaitDescription/);
+    assert.doesNotMatch(contentSource, /transcript: language /);
+    assert.match(backgroundSource, /transcriptInputMessage\(transcriptText, metadata\)/);
+    assert.equal(
+        (contentSource.match(/timeout budget:/g) || []).length,
+        1
+    );
 });
 
 test("provider picker is disabled when no provider is connected", () => {

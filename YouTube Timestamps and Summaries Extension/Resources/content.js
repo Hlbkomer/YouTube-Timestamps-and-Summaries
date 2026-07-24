@@ -195,9 +195,6 @@ const transcriptOrchestrator = transcriptOrchestration.createTranscriptOrchestra
     resolveTranscript,
     onCacheHit: (kind, transcript) => {
         logTranscriptDebug(kind, `transcript: using cached captions (${transcript.lineCount} lines)`);
-        if (transcript.languageCode || transcript.languageLabel) {
-            logTranscriptDebug(kind, `transcript: language ${transcript.languageLabel || transcript.languageCode}${transcript.languageCode ? ` (${transcript.languageCode})` : ""}`);
-        }
     },
     onSharedRequest: (kind) => logTranscriptDebug(kind, "transcript: waiting for shared transcript fetch"),
     onPassiveFailure: (kind, error) => {
@@ -663,30 +660,6 @@ function responseEngineLabel(kind, response) {
         || response?.debug?.native?.engineLabel
         || ""
     ).trim() || currentResultEngineLabel(kind);
-}
-
-function generationStepDescription(kind, usesSelectedProvider) {
-    if (!usesSelectedProvider) {
-        return kind === "summary"
-            ? "step: asking Apple Intelligence to create summary"
-            : "step: asking Apple Intelligence to create timestamps";
-    }
-
-    return kind === "summary"
-        ? `step: asking ${summaryEngineLabel()} to create summary`
-        : `step: asking ${modelLabel()} to create timestamps`;
-}
-
-function generationWaitDescription(kind, usesSelectedProvider) {
-    if (!usesSelectedProvider) {
-        return kind === "summary"
-            ? "step: waiting for Apple Intelligence summary"
-            : "step: waiting for Apple Intelligence timestamps";
-    }
-
-    return kind === "summary"
-        ? `step: waiting for ${summaryEngineLabel()} summary`
-        : `step: waiting for ${modelLabel()} timestamps`;
 }
 
 function isCurrentGeneration(videoKey, kind, generationID) {
@@ -2086,9 +2059,6 @@ async function tryTranscriptTracks(videoKey, kind, source, tracks) {
             const transcript = await fetchTranscript(track);
             rememberTranscript(videoKey, transcript);
             logTranscriptDebug(kind, `transcript: ready (${transcript.lineCount} lines)`);
-            if (transcript.languageCode || transcript.languageLabel) {
-                logTranscriptDebug(kind, `transcript: language ${transcript.languageLabel || transcript.languageCode}${transcript.languageCode ? ` (${transcript.languageCode})` : ""}`);
-            }
             return {
                 transcript,
                 error: "",
@@ -2784,7 +2754,7 @@ function chapterSourceSwitch(kind) {
 function renderResultCaption(kind) {
     const sourceSwitch = chapterSourceSwitch(kind);
     const sourceActionHTML = sourceSwitch
-        ? ` <button class="caption-link" type="button" data-chapter-source-switch="${escapeHTML(sourceSwitch.source)}" title="${escapeHTML(sourceSwitch.title)}">${escapeHTML(sourceSwitch.label)}</button>.`
+        ? `<button class="caption-link" type="button" data-chapter-source-switch="${escapeHTML(sourceSwitch.source)}" title="${escapeHTML(sourceSwitch.title)}">${escapeHTML(sourceSwitch.label)}</button>`
         : "";
     return `<div class="caption">${escapeHTML(resultCaption(kind))}${sourceActionHTML}</div>`;
 }
@@ -3455,6 +3425,7 @@ function render() {
                 background: transparent;
                 color: inherit;
                 cursor: pointer;
+                display: block;
                 font: inherit;
                 font-weight: inherit;
                 margin: 0;
@@ -4039,7 +4010,7 @@ async function generate(kind) {
     const generationID = state.generationIDs[kind];
     let generationStartedAt = Date.now();
     logDebug(kind, `started: ${new Date().toLocaleTimeString()}`);
-    logDebug(kind, "video: supported YouTube video detected");
+    logDebug(kind, `video: YouTube video detected (${videoKey})`);
     render();
 
     const transcript = await transcriptOrchestrator.get(videoKey, kind).catch((error) => {
@@ -4067,7 +4038,6 @@ async function generate(kind) {
     };
     const generationTimeoutMs = generationTimeoutForTranscript(requestTranscript);
 
-    logDebug(kind, generationStepDescription(kind, usesSelectedProvider));
     logDebug(kind, `timeout budget: ${Math.round(generationTimeoutMs / 1000)}s`);
     render();
 
@@ -4160,7 +4130,6 @@ async function generate(kind) {
         logDebug(kind, `requestId: ${jobID}`);
     }
 
-    logDebug(kind, generationWaitDescription(kind, usesSelectedProvider));
     render();
 
     const response = await pollGenerationJob(kind, videoKey, generationID, jobID, generationTimeoutMs);

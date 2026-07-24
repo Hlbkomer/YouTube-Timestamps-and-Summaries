@@ -508,18 +508,34 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         appleIntelligenceAvailable: Bool,
         selectedProviderConnected: Bool
     ) -> GenerationSettings {
+        let summaryUsesApple = GenerationSettings
+            .isAppleIntelligenceSummaryModelID(settings.summaryModelID)
+
         if !selectedProviderConnected, appleIntelligenceAvailable {
+            let appleSummaryModelID = summaryUsesApple
+                ? effectiveAppleSummaryModelID(settings.summaryModelID)
+                : GenerationSettings.appleIntelligenceModelID
             return GenerationSettings(
                 providerID: settings.providerID,
                 modelID: settings.modelID,
                 summaryEngine: "appleIntelligence",
-                summaryModelID: GenerationSettings.appleIntelligenceModelID,
+                summaryModelID: appleSummaryModelID,
                 chapterPreference: settings.chapterPreference
             )
         }
 
-        guard settings.summaryModelID == GenerationSettings.appleIntelligenceModelID, !appleIntelligenceAvailable else {
+        guard summaryUsesApple else {
             return settings
+        }
+
+        if appleIntelligenceAvailable {
+            return GenerationSettings(
+                providerID: settings.providerID,
+                modelID: settings.modelID,
+                summaryEngine: "appleIntelligence",
+                summaryModelID: effectiveAppleSummaryModelID(settings.summaryModelID),
+                chapterPreference: settings.chapterPreference
+            )
         }
 
         return GenerationSettings(
@@ -531,30 +547,29 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         )
     }
 
+    private func effectiveAppleSummaryModelID(_ modelID: String) -> String {
+        GenerationSettings.normalizedAppleIntelligenceSummaryModelID(
+            modelID,
+            legacyStrategy: GenerationSettings.defaultAppleSummaryStrategy
+        )
+    }
+
     private func summaryOptions(
         providerModels: [[String: String]],
         appleIntelligenceAvailable: Bool,
         selectedProviderConnected: Bool
     ) -> [[String: String]] {
+        let appleModels = GenerationSettings.appleIntelligenceSummaryModelOptions
+
         if !selectedProviderConnected {
-            return appleIntelligenceAvailable
-                ? [
-                    [
-                        "id": "appleIntelligence",
-                        "label": "Apple Intelligence",
-                    ],
-                ]
-                : []
+            return appleIntelligenceAvailable ? appleModels : []
         }
 
         guard appleIntelligenceAvailable else { return providerModels }
-
-        return [
-            [
-                "id": "appleIntelligence",
-                "label": "Apple Intelligence",
-            ],
-        ] + providerModels
+        return GenerationSettings.orderedSummaryModelOptions(
+            providerModels: providerModels,
+            appleModels: appleModels
+        )
     }
 
     private func modelOptions(
@@ -576,7 +591,11 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             }
         } else if providerID == GenerationSettings.grokProviderID, selectedProviderConnected {
             do {
-                let remoteOptions = try await xaiAuthService.modelOptions()
+                let remoteOptions = try await xaiAuthService.modelOptions().filter { option in
+                    guard let id = option["id"]?.lowercased() else { return false }
+                    return id != GenerationSettings.defaultGrokModelID
+                        && id != "\(GenerationSettings.defaultGrokModelID)-latest"
+                }
                 if !remoteOptions.isEmpty {
                     options = mergedModelOptions(primary: remoteOptions, fallback: options)
                 }
@@ -586,7 +605,7 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         }
 
         options = addingModelOptionIfNeeded(settings.modelID, providerID: providerID, to: options)
-        if settings.summaryModelID != GenerationSettings.appleIntelligenceModelID {
+        if !GenerationSettings.isAppleIntelligenceSummaryModelID(settings.summaryModelID) {
             options = addingModelOptionIfNeeded(settings.summaryModelID, providerID: providerID, to: options)
         }
         return GenerationSettings.sortedModelOptions(options)

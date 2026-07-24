@@ -57,12 +57,18 @@ function providerIsConnected(providerID, state) {
     return false;
 }
 
+function summaryModelUsesAppleIntelligence(modelID) {
+    return String(modelID || "").startsWith("appleIntelligence");
+}
+
 function saveGenerationSettings() {
     post("saveGenerationSettings", {
         providerID: providerSelect.value,
         modelID: modelSelect.value,
         chapterPreference: chapterPreferenceSelect.value || "preferNative",
-        summaryEngine: summarySelect.value === "appleIntelligence" ? "appleIntelligence" : "selectedModel",
+        summaryEngine: summaryModelUsesAppleIntelligence(summarySelect.value)
+            ? "appleIntelligence"
+            : "selectedModel",
         summaryModelID: summarySelect.value,
     });
 }
@@ -82,7 +88,11 @@ window.renderAppState = function renderAppState(state) {
     renderOptions(providerSelect, providerOptions, selectedProviderID);
     renderOptions(modelSelect, state.modelOptions || [], settings.modelID || "gpt-5.6-terra");
     renderOptions(chapterPreferenceSelect, state.chapterPreferenceOptions || [], settings.chapterPreference || "preferNative");
-    renderOptions(summarySelect, state.summaryOptions || [], settings.summaryModelID || settings.modelID || "appleIntelligence");
+    renderOptions(
+        summarySelect,
+        state.summaryOptions || [],
+        settings.summaryModelID || settings.modelID || "appleIntelligence",
+    );
 
     const chatGPTConnected = Boolean(state.codex?.connected);
     providerSelect.disabled = providerOptions.length === 0 || providerOptions.every((option) => option.disabled);

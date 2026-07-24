@@ -25,18 +25,189 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(defaults.summaryModelID == GenerationSettings.defaultModelID)
         #expect(defaults.summaryEngine == GenerationSettings.defaultSummaryEngine)
         #expect(defaults.chapterPreference == GenerationSettings.preferNativeChapters)
+        #expect(defaults.appleSummaryStrategy == GenerationSettings.defaultAppleSummaryStrategy)
 
         let appleSummary = GenerationSettings(
             providerID: GenerationSettings.grokProviderID,
             modelID: "grok-4.3",
             summaryEngine: GenerationSettings.appleIntelligenceModelID,
             summaryModelID: GenerationSettings.appleIntelligenceModelID,
-            chapterPreference: GenerationSettings.alwaysGenerateChapters
+            chapterPreference: GenerationSettings.alwaysGenerateChapters,
+            appleSummaryStrategy: GenerationSettings.appleSummaryStrategyAdaptiveGrounded
         )
         #expect(appleSummary.modelID == "grok-4.3")
-        #expect(appleSummary.summaryModelID == GenerationSettings.appleIntelligenceModelID)
+        #expect(
+            appleSummary.summaryModelID
+                == GenerationSettings.appleIntelligenceModelID
+        )
         #expect(appleSummary.summaryEngine == GenerationSettings.appleIntelligenceModelID)
         #expect(appleSummary.chapterPreference == GenerationSettings.alwaysGenerateChapters)
+        #expect(
+            appleSummary.appleSummaryStrategy
+                == GenerationSettings.appleSummaryStrategyAdaptiveGrounded
+        )
+        #expect(
+            GenerationSettings.normalizedAppleSummaryStrategy("unknown")
+                == GenerationSettings.defaultAppleSummaryStrategy
+        )
+        #expect(
+            GenerationSettings.normalizedAppleSummaryStrategy(
+                GenerationSettings.appleSummaryStrategyBaseline
+            ) == GenerationSettings.appleSummaryStrategyAdaptiveGrounded
+        )
+        #expect(
+            GenerationSettings.appleIntelligenceSummaryModelOptions == [
+                [
+                    "id": GenerationSettings.appleIntelligenceModelID,
+                    "label": "Apple Intelligence",
+                ],
+            ]
+        )
+        #expect(
+            GenerationSettings.orderedSummaryModelOptions(
+                providerModels: [["id": "gpt-5.6-terra", "label": "GPT-5.6 Terra"]],
+                appleModels: GenerationSettings.appleIntelligenceSummaryModelOptions
+            ).compactMap { $0["id"] } == [
+                "gpt-5.6-terra",
+                GenerationSettings.appleIntelligenceModelID,
+            ]
+        )
+        #expect(
+            GenerationSettings.appleIntelligenceResultLabel(
+                for: GenerationSettings.appleIntelligenceModelID
+            ) == "Apple Intelligence"
+        )
+        #expect(
+            GenerationSettings.appleIntelligenceResultLabel(
+                for: "appleIntelligenceFast"
+            ) == "Apple Intelligence"
+        )
+        #expect(
+            GenerationSettings.normalizedAppleSummaryStrategyForTesting(
+                GenerationSettings.appleSummaryStrategyRollingJoined
+            ) == GenerationSettings.appleSummaryStrategyRollingJoined
+        )
+
+        let migratedFastAppleSummary = GenerationSettings(
+            providerID: GenerationSettings.chatGPTProviderID,
+            modelID: GenerationSettings.defaultModelID,
+            summaryEngine: GenerationSettings.appleIntelligenceModelID,
+            summaryModelID: "appleIntelligenceFast",
+            appleSummaryStrategy: GenerationSettings.appleSummaryStrategyRollingJoined
+        )
+        #expect(
+            migratedFastAppleSummary.summaryModelID
+                == GenerationSettings.appleIntelligenceModelID
+        )
+        #expect(
+            migratedFastAppleSummary.appleSummaryStrategy
+                == GenerationSettings.appleSummaryStrategyAdaptiveGrounded
+        )
+
+        let migratedQualityAppleSummary = GenerationSettings(
+            providerID: GenerationSettings.chatGPTProviderID,
+            modelID: GenerationSettings.defaultModelID,
+            summaryEngine: GenerationSettings.appleIntelligenceModelID,
+            summaryModelID: "appleIntelligenceQuality"
+        )
+        #expect(
+            migratedQualityAppleSummary.summaryModelID
+                == GenerationSettings.appleIntelligenceModelID
+        )
+    }
+
+    @Test func appleSummaryCleanupRemovesGenericTitleAndDuplicateLines() {
+        let cleaned = AppleSummaryTextUtilities.cleanedSummaryText(
+            """
+            Summary of Video Transcript
+
+            - A useful point
+            - A useful point
+            Section 2 of 3:
+            - Another point
+            """
+        )
+
+        #expect(cleaned == "- A useful point\n- Another point")
+    }
+
+    @Test func appleSummaryCleanupDetectsLeakedModelProtocolText() {
+        #expect(AppleSummaryTextUtilities.containsModelMetaText(
+            #"```json {"detected_language":"English"}"#
+        ))
+        #expect(AppleSummaryTextUtilities.containsModelMetaText(
+            "Tool Analysis: The user provided a transcript."
+        ))
+        #expect(AppleSummaryTextUtilities.containsModelMetaText(
+            "Tool call: summarize_youtube_transcript_parts"
+        ))
+        #expect(!AppleSummaryTextUtilities.containsModelMetaText(
+            "Got it. Here are the requested bullet points based on the transcript."
+        ))
+        #expect(!AppleSummaryTextUtilities.containsModelMetaText(
+            #"```json {"overview":"A reader-facing summary"} ```"#
+        ))
+        #expect(!AppleSummaryTextUtilities.containsModelMetaText(
+            "The episode discusses creativity, family, and changes in the music industry."
+        ))
+    }
+
+    @Test func appleSummaryStrictFormatRejectsCapturedMalformedJSON() {
+        let capturedResponse = """
+        ```json
+        "overview": "President Trump is reinforcing his commitment to prevent Iran from acquiring nuclear weapons.",
+        "main_topic": [
+        "* Evidence suggests Iran relocated nuclear equipment to Pickaxe Mountain."
+        ```
+        """
+
+        #expect(!AppleSummaryTextUtilities.containsModelMetaText(capturedResponse))
+        #expect(!AppleSummaryTextUtilities.isStrictReaderFacingSummary(capturedResponse))
+        #expect(AppleSummaryTextUtilities.isStrictReaderFacingSummary(
+            """
+            President Trump discusses Iran's nuclear program.
+
+            **Pickaxe Mountain**
+            - Mark Wallace describes the facility as deeply buried.
+            """
+        ))
+    }
+
+    @Test func appleSummaryNativeRedactionMatchesExtensionSafeguards() {
+        let redacted = AppleSummaryTranscriptUtilities.redactedForAppleIntelligence(
+            """
+            [0:00] I think [ __ ] this is inflammatory.
+            [0:04] Fuck that bullshit, you asshole.
+            [0:08] A factual discussion of war remains intact.
+            """
+        )
+
+        #expect(redacted.count == 4)
+        #expect(!redacted.text.lowercased().contains("fuck"))
+        #expect(!redacted.text.lowercased().contains("bullshit"))
+        #expect(!redacted.text.lowercased().contains("asshole"))
+        #expect(!redacted.text.contains("[ __ ]"))
+        #expect(redacted.text.contains("A factual discussion of war remains intact."))
+    }
+
+    @Test func appleSummaryCleanupSalvagesReaderFacingTextBeforeProtocolLeak() {
+        let cleaned = AppleSummaryTextUtilities.cleanedReaderFacingText(
+            """
+            Summary of Video Transcript
+            Overview
+            The guest discusses fear, fair compensation, and family.
+
+            `json "detected_language": "English", "summary_points": []
+            I'll summarize the transcript and extract useful bullet points.
+            Tool Analysis: The user provided a transcript.
+            """
+        )
+
+        #expect(
+            cleaned
+                == "Overview\nThe guest discusses fear, fair compensation, and family."
+        )
+        #expect(!AppleSummaryTextUtilities.containsModelMetaText(cleaned))
     }
 
     @Test func providerAndModelNormalizationHandlesAliasesAndFutureModels() {
@@ -46,6 +217,22 @@ struct YouTube_Timestamps_and_SummariesTests {
             "gpt-5.6",
             providerID: GenerationSettings.chatGPTProviderID
         ) == GenerationSettings.chatGPTSolModelID)
+        #expect(GenerationSettings.normalizedModelID(
+            "gpt-5.4",
+            providerID: GenerationSettings.chatGPTProviderID
+        ) == GenerationSettings.chatGPTTerraModelID)
+        #expect(GenerationSettings.normalizedModelID(
+            "gpt-5.4-mini",
+            providerID: GenerationSettings.chatGPTProviderID
+        ) == GenerationSettings.chatGPTLunaModelID)
+        let migratedSettings = GenerationSettings(
+            providerID: GenerationSettings.chatGPTProviderID,
+            modelID: "gpt-5.4",
+            summaryEngine: GenerationSettings.defaultSummaryEngine,
+            summaryModelID: "gpt-5.4-mini"
+        )
+        #expect(migratedSettings.modelID == GenerationSettings.chatGPTTerraModelID)
+        #expect(migratedSettings.summaryModelID == GenerationSettings.chatGPTLunaModelID)
         #expect(GenerationSettings.isUsableModelID(
             "gpt-6.0-future",
             providerID: GenerationSettings.chatGPTProviderID
@@ -81,9 +268,24 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(GenerationSettings.supportedModelIDs(
             for: GenerationSettings.chatGPTProviderID
         ).contains(GenerationSettings.chatGPTSolModelID))
+        #expect(!GenerationSettings.supportedModelIDs(
+            for: GenerationSettings.chatGPTProviderID
+        ).contains("gpt-5.4"))
+        #expect(!GenerationSettings.supportedModelIDs(
+            for: GenerationSettings.chatGPTProviderID
+        ).contains("gpt-5.4-mini"))
         #expect(GenerationSettings.supportedModelIDs(
             for: GenerationSettings.grokProviderID
         ).contains(GenerationSettings.defaultGrokModelID))
+        #expect(GenerationSettings.modelOptions(
+            for: GenerationSettings.grokProviderID
+        ).contains {
+            $0["id"] == GenerationSettings.defaultGrokModelID
+                && $0["label"] == "Grok 4.5"
+        })
+        #expect(!GenerationSettings.modelOptions(
+            for: GenerationSettings.grokProviderID
+        ).contains { $0["id"] == "grok-4.5-quality" })
     }
 
     @Test func modelOptionsSortHigherVersionsBeforeLowerVersions() throws {
@@ -110,11 +312,43 @@ struct YouTube_Timestamps_and_SummariesTests {
         ])
     }
 
-    @Test func grok45UsesLowReasoningWhileOtherModelsKeepProviderDefaults() {
+    @Test func grok45UsesLowReasoningAndMigratesLegacyQualityVariant() {
+        #expect(GenerationSettings.isGrok45ModelID("grok-4.5"))
+        #expect(GenerationSettings.isGrok45ModelID("grok-4.5-latest"))
         #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5") == "low")
         #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5-latest") == "low")
+        #expect(
+            GenerationSettings.grokReasoningRequestValue(for: "grok-4.5")
+                == ["effort": "low"]
+        )
+        #expect(
+            GenerationSettings.grokReasoningRequestValue(for: "grok-4.5-latest")
+                == ["effort": "low"]
+        )
+        #expect(
+            GenerationSettings.normalizedModelID(
+                "grok-4.5-quality",
+                providerID: GenerationSettings.grokProviderID
+            ) == GenerationSettings.defaultGrokModelID
+        )
+        #expect(
+            GenerationSettings.grokProviderModelID(for: "grok-4.5-quality")
+                == GenerationSettings.defaultGrokModelID
+        )
+        #expect(GenerationSettings.isGrok45ModelID("grok-4.5-quality"))
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5-quality") == "low")
+        #expect(
+            GenerationSettings.grokReasoningRequestValue(for: "grok-4.5-quality")
+                == ["effort": "low"]
+        )
+        #expect(!GenerationSettings.isGrok45ModelID("grok-4.3"))
         #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.3") == nil)
+        #expect(GenerationSettings.grokReasoningRequestValue(for: "grok-4.3") == nil)
+        #expect(!GenerationSettings.isGrok45ModelID("grok-5.0-future"))
         #expect(GenerationSettings.grokReasoningEffort(for: "grok-5.0-future") == nil)
+        #expect(
+            GenerationSettings.grokReasoningRequestValue(for: "grok-5.0-future") == nil
+        )
     }
 
     @Test func publishedModelCatalogContainsUniqueUsableEntries() throws {
@@ -139,6 +373,11 @@ struct YouTube_Timestamps_and_SummariesTests {
             #expect(ids.allSatisfy {
                 GenerationSettings.isUsableModelID($0, providerID: providerID)
             })
+            if providerID == GenerationSettings.chatGPTProviderID {
+                let excludedIDs = Set(provider["excludedModelIDs"] as? [String] ?? [])
+                #expect(excludedIDs.contains("gpt-5.4"))
+                #expect(excludedIDs.contains("gpt-5.4-mini"))
+            }
         }
     }
 

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Keep one `Apple Intelligence` choice in the existing Summary model picker, backed by the more precise adaptive-grounded pipeline. Migrate former Fast, Quality, and legacy Apple selections to it, and simplify result captions to the same name.
+- Replace the legacy Apple Intelligence `<= 2`-chunk baseline branch: exactly one chunk now uses a strict one-call reader-facing Markdown contract, while two or more chunks use the grounded multi-chunk pipeline. Narrow protocol-leak detection to actual schema/tool markers so an ordinary JSON code fence is treated as an invalid output format rather than mislabeled as model-internal text.
+- Rework long Apple Intelligence summaries around token-aware transcript thought lines with model-facing timestamps removed: the production pipeline extracts self-contained grounded points, recursively reduces only when required, and performs one final composition. Retain the concise rolling-joined pipeline only for Debug comparisons.
+- Harden Apple Intelligence generation with native-boundary transcript redaction, permissive String intermediates, tagged/JSON/prose format recovery, deterministic final rendering, generic-heading removal, protocol-leak cleanup, and stage/retry/recovery/token diagnostics. Targeted reruns of every reproduced format-retry case completed without a repeated retry.
+- Keep one `Grok 4.5` picker entry with explicit low reasoning after hands-on testing found no noticeable Chapters or Summary benefit from the temporary high-reasoning Quality variant. Migrate its synthetic saved ID back to `grok-4.5`.
+- Enforce Grok 4.5 low reasoning at the final shared xAI request boundary: derive `{"effort":"low"}` from the serialized provider model and fail locally if it is ever missing, covering Chapters, Summary, aliases, migrated settings, and repeated attempts.
+- Remove GPT-5.4 Thinking and GPT-5.4 mini from the ChatGPT model picker now that the GPT-5.6 family covers their roles. Migrate saved GPT-5.4 Thinking selections to GPT-5.6 Terra and saved GPT-5.4 mini selections to GPT-5.6 Luna; retain GPT-5.5 as the single older fallback.
+- Keep prior Apple summary strategies available to Debug test runners while normalizing every production and legacy Apple selection to the adaptive-grounded strategy.
+- Move Chapters source actions onto a second caption line and remove their terminal periods while preserving the attribution sentence's period.
+- Remove redundant generation-log lines for both Chapters and Summary, including the `step: asking…` and `step: waiting…` lifecycle entries. Keep one start, timeout budget, transcript input with language, polling timer, provider metrics, and final outcome.
+- Include the YouTube video ID in each Summary and Chapters generation log so diagnostics can be matched to the correct SPA video session.
+- Lock in one transcript retrieval per video across native chapters, automatic Summary, and the later `Generate chapters from transcript` action. Concurrent consumers share the in-flight request; later consumers use the completed cache, with timestamps stripped only from the Summary payload.
 - Synchronize the README, GitHub Pages project site, App Store preparation notes, privacy/terms dates, and version 1.1 publication record after the GitHub release.
 
 ## v1.1 - 2026-07-20

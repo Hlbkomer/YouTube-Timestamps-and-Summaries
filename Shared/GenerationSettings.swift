@@ -12,18 +12,32 @@ nonisolated struct GenerationSettings {
     static let summaryEngineKey = "generation.summaryEngine"
     static let summaryModelIDKey = "generation.summaryModelID"
     static let chapterPreferenceKey = "generation.chapterPreference"
+    static let appleSummaryStrategyKey = "generation.appleSummaryStrategy"
 
     static let chatGPTProviderID = "openaiCodex"
     static let grokProviderID = "xaiOAuth"
     private static let legacyGrokBuildProviderID = "grokBuild"
     private static let legacyGrokBuildModelID = "grok-build-0.1"
     private static let legacyChatGPTSolAlias = "gpt-5.6"
+    private static let legacyChatGPT54ModelID = "gpt-5.4"
+    private static let legacyChatGPT54MiniModelID = "gpt-5.4-mini"
     static let chatGPTSolModelID = "gpt-5.6-sol"
+    static let chatGPTTerraModelID = "gpt-5.6-terra"
+    static let chatGPTLunaModelID = "gpt-5.6-luna"
     static let defaultProviderID = chatGPTProviderID
-    static let defaultModelID = "gpt-5.6-terra"
+    static let defaultModelID = chatGPTTerraModelID
     static let defaultGrokModelID = "grok-4.5"
     static let defaultSummaryEngine = "selectedModel"
     static let appleIntelligenceModelID = "appleIntelligence"
+    private static let legacyAppleIntelligenceFastModelID = "appleIntelligenceFast"
+    private static let legacyAppleIntelligenceQualityModelID = "appleIntelligenceQuality"
+    static let appleSummaryStrategyBaseline = "baseline"
+    static let appleSummaryStrategyHierarchical = "hierarchical"
+    static let appleSummaryStrategyRollingJoined = "rollingJoined"
+    static let appleSummaryStrategyRollingComposed = "rollingComposed"
+    static let appleSummaryStrategyAdaptiveGrounded = "adaptiveGrounded"
+    static let defaultAppleSummaryStrategy = appleSummaryStrategyAdaptiveGrounded
+    private static let legacyGrok45QualityModelID = "grok-4.5-quality"
     static let preferNativeChapters = "preferNative"
     static let alwaysGenerateChapters = "alwaysGenerate"
     static let defaultChapterPreference = preferNativeChapters
@@ -33,28 +47,47 @@ nonisolated struct GenerationSettings {
     let summaryModelID: String
     let summaryEngine: String
     let chapterPreference: String
+    let appleSummaryStrategy: String
 
     init(
         providerID: String,
         modelID: String,
         summaryEngine: String,
         summaryModelID: String? = nil,
-        chapterPreference: String = defaultChapterPreference
+        chapterPreference: String = defaultChapterPreference,
+        appleSummaryStrategy: String = defaultAppleSummaryStrategy
     ) {
         let normalizedProviderID = Self.normalizedProviderID(providerID)
         let normalizedModelID = Self.normalizedModelID(modelID, providerID: normalizedProviderID)
+        let normalizedLegacyAppleStrategy = Self.normalizedAppleSummaryStrategy(
+            appleSummaryStrategy
+        )
         let requestedSummaryModelID = summaryModelID
             ?? (summaryEngine == Self.appleIntelligenceModelID ? Self.appleIntelligenceModelID : normalizedModelID)
+        let appleSummaryModelID = Self.isAppleIntelligenceSummaryModelID(
+            requestedSummaryModelID
+        )
+            ? Self.normalizedAppleIntelligenceSummaryModelID(
+                requestedSummaryModelID,
+                legacyStrategy: normalizedLegacyAppleStrategy
+            )
+            : nil
 
         self.providerID = normalizedProviderID
         self.modelID = normalizedModelID
-        self.summaryModelID = requestedSummaryModelID == Self.appleIntelligenceModelID
-            ? Self.appleIntelligenceModelID
-            : Self.normalizedModelID(requestedSummaryModelID, providerID: normalizedProviderID, fallback: normalizedModelID)
-        self.summaryEngine = self.summaryModelID == Self.appleIntelligenceModelID
-            ? Self.appleIntelligenceModelID
-            : Self.defaultSummaryEngine
+        self.summaryModelID = appleSummaryModelID
+            ?? Self.normalizedModelID(
+                requestedSummaryModelID,
+                providerID: normalizedProviderID,
+                fallback: normalizedModelID
+            )
+        self.summaryEngine = appleSummaryModelID == nil
+            ? Self.defaultSummaryEngine
+            : Self.appleIntelligenceModelID
         self.chapterPreference = Self.normalizedChapterPreference(chapterPreference)
+        self.appleSummaryStrategy = appleSummaryModelID.map {
+            Self.appleSummaryStrategy(for: $0)
+        } ?? normalizedLegacyAppleStrategy
     }
 
     static var sharedDefaults: UserDefaults {
@@ -68,7 +101,8 @@ nonisolated struct GenerationSettings {
             modelID: defaults.string(forKey: modelIDKey) ?? defaultModelID,
             summaryEngine: defaults.string(forKey: summaryEngineKey) ?? defaultSummaryEngine,
             summaryModelID: defaults.string(forKey: summaryModelIDKey),
-            chapterPreference: defaults.string(forKey: chapterPreferenceKey) ?? defaultChapterPreference
+            chapterPreference: defaults.string(forKey: chapterPreferenceKey) ?? defaultChapterPreference,
+            appleSummaryStrategy: defaults.string(forKey: appleSummaryStrategyKey) ?? defaultAppleSummaryStrategy
         )
     }
 
@@ -79,6 +113,7 @@ nonisolated struct GenerationSettings {
         defaults.set(summaryModelID, forKey: Self.summaryModelIDKey)
         defaults.set(summaryEngine, forKey: Self.summaryEngineKey)
         defaults.set(chapterPreference, forKey: Self.chapterPreferenceKey)
+        defaults.set(appleSummaryStrategy, forKey: Self.appleSummaryStrategyKey)
     }
 
     var payload: [String: Any] {
@@ -88,6 +123,16 @@ nonisolated struct GenerationSettings {
             "summaryModelID": summaryModelID,
             "summaryEngine": summaryEngine,
             "chapterPreference": chapterPreference,
+            "appleSummaryStrategy": appleSummaryStrategy,
+        ]
+    }
+
+    static var appleIntelligenceSummaryModelOptions: [[String: String]] {
+        [
+            [
+                "id": appleIntelligenceModelID,
+                "label": "Apple Intelligence",
+            ],
         ]
     }
 
@@ -102,6 +147,13 @@ nonisolated struct GenerationSettings {
                 "label": "Always generate chapters",
             ],
         ]
+    }
+
+    static func orderedSummaryModelOptions(
+        providerModels: [[String: String]],
+        appleModels: [[String: String]]
+    ) -> [[String: String]] {
+        providerModels + appleModels
     }
 
     static var providerOptions: [[String: String]] {
@@ -137,24 +189,16 @@ nonisolated struct GenerationSettings {
                     "label": "GPT-5.6 Sol",
                 ],
                 [
-                    "id": "gpt-5.6-terra",
+                    "id": chatGPTTerraModelID,
                     "label": "GPT-5.6 Terra",
                 ],
                 [
-                    "id": "gpt-5.6-luna",
+                    "id": chatGPTLunaModelID,
                     "label": "GPT-5.6 Luna",
                 ],
                 [
                     "id": "gpt-5.5",
                     "label": "GPT-5.5 Thinking",
-                ],
-                [
-                    "id": "gpt-5.4",
-                    "label": "GPT-5.4 Thinking",
-                ],
-                [
-                    "id": "gpt-5.4-mini",
-                    "label": "GPT-5.4 mini",
                 ],
             ]
         }
@@ -213,17 +257,28 @@ nonisolated struct GenerationSettings {
             : defaultModelID
     }
 
-    /// Grok 4.5 defaults to high reasoning at the API. Chapter extraction and
-    /// transcript summarization are latency-sensitive, constrained tasks, so
-    /// explicitly request the model's supported low-reasoning mode. Older and
-    /// future model families retain the provider default until validated.
-    static func grokReasoningEffort(for modelID: String) -> String? {
-        let candidate = modelID
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+    static func isGrok45ModelID(_ modelID: String) -> Bool {
+        let candidate = canonicalModelID(modelID, providerID: grokProviderID)
             .lowercased()
         return candidate == "grok-4.5" || candidate.hasPrefix("grok-4.5-")
-            ? "low"
-            : nil
+    }
+
+    /// Every Grok 4.5 request must carry an explicit low-reasoning payload.
+    /// Older and future model families retain the provider default until
+    /// separately validated.
+    static func grokReasoningEffort(for modelID: String) -> String? {
+        isGrok45ModelID(modelID) ? "low" : nil
+    }
+
+    static func grokReasoningRequestValue(for modelID: String) -> [String: String]? {
+        guard let effort = grokReasoningEffort(for: modelID) else {
+            return nil
+        }
+        return ["effort": effort]
+    }
+
+    static func grokProviderModelID(for modelID: String) -> String {
+        canonicalModelID(modelID, providerID: grokProviderID)
     }
 
     static func modelLabel(for modelID: String, providerID: String = defaultProviderID) -> String {
@@ -246,6 +301,48 @@ nonisolated struct GenerationSettings {
             ? chapterPreference
             : defaultChapterPreference
     }
+
+    static func normalizedAppleSummaryStrategy(_ strategy: String) -> String {
+        defaultAppleSummaryStrategy
+    }
+
+    static func isAppleIntelligenceSummaryModelID(_ modelID: String) -> Bool {
+        [
+            appleIntelligenceModelID,
+            legacyAppleIntelligenceFastModelID,
+            legacyAppleIntelligenceQualityModelID,
+        ].contains(modelID)
+    }
+
+    static func appleSummaryStrategy(for summaryModelID: String) -> String {
+        appleSummaryStrategyAdaptiveGrounded
+    }
+
+    static func appleIntelligenceResultLabel(for summaryModelID: String) -> String {
+        "Apple Intelligence"
+    }
+
+    static func normalizedAppleIntelligenceSummaryModelID(
+        _ modelID: String,
+        legacyStrategy: String
+    ) -> String {
+        appleIntelligenceModelID
+    }
+
+    #if DEBUG
+    static func normalizedAppleSummaryStrategyForTesting(_ strategy: String) -> String {
+        let internalStrategies = Set([
+            appleSummaryStrategyBaseline,
+            appleSummaryStrategyHierarchical,
+            appleSummaryStrategyRollingJoined,
+            appleSummaryStrategyRollingComposed,
+            appleSummaryStrategyAdaptiveGrounded,
+        ])
+        return internalStrategies.contains(strategy)
+            ? strategy
+            : defaultAppleSummaryStrategy
+    }
+    #endif
 
     private static func allowsFutureModelID(_ modelID: String, providerID: String) -> Bool {
         guard !modelID.isEmpty else { return false }
@@ -272,8 +369,21 @@ nonisolated struct GenerationSettings {
 
     private static func canonicalModelID(_ modelID: String, providerID: String) -> String {
         let candidate = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
-        if normalizedProviderID(providerID) == chatGPTProviderID, candidate == legacyChatGPTSolAlias {
-            return chatGPTSolModelID
+        if normalizedProviderID(providerID) == chatGPTProviderID {
+            switch candidate.lowercased() {
+            case legacyChatGPTSolAlias:
+                return chatGPTSolModelID
+            case legacyChatGPT54ModelID:
+                return chatGPTTerraModelID
+            case legacyChatGPT54MiniModelID:
+                return chatGPTLunaModelID
+            default:
+                break
+            }
+        }
+        if normalizedProviderID(providerID) == grokProviderID,
+           candidate.lowercased() == legacyGrok45QualityModelID {
+            return defaultGrokModelID
         }
         return candidate
     }

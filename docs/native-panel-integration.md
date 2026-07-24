@@ -271,16 +271,16 @@ The displayed result's `state.timestampsSource` is the rendering authority: `you
 
 Footer presentation follows these rules:
 
-- YouTube result with a connected timestamp provider and no matching generated cache: `Chapters provided by YouTube. Generate chapters from transcript.`
-- YouTube result with a matching cached result: `Chapters provided by YouTube. View generated chapters.`
+- YouTube result with a connected timestamp provider and no matching generated cache: `Chapters provided by YouTube.` followed on the next line by `Generate chapters from transcript`
+- YouTube result with a matching cached result: `Chapters provided by YouTube.` followed on the next line by `View generated chapters`
 - YouTube result without an available timestamp provider: show only the YouTube attribution
-- generated result with discovered YouTube rows: `Chapters generated with <model> in <time>. View YouTube chapters.`
+- generated result with discovered YouTube rows: `Chapters generated with <model> in <time>.` followed on the next line by `View YouTube chapters`
 - generated result without YouTube rows, or while native discovery is unresolved: show only the generation attribution
 - Summary captions never show a chapter source action
 
-All chapter footer variants are one compact left-aligned line after the final chapter, separated by the same standard result spacing used for summary captions. The HTML contains no leading template whitespace because captions preserve whitespace for other result text. Only the action is underlined and it inherits the caption's normal font weight.
+All chapter footer variants use a compact left-aligned caption after the final chapter, separated by the same standard result spacing used for summary captions. When present, the source action is a block-level second line with no terminal punctuation. Only the action is underlined, and it inherits the caption's normal font weight.
 
-The action is a semantic button styled as a small inline link. It is routed through the same stable `page-controls.js` capture boundary as Chapters, Summary, Copy, and timestamp links, so a YouTube rerender cannot leave it visibly present but detached from its handler. Switching to generated chapters reuses a cached generated result when available; otherwise it starts the existing transcript/provider generation flow. Switching to YouTube chapters uses cached extracted rows and never displays YouTube's roomier native list.
+The action is a semantic button styled as a small link. It is routed through the same stable `page-controls.js` capture boundary as Chapters, Summary, Copy, and timestamp links, so a YouTube rerender cannot leave it visibly present but detached from its handler. Switching to generated chapters reuses a cached generated result when available; otherwise it starts the existing transcript/provider generation flow. Switching to YouTube chapters uses cached extracted rows and never displays YouTube's roomier native list.
 
 When native chapters or Key moments are found, `applyNativeChaptersIfAvailable()` sets the timestamps result to chapter text and marks the source as `youtubeChapters`. That source marker prevents provider timestamp generation for that video and makes the compact result caption say the chapters came from YouTube.
 
