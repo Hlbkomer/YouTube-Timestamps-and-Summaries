@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
     createTranscriptOrchestrator,
@@ -26,6 +28,31 @@ test("transcript discovery requires a real transcript control", () => {
     assert.equal(
         transcriptOpenControl([], [disabledTranscript, collapsedTranscript]),
         collapsedTranscript
+    );
+});
+
+test("fresh player caption URLs are tried before page-embedded caption URLs", () => {
+    const contentSource = fs.readFileSync(path.resolve(
+        __dirname,
+        "../../YouTube Timestamps and Summaries Extension/Resources/content.js",
+    ), "utf8");
+    const resolverSource = contentSource.match(
+        /async function resolveTranscript\([\s\S]+?\n}\n\nfunction needsTranscriptForTimestamps/,
+    )?.[0] || "";
+    const freshPlayerAttempt = resolverSource.indexOf(
+        "fetchInnertubePlayerTracks(videoKey)",
+    );
+    const pageTrackAttempt = resolverSource.indexOf(
+        "tryTranscriptTracks(videoKey, kind, source, tracks)",
+    );
+
+    assert.notEqual(freshPlayerAttempt, -1);
+    assert.notEqual(pageTrackAttempt, -1);
+    assert.ok(freshPlayerAttempt < pageTrackAttempt);
+    assert.match(contentSource, /source: "page-embedded",\s+tracks: pageTracks/);
+    assert.match(
+        resolverSource,
+        /tryTranscriptTracks\(videoKey, kind, "fresh YouTube player", playerTracks\)/,
     );
 });
 

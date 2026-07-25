@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Prefer freshly requested YouTube player caption URLs for transcript acquisition, while retaining page-embedded caption URLs and the existing transcript-panel/timed-text sources as fallbacks. This removes repeated empty page-caption requests without changing transcript sharing, caption selection, or generated output.
 - Prevent captionless live videos from opening YouTube's Description engagement panel during transcript discovery. An empty transcript-section shell no longer authorizes a generic description expansion; only a real transcript control can be clicked.
 - Consolidate the duplicate ChatGPT and Grok summary instructions into one shared, versioned provider prompt builder and one production-version switch. Carry verified title, channel, cleaned description, duration, and caption source through the selected-provider summary boundary while keeping production on the exact legacy Prompt 1 contract.
 - Add a gated signed-Debug provider prompt comparison runner that preserves the one-call full-transcript architecture, enforces Grok 4.5 low reasoning, captures latency/first-output/token metrics, resumes completed calls, and exports sandbox-safe Xcode attachments. Retain the full eight-video, 32-output Prompt 1/Prompt 2 corpus under `test-results/provider-prompt-comparisons`; Prompt 2 improved names and attribution but remained too verbose and slow for production.

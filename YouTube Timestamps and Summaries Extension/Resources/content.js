@@ -1214,7 +1214,7 @@ async function getCaptionTracks(videoKey) {
     const pageTracks = getPageCaptionTracks(videoKey);
     if (pageTracks.length > 0) {
         return {
-            source: "player",
+            source: "page-embedded",
             tracks: pageTracks,
         };
     }
@@ -2072,24 +2072,24 @@ async function resolveTranscript(videoKey, kind, { allowNativePanelOpen = true }
         const { source, tracks, error } = await getCaptionTracks(videoKey);
         if (tracks.length > 0) {
             let lastError = "";
+
+            try {
+                const playerTracks = await fetchInnertubePlayerTracks(videoKey);
+                const playerResult = await tryTranscriptTracks(videoKey, kind, "fresh YouTube player", playerTracks);
+                if (playerResult.transcript) {
+                    return playerResult.transcript;
+                }
+                lastError = playerResult.error;
+            } catch (error) {
+                lastError = error?.message || String(error);
+                logTranscriptDebug(kind, `transcript: fresh player captions unavailable (${lastError})`);
+            }
+
             const pageResult = await tryTranscriptTracks(videoKey, kind, source, tracks);
             if (pageResult.transcript) {
                 return pageResult.transcript;
             }
-            lastError = pageResult.error;
-
-            logTranscriptDebug(kind, "transcript: trying YouTube player captions");
-            try {
-                const playerTracks = await fetchInnertubePlayerTracks(videoKey);
-                const playerResult = await tryTranscriptTracks(videoKey, kind, "YouTube player", playerTracks);
-                if (playerResult.transcript) {
-                    return playerResult.transcript;
-                }
-                lastError = playerResult.error || lastError;
-            } catch (error) {
-                lastError = error?.message || String(error);
-                logTranscriptDebug(kind, `transcript: player fallback failed (${lastError})`);
-            }
+            lastError = pageResult.error || lastError;
 
             logTranscriptDebug(kind, "transcript: trying YouTube transcript panel");
             try {

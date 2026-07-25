@@ -52,6 +52,8 @@ For selected-provider summaries, timestamp prefixes are stripped before the requ
 
 Transcript acquisition is shared per video. Navigation reconciliation, status refresh, and automatic analysis may all ask for the same transcript while YouTube is still exposing captions, but compatible passive prefetch calls reuse the existing promise without registering another consumer. Direct Chapters and Summary consumers also report `transcript: waiting for shared transcript fetch` at most once per result kind for that in-flight request. This keeps the diagnostics readable without changing cache reuse, parallel Chapters/Summary generation, or the active retry that may open YouTube's native transcript panel after a passive fetch fails.
 
+Once YouTube exposes caption metadata, transcript acquisition requests fresh caption-track URLs from YouTube's player endpoint first. Page-embedded caption URLs remain the immediate fallback, followed by the transcript endpoint, native transcript panel, and timed-text lookup. Fresh-first ordering avoids repeatedly trying expired or otherwise unusable page URLs while preserving the page data as a compatibility fallback. All successful paths populate the same per-video transcript cache.
+
 ## Provider Paths
 
 The stable provider uses the same broad ChatGPT/Codex approach seen in Hermes and OpenClaw:
