@@ -13,10 +13,13 @@ attribution, handling of uncertain automatic captions, and coverage of later
 topics. Its main cost is not the added metadata input; it is the much longer
 answer the detail instructions encourage.
 
-Production therefore remains on Prompt 1. The recommended next candidate is a
-compact grounded prompt that retains Prompt 2's context and attribution rules
-but adds an explicit output budget and tells the model to select the most
-important examples instead of enumerating every stock, fight, or subtopic.
+Production therefore remains on Prompt 1. A subsequent review on 2026-07-25
+concluded that Prompt 2 is over-engineered for this product and that carrying
+most of its rules into a new Prompt 3 would preserve unnecessary complexity.
+If prompt work resumes, the preferred candidate is instead a minimally changed
+Prompt 1.1: the shared Prompt 1 contract plus compact title/channel/description
+context and a direct-start rule. See [DECISION.md](DECISION.md) for the exact
+deferred proposal, the current Apple metadata gap, and the ASR terminology.
 
 ## Quantitative results
 
@@ -58,7 +61,12 @@ single in-flight request was restarted.
 | 53-minute Lawrence Wilkerson interview | Grok Prompt 2 used the description and title to identify Lawrence Wilkerson's exact former role and host Glenn Diesen, while keeping opinions attributed to Wilkerson. Terra Prompt 2 improved detail and attribution but nearly doubled in length. |
 | 3-hour Joe Rogan episode | Prompt 2 used Luigi Vendittelli's full name, covered the late ancient-civilization and filmmaking-evidence sections, and repeatedly marked Lazar's statements and broader speculation as claims rather than established facts. Prompt 1 already covered the full thematic arc. Terra Prompt 2 reached 2,388 words and Grok reached 1,386, so the extra coverage is not efficient enough for production. Neither Prompt 2 output misattributed the environmental-health discussion to Shanna Swan. |
 
-## Recommended Prompt 3 direction
+## Earlier Prompt 3 idea (historical, not the current recommendation)
+
+This was the initial recommendation immediately after reviewing the outputs.
+It is retained to preserve the investigation trail, but the 2026-07-25
+decision rejected this direction as too elaborate. It is not an approved
+implementation plan.
 
 Keep:
 
@@ -95,3 +103,5 @@ words above two hours. These are proposed test ranges, not production settings.
   outputs, and four raw result JSON files; stripped transcripts are local-only
 - `metrics.csv`: per-request latency, first-output, token, and size metrics
 - `aggregate-results.json`: all 32 raw results in one file
+- `DECISION.md`: the later product decision, deferred Prompt 1.1 draft, metadata
+  scope, Apple Intelligence finding, and ASR glossary

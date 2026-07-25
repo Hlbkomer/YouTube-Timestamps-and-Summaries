@@ -117,9 +117,19 @@ Debug comparison candidate that treats metadata as disambiguation context and
 the transcript as the only factual source, strengthens entity attribution,
 and requests whole-video coverage. The eight-video GPT-5.6 Terra/Grok 4.5
 comparison found better names and attribution but excessive verbosity and
-latency, so promotion was deferred. The exact inputs, 32 outputs, metrics, and
-review are retained in
+latency. A later product review rejected Prompt 2 and the proposed elaborate
+Prompt 3 direction as over-engineered. Production remains on Prompt 1. The
+deferred alternative is a small Prompt 1.1 that would add only compact
+title/channel/cleaned-description context plus a direct-start rule; it has not
+been enabled or benchmarked. The exact inputs, 32 outputs, metrics, findings,
+and dated decision record are retained in
 [`test-results/provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2`](test-results/provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2).
+
+The Apple Intelligence request currently receives transcript and caption
+language but not the title, channel, or description. Compact context may be
+tested there separately later, without changing the selected adaptive-grounded
+architecture or adding calls. This is intentionally separate from the
+provider Prompt 1.1 experiment.
 
 Private Cloud Compute is intentionally not in any active app path while the managed `com.apple.developer.private-cloud-compute` entitlement is pending. The former T27/S27 tabs were removed because attempting PCC without that entitlement terminated the Safari extension process instead of returning a recoverable generation error. See [docs/macos27-summary.md](docs/macos27-summary.md) for the observed behavior and test plan.
 

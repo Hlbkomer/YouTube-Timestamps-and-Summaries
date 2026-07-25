@@ -19,8 +19,12 @@ Corpus: the eight videos used for the July 23 Apple Intelligence comparison
 Production remains on Prompt 1 while these results are reviewed.
 
 The review concluded that Prompt 2 improves grounding and metadata-assisted
-attribution but is too verbose for production. See [FINDINGS.md](FINDINGS.md)
-for the quantitative and per-video assessment.
+attribution but is too verbose for production. A later product review also
+concluded that its prompt definition is over-engineered relative to those
+gains. Production remains on Prompt 1; a small metadata-assisted Prompt 1.1 is
+documented but deliberately deferred. See [FINDINGS.md](FINDINGS.md) for the
+quantitative and per-video assessment and [DECISION.md](DECISION.md) for the
+current decision and exact future proposal.
 
 ## Stored artifacts
 
@@ -34,7 +38,9 @@ for the quantitative and per-video assessment.
   size
 - `aggregate-results.json`: all 32 raw provider results
 - `FINDINGS.md`: quantitative comparison, qualitative review, and recommended
-  next experiment
+  interpretation
+- `DECISION.md`: current decision, proposed lean Prompt 1.1, metadata scope,
+  Apple Intelligence finding, and ASR explanation
 
 ## Rerunning
 
