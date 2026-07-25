@@ -3,7 +3,31 @@ const assert = require("node:assert/strict");
 
 const {
     createTranscriptOrchestrator,
+    transcriptOpenControl,
 } = require("../../YouTube Timestamps and Summaries Extension/Resources/transcript-orchestrator.js");
+
+test("transcript discovery requires a real transcript control", () => {
+    const visibleTranscript = {
+        getAttribute: () => null,
+    };
+    const collapsedTranscript = {
+        getAttribute: () => null,
+    };
+    const disabledTranscript = {
+        disabled: true,
+        getAttribute: () => null,
+    };
+
+    assert.equal(transcriptOpenControl([], []), null);
+    assert.equal(
+        transcriptOpenControl([visibleTranscript], [collapsedTranscript]),
+        visibleTranscript
+    );
+    assert.equal(
+        transcriptOpenControl([], [disabledTranscript, collapsedTranscript]),
+        collapsedTranscript
+    );
+});
 
 function deferred() {
     let resolve;

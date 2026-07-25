@@ -17,6 +17,7 @@ const {
 const chapterState = globalThis.YouTubeTimestampsChapterState;
 const contentState = globalThis.YouTubeTimestampsContentState;
 const transcriptOrchestration = globalThis.YouTubeTimestampsTranscriptOrchestrator;
+const { transcriptOpenControl } = transcriptOrchestration;
 const generationOrchestration = globalThis.YouTubeTimestampsGenerationOrchestrator;
 const {
     automaticGenerationKinds,
@@ -89,13 +90,6 @@ const NATIVE_TRANSCRIPT_OPEN_BUTTON_SELECTORS = [
     "button[aria-label*='transcript' i]",
     "[role='button'][aria-label*='transcript' i]",
     "button[title*='transcript' i]",
-];
-const DESCRIPTION_EXPAND_BUTTON_SELECTORS = [
-    "ytd-watch-metadata ytd-text-inline-expander tp-yt-paper-button#expand",
-    "ytd-watch-metadata tp-yt-paper-button#expand",
-    "ytd-watch-metadata #description tp-yt-paper-button#expand",
-    "ytd-watch-metadata #description button[aria-label*='more' i]",
-    "ytd-watch-metadata #description [role='button'][aria-label*='more' i]",
 ];
 const transcriptCache = new Map();
 const transcriptRequestCache = new Map();
@@ -1919,41 +1913,38 @@ function nativeTranscriptOpenButtons() {
     return uniqueElements([...selectorCandidates, ...textCandidates]).filter(isVisibleElement);
 }
 
-function descriptionExpandButtons() {
-    const selectorCandidates = DESCRIPTION_EXPAND_BUTTON_SELECTORS
-        .flatMap((selector) => querySelectorAllSafe(document, selector));
-    const textCandidates = querySelectorAllSafe(document, "ytd-watch-metadata button, ytd-watch-metadata [role='button'], ytd-watch-metadata tp-yt-paper-button")
-        .filter((element) => {
-            const text = visibleText(element);
-            return /\b(show more|more|viac|zobraziť viac|zobrazit vice|mehr|más|plus)\b/i.test(text);
-        });
+function nativeTranscriptSectionOpenButtons() {
+    const transcriptSection = document.querySelector(
+        "ytd-video-description-transcript-section-renderer"
+    );
+    if (!transcriptSection) {
+        return [];
+    }
 
-    return uniqueElements([...selectorCandidates, ...textCandidates]).filter(isVisibleElement);
+    return uniqueElements(
+        querySelectorAllSafe(
+            transcriptSection,
+            "button, a, [role='button'], .yt-spec-button-shape-next, button-view-model, yt-button-view-model"
+        ).map(actionableTranscriptButton)
+    );
 }
 
 async function openNativeTranscriptPanel(kind) {
-    let buttons = nativeTranscriptOpenButtons();
-    const transcriptSection = document.querySelector("ytd-video-description-transcript-section-renderer");
-    if (buttons.length === 0 && transcriptSection) {
-        // Expanding a generic description just to look for a transcript has a
-        // visible side effect on transcript-free videos: current YouTube builds
-        // open the full Description engagement panel. Expand only when YouTube
-        // has already supplied positive transcript-section evidence.
-        const expanders = descriptionExpandButtons();
-        if (expanders.length > 0) {
-            logTranscriptDebug(kind, "transcript: expanding YouTube description");
-            expanders[0].click();
-            await sleep(500);
-            buttons = nativeTranscriptOpenButtons();
-        }
-    }
-
-    if (buttons.length === 0) {
+    // Some YouTube builds leave an empty transcript-section shell on live or
+    // captionless videos. The shell alone is not evidence of a transcript.
+    // Never click the generic description expander: it opens the Description
+    // engagement panel and leaves a transcript-free page visibly changed.
+    // A real control inside the transcript section can be clicked directly
+    // even while the surrounding description is collapsed.
+    const button = transcriptOpenControl(
+        nativeTranscriptOpenButtons(),
+        nativeTranscriptSectionOpenButtons()
+    );
+    if (!button) {
         logTranscriptDebug(kind, "transcript: native transcript button not found");
         return false;
     }
 
-    const button = actionableTranscriptButton(buttons[0]);
     const label = visibleText(button).slice(0, 80) || button?.tagName?.toLowerCase() || "button";
     logTranscriptDebug(kind, `transcript: opening YouTube transcript panel (${label})`);
     button?.click();

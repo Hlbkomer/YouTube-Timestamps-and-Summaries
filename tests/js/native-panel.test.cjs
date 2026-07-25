@@ -157,15 +157,19 @@ test("native panel mounting rejects Description surfaces with tab-list-like mark
     assert.equal(controllerFor([targetedDescription], {}).getMount(), null);
 });
 
-test("transcript discovery expands a description only with positive transcript-section evidence", () => {
+test("transcript discovery never expands a generic Description panel", () => {
     const contentSource = fs.readFileSync(path.resolve(
         __dirname,
         "../../YouTube Timestamps and Summaries Extension/Resources/content.js",
     ), "utf8");
 
+    assert.doesNotMatch(
+        contentSource,
+        /DESCRIPTION_EXPAND_BUTTON_SELECTORS|descriptionExpandButtons|expanding YouTube description/,
+    );
     assert.match(
         contentSource,
-        /const transcriptSection = document\.querySelector\("ytd-video-description-transcript-section-renderer"\);\s*if \(buttons\.length === 0 && transcriptSection\)/,
+        /transcriptOpenControl\(\s*nativeTranscriptOpenButtons\(\),\s*nativeTranscriptSectionOpenButtons\(\)\s*\)/,
     );
 });
 

@@ -1,4 +1,12 @@
 (function (globalScope) {
+    function transcriptOpenControl(visibleControls = [], sectionControls = []) {
+        return [...visibleControls, ...sectionControls].find((control) => (
+            control
+            && control.disabled !== true
+            && control.getAttribute?.("aria-disabled") !== "true"
+        )) || null;
+    }
+
     function createTranscriptOrchestrator({
         completedCache,
         requestCache,
@@ -102,7 +110,10 @@
         return { forget, get, hasAvailableTranscript, status };
     }
 
-    const transcriptOrchestrator = { createTranscriptOrchestrator };
+    const transcriptOrchestrator = {
+        createTranscriptOrchestrator,
+        transcriptOpenControl,
+    };
     globalScope.YouTubeTimestampsTranscriptOrchestrator = transcriptOrchestrator;
 
     if (typeof module !== "undefined" && module.exports) {
