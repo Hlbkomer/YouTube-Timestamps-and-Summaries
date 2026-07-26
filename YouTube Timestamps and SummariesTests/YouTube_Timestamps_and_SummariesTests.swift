@@ -175,6 +175,101 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(!AppleSummaryTextUtilities.containsModelMetaText(cleaned))
     }
 
+    @Test func appleVideoMapParsesOnlyGroundedChapterAnchors() {
+        let parsed = AppleVideoMapUtilities.parseDigest(
+            """
+            ```
+            TOPIC: Foundation Models
+            POINT: The guest says local inference protects transcript privacy.
+            CHAPTER: L0007 | Local Inference and Privacy
+            HANDOFF: The discussion is moving to model limitations.
+            ```
+            """,
+            anchorSeconds: [
+                "L0007": 82,
+                "L0008": 95,
+            ],
+            includeSummaryPoints: true
+        )
+
+        #expect(parsed?.topic == "Foundation Models")
+        #expect(parsed?.points.count == 1)
+        #expect(parsed?.chapters == [
+            AppleVideoMapUtilities.ChapterCandidate(
+                anchorID: "L0007",
+                seconds: 82,
+                title: "Local Inference and Privacy"
+            ),
+        ])
+        #expect(AppleVideoMapUtilities.parseDigest(
+            """
+            TOPIC: Foundation Models
+            CHAPTER: L9999 | Invented Anchor
+            HANDOFF: Continue independently.
+            """,
+            anchorSeconds: ["L0007": 82],
+            includeSummaryPoints: false
+        ) == nil)
+    }
+
+    @Test func appleVideoMapAcceptsEquivalentValidatedJSONTransport() {
+        let parsed = AppleVideoMapUtilities.parseDigest(
+            """
+            {"topic":"Iran nuclear policy","chapters":[["L0001","Iran Nuclear Warning"]],"handoff":"Pickaxe Mountain"}
+            """,
+            anchorSeconds: ["L0001": 0],
+            includeSummaryPoints: false
+        )
+
+        #expect(parsed?.topic == "Iran nuclear policy")
+        #expect(parsed?.handoff == "Pickaxe Mountain")
+        #expect(parsed?.chapters.first?.seconds == 0)
+        #expect(AppleVideoMapUtilities.parseDigest(
+            """
+            {"topic":"Iran nuclear policy","chapters":[{"chapter":"L9999 | Invented Anchor"}]}
+            """,
+            anchorSeconds: ["L0001": 0],
+            includeSummaryPoints: false
+        ) == nil)
+    }
+
+    @Test func appleVideoMapChapterCompilerAddsZeroAndLimitsNoise() {
+        let candidates = [
+            AppleVideoMapUtilities.ChapterCandidate(
+                anchorID: "L0004",
+                seconds: 18,
+                title: "Opening Argument"
+            ),
+            AppleVideoMapUtilities.ChapterCandidate(
+                anchorID: "L0005",
+                seconds: 25,
+                title: "Opening Argument"
+            ),
+            AppleVideoMapUtilities.ChapterCandidate(
+                anchorID: "L0040",
+                seconds: 185,
+                title: "Practical Examples"
+            ),
+            AppleVideoMapUtilities.ChapterCandidate(
+                anchorID: "L0080",
+                seconds: 380,
+                title: "Final Recommendations"
+            ),
+        ]
+
+        #expect(
+            AppleVideoMapUtilities.compileChapters(
+                candidates: candidates,
+                videoDuration: 420,
+                fallbackTitle: "Video Overview"
+            ) == [
+                "00:00 Video Overview",
+                "03:05 Practical Examples",
+                "06:20 Final Recommendations",
+            ]
+        )
+    }
+
     @Test func providerAndModelNormalizationHandlesAliasesAndFutureModels() {
         #expect(GenerationSettings.normalizedProviderID("grokBuild") == GenerationSettings.grokProviderID)
         #expect(GenerationSettings.normalizedProviderID("unknown") == GenerationSettings.chatGPTProviderID)

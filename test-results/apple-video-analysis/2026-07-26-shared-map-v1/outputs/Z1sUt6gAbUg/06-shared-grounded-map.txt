@@ -1,0 +1,11 @@
+TOPICS
+US military action on Iran's nuclear facilities
+
+POINTS
+President Trump emphasizes preventing Iran's nuclear weapon development
+US military considers destroying Pickaxe Mountain as a nuclear facility
+
+CHAPTER CANDIDATES
+L00001 | 00:00 | US military strategy on Iran's nuclear sites
+L00003 | 00:26 | Iran's readiness and past deal attempts
+L00006 | 01:12 | US perspective on removing nuclear mystery at Pickaxe Mountain

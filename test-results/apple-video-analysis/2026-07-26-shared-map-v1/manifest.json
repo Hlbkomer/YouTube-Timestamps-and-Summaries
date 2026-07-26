@@ -1,0 +1,112 @@
+[
+  {
+    "id": "b_W0z6hZlrI",
+    "title": "The Odyssey - A Disastrous Triumph",
+    "channel": "The Critical Drinker",
+    "durationSeconds": 727,
+    "duration": "12:07",
+    "cueCount": 332,
+    "transcriptCharacters": 14934,
+    "transcriptPath": "../../provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2/sources/01-movie-review-b_W0z6hZlrI.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=b_W0z6hZlrI"
+  },
+  {
+    "id": "VZTmS4B840k",
+    "title": "OpenAI President Greg Brockman: Our Plan To Merge Chat And Agents",
+    "channel": "Alex Kantrowitz",
+    "durationSeconds": 2680,
+    "duration": "44:40",
+    "cueCount": 1303,
+    "transcriptCharacters": 58907,
+    "transcriptPath": "../../provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2/sources/02-openai-interview-VZTmS4B840k.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=VZTmS4B840k"
+  },
+  {
+    "id": "WsCf_rCJxnM",
+    "title": "Bitcoin's Second Failed Bounce in Two Weeks — Targets Lower.",
+    "channel": "Krown",
+    "durationSeconds": 6976,
+    "duration": "1:56:16",
+    "cueCount": 3327,
+    "transcriptCharacters": 153301,
+    "transcriptPath": "../../provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2/sources/03-crypto-WsCf_rCJxnM.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=WsCf_rCJxnM"
+  },
+  {
+    "id": "Z1sUt6gAbUg",
+    "title": "'CLOUDED IN MYSTERY': Hidden Iran facility fuels new Trump warning",
+    "channel": "Fox News",
+    "durationSeconds": 227,
+    "duration": "3:47",
+    "cueCount": 105,
+    "transcriptCharacters": 4399,
+    "transcriptPath": "../../provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2/sources/04-news-Z1sUt6gAbUg.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=Z1sUt6gAbUg"
+  },
+  {
+    "id": "UvjW6qASU48",
+    "title": "Iran launches ground invasion of US bases. They got vaporized.",
+    "channel": "Nux Taku",
+    "durationSeconds": 1763,
+    "duration": "29:23",
+    "cueCount": 857,
+    "transcriptCharacters": 38362,
+    "transcriptPath": "../../provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2/sources/05-lux-UvjW6qASU48.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=UvjW6qASU48"
+  },
+  {
+    "id": "n6CNgAtdMw0",
+    "title": "UFC Abu Dhabi Picks, Bets, Props | Ankalaev vs Guskov Fight Previews, Predictions",
+    "channel": "Bookie Beatdown",
+    "durationSeconds": 5478,
+    "duration": "1:31:18",
+    "cueCount": 2634,
+    "transcriptCharacters": 120667,
+    "transcriptPath": "../../provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2/sources/06-mma-betting-n6CNgAtdMw0.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=n6CNgAtdMw0"
+  },
+  {
+    "id": "EfKReR8i6W0",
+    "title": "Lawrence Wilkerson: Iran War Escalates Toward Global Crisis",
+    "channel": "Glenn Diesen",
+    "durationSeconds": 3174,
+    "duration": "52:54",
+    "cueCount": 1237,
+    "transcriptCharacters": 55820,
+    "transcriptPath": "../../provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2/sources/07-politics-EfKReR8i6W0.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=EfKReR8i6W0"
+  },
+  {
+    "id": "Lb_1d68vx-g",
+    "title": "Joe Rogan Experience #2479 - Bob Lazar & Luigi Vendittelli",
+    "channel": "PowerfulJRE",
+    "durationSeconds": 10778,
+    "duration": "2:59:38",
+    "cueCount": 4948,
+    "transcriptCharacters": 208961,
+    "transcriptPath": "../../provider-prompt-comparisons/2026-07-24-prompt1-vs-prompt2/sources/08-joe-rogan-Lb_1d68vx-g.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=Lb_1d68vx-g"
+  },
+  {
+    "id": "CMQwmnd3Ak8",
+    "title": "Asmongold’s Girlfriend Just Destroyed Hasan..",
+    "channel": "MorePegasus",
+    "durationSeconds": 2070,
+    "duration": "34:30",
+    "cueCount": 1077,
+    "transcriptCharacters": 45705,
+    "transcriptPath": "sources/09-commentary-CMQwmnd3Ak8.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=CMQwmnd3Ak8"
+  },
+  {
+    "id": "425R4PQ5svQ",
+    "title": "FAIRNESS IS IRRELEVANT... ONLY VICTORY MATTERS.",
+    "channel": "Nuxanor",
+    "durationSeconds": 8224,
+    "duration": "2:17:04",
+    "cueCount": 3985,
+    "transcriptCharacters": 180141,
+    "transcriptPath": "sources/10-long-commentary-425R4PQ5svQ.txt",
+    "sourceURL": "https://www.youtube.com/watch?v=425R4PQ5svQ"
+  }
+]

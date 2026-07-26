@@ -1,0 +1,53 @@
+{
+  "approach" : "sharedChaptersSummary",
+  "elapsedSeconds" : 8.9309354160000005,
+  "response" : {
+    "chaptersText" : "00:00 US military strategy on Iran's nuclear sites\n01:12 US perspective on removing nuclear mystery at Pickaxe Mountain",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:00 | US military strategy on Iran's nuclear sites\nL00003 | 00:26 | Iran's readiness and past deal attempts\nL00006 | 01:12 | US perspective on removing nuclear mystery at Pickaxe Mountain",
+      "chapterCandidates" : 3,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 2,
+      "chunks" : 1,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 0,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 2058,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "President Trump emphasizes preventing Iran's nuclear weapon development\nUS military considers destroying Pickaxe Mountain as a nuclear facility",
+      "mappedTopics" : "US military action on Iran's nuclear facilities",
+      "mapSequence" : "sequential",
+      "mode" : "sharedChaptersSummary",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 2,
+      "nativeTranscriptRedactions" : 0,
+      "outputTokens" : 218,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "sharedVideoMapChunk=1,sharedVideoMapCompose=1",
+      "summaryDigestCount" : 1,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true,
+    "summaryText" : "The video opens with the host outlining the central concern of US military action regarding Iran's nuclear capabilities, emphasizing the need to prevent the development of nuclear weapons. The discussion shifts to the strategic consideration of destroying Pickaxe Mountain, identified as a nuclear facility, within the broader framework of US policy.\n\n**US military strategy**\n- Destruction of Pickaxe Mountain is under consideration\n- Focus remains on preventing Iran's nuclear weapon development\n\n**Key figures**\n- President Trump emphasizes the importance of halting nuclear advancement"
+  },
+  "video" : {
+    "channel" : "Fox News",
+    "cueCount" : 105,
+    "duration" : "3:47",
+    "durationSeconds" : 227,
+    "id" : "Z1sUt6gAbUg",
+    "sourceURL" : "https://www.youtube.com/watch?v=Z1sUt6gAbUg",
+    "title" : "'CLOUDED IN MYSTERY': Hidden Iran facility fuels new Trump warning",
+    "transcriptCharacters" : 4399
+  }
+}

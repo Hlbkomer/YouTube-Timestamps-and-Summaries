@@ -1,0 +1,109 @@
+TOPICS
+winning is awesome
+winning over terrorism
+Saudi-Iran proxy conflict escalation
+Houthi attacks and strategic advantage
+US military strategy and political accountability
+Zoran Mdani's war rhetoric and Netanyahu allegations
+Netanyahu's legal predicament and criticism
+Netanyahu and ICC
+ICC jurisdiction and American sovereignty
+military merger legislation
+military merger debate
+military merger criticism
+implicit biases and ideological references
+Hassan's extremist political views
+Hassan extremist views
+progressive taxation and terrorism debate
+leftist extremism and threats
+Hollywood vs AI competition
+UK crime statistics and cultural narratives
+Odyssey vs Lord of the Rings cultural debate
+Odyssey vs Lord of the Rings cultural debate
+
+POINTS
+Zoran Mani is declaring war on Israel.
+The United States will bomb and destroy one bridge or power plant near Tehran.
+Trump's approval exceeds 80% among Republicans in second term.
+Trump criticized Houthi attacks on boats.
+Saudi Arabia is receiving US non-enriched nuclear energy.
+Houthi attacks threaten the Strait of Hormuz.
+Houthi control of mountain areas enables nuclear enrichment.
+Secretary Rubio's criticism of Ortega's dictatorship deepens repression.
+Zoran Mdani lacks legal authority to invade Poland.
+Zoran Mdani claimed to arrest Benjamin Netanyahu.
+Netanyahu is described as a war criminal.
+Zoran Mandani argues Netanyahu should be arrested for ICC crimes.
+Zoran Mandani is exploring arresting Netanyahu.
+Rubio rejects ICC jurisdiction over non-members.
+Rubio says ICC has no power here.
+Shapiro signed artillery shells for Ukraine.
+House passed a bill to merge US and Israeli militaries.
+Congress voted to merge US military with Israel's.
+IDF has experience with terror tunnels.
+NDA Act includes section 219.
+Nick's criticism of military merger with Israel.
+Military sharing is not a merger.
+Nick struggles with anti-Semitic alliances.
+ABA website states 'All of us have implicit biases'
+Hassan supports Mao, a Chinese communist who murdered 60 million people
+Hassan defends America deserved 911 multiple times
+Hassan supports terrorism and extremist ideologies
+Hassan supports pedophiles like Hamas and Hezbollah and Iran Islamic regime in Iran.
+Hassan killed 40 to 60 million people estimated starving to death.
+Hassan compares Trump to genocidal dictators and Hamas.
+Hassan supports universal healthcare and four or five ways to achieve it.
+Hassan opposes progressive taxation from the very rich.
+Hassan equates terrorism with left-wing policies.
+Hassan praised menacing politicians with AR-15 threats.
+AI is a competition to Hollywood's stranglehold on entertainment.
+London has an average of one rape every 53 seconds.
+The majority of UK mayors are Muslim.
+Odyssey's 97% score is pushed by notification bias
+Poll data shows 56% positive ratings for Odyssey
+Woke narratives distort historical objectivity
+Odyssey criticizes Christopher Nolan's gender portrayal.
+Feminist rewrote Odyssey script to be gayer and more feminine.
+
+CHAPTER CANDIDATES
+L00001 | 00:00 | War with Iran: Strategic Shift
+L00013 | 02:42 | President's aggressive rhetoric on Iran
+L00035 | 07:19 | Trump's second-term popularity
+L00041 | 08:28 | US-Lebanon aviation policy
+L00061 | 12:47 | Proxy warfare update
+L00064 | 13:22 | Saudi-Iran strategic realignment
+L00094 | 19:52 | Houthi threat escalation
+L00117 | 24:31 | Conventional Iranian capability revealed
+L00124 | 26:01 | Ortega's dictatorship and repression
+L00136 | 28:32 | Democrats funding military equipment
+L00163 | 34:31 | Mdani's failed invasion claims
+L00169 | 35:41 | Netanyahu's war crime accusations
+L00187 | 39:24 | Netanyahu's legal stance
+L00194 | 40:52 | Criticism of Netanyahu's silence
+L00224 | 47:04 | Mandani's Arrest Discussions
+L00245 | 51:19 | Rubio on ICC Limitations
+L00252 | 52:42 | ICC Authority Debate
+L00254 | 53:04 | Communist Influence Warning
+L00283 | 59:15 | Military ties clarification
+L00297 | 1:02:07 | Military merger controversy
+L00323 | 1:07:30 | NDA Act military merger
+L00326 | 1:08:08 | Congress NDAA vote
+L00342 | 1:11:53 | Military Sharing Clarification
+L00358 | 1:15:39 | Gil's Congressional Advocacy
+L00385 | 1:22:13 | Ideological References Discussion
+L00392 | 1:23:53 | ABA and Implicit Bias Debate
+L00405 | 1:26:26 | Hassan's extremist ideology revealed
+L00421 | 1:30:04 | Young Democrats distance from Hassan
+L00432 | 1:32:26 | Hassan extremist views
+L00449 | 1:36:29 | Democratic party collapse
+L00464 | 1:40:04 | Progressive taxation critique
+L00471 | 1:41:39 | Center-left responsibility discussion
+L00505 | 1:49:18 | Hassan extremist rhetoric
+L00517 | 1:52:08 | AI-generated Odyssey controversy
+L00527 | 1:54:11 | AI vs Hollywood competition
+L00560 | 2:01:40 | London crime data
+L00563 | 2:02:27 | UK demographic trends
+L00589 | 2:07:55 | Film comparison: Odyssey vs Lord of the Rings
+L00594 | 2:09:15 | Statistical manipulation in Rotten Tomatoes
+L00620 | 2:14:53 | Cultural critique of Odyssey
+L00622 | 2:15:21 | Discussion of censorship and personal restrictions

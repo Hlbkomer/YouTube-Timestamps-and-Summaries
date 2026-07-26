@@ -1,0 +1,53 @@
+{
+  "approach" : "sharedChaptersSummary",
+  "elapsedSeconds" : 186.35029825000001,
+  "response" : {
+    "chaptersText" : "00:00 shitcoin\n09:56 Heat and AC disruption\n19:24 Bearish trend persists\n24:21 Bearish trend confirmation\n30:03 Next area of interest: 53-55\n34:10 Bullish trend analysis\n45:47 Weekly trend concerns\n53:20 Analysis of current consolidation patterns\n59:46 Higher lows in C A R\n1:08:51 Retirement buy analysis\n1:19:14 Short-term upside: 18 3/4\n1:25:43 Trading strategies for Micro Strategy\n1:33:43 Japan market observations\n1:41:48 Uniswap ranking\n1:50:56 CLF market outlook\n1:55:17 Market setups failing",
+    "debug" : {
+      "chapterCandidateMap" : "L00028 | 09:56 | Heat and AC disruption\nL00030 | 10:21 | Bitcoin's downside target confirmed\nL00051 | 14:05 | Bearish divergence analysis\nL00055 | 14:44 | AI chatbot training announcement\nL00081 | 19:24 | Bearish trend persists\nL00093 | 21:34 | Technical pattern implications\nL00109 | 24:21 | Bearish trend confirmation\nL00111 | 24:40 | Critical monthly low zone identified\nL00141 | 30:03 | Next area of interest: 53-55\nL00155 | 32:42 | Monthly reversal confirmed by higher lows\nL00163 | 34:10 | Bullish trend analysis\nL00168 | 35:10 | Volatility and RSI indicators\nL00192 | 39:57 | Monthly downtrend confirmed\nL00196 | 40:42 | Weekly uptrend confirmation needed\nL00221 | 45:47 | Weekly trend concerns\nL00237 | 48:57 | Short-term selling signals\nL00258 | 53:20 | Analysis of current consolidation patterns\nL00262 | 54:19 | Discussion of 961 resistance and correction risk\nL00289 | 59:46 | Higher lows in C A R\nL00299 | 1:01:42 | Focus on weekly, daily, and quarterly signals\nL00303 | 1:02:25 | Short-term downside risk\nL00307 | 1:03:16 | Breakdown probability increases\nL00335 | 1:08:51 | Retirement buy analysis\nL00346 | 1:11:06 | RGTI Regetti outlook\nL00363 | 1:14:32 | New topic: SpaceX IPO\nL00374 | 1:16:52 | Revised downside: $34-$35\nL00385 | 1:19:14 | Short-term upside: 18 3/4\nL00387 | 1:19:32 | Entry point analysis\nL00395 | 1:21:09 | Tom's bearish signals\nL00417 | 1:25:43 | Trading strategies for Micro Strategy\nL00425 | 1:27:27 | INFQ's sideways movement and invalidation point\nL00442 | 1:30:52 | Bearish divergence analysis\nL00458 | 1:33:43 | Japan market observations\nL00472 | 1:37:02 | Ethereum outlook\nL00494 | 1:41:48 | Uniswap ranking\nL00504 | 1:44:14 | Market research for Rain\nL00518 | 1:47:05 | Long-term chart analysis for Rain\nL00529 | 1:49:26 | URG price analysis\nL00536 | 1:50:56 | CLF market outlook\nL00557 | 1:55:17 | Market setups failing\nL00559 | 1:55:43 | Lower highs anticipated",
+      "chapterCandidates" : 41,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 16,
+      "chunks" : 20,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 1,
+      "formatRecoveries" : 20,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 51698,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "Bitcoin is trading near $30,000 resistance level.\nBitcoin may fall near 29,000 dollars.\nBearish divergence appears on daily RSI.\nShort-term correction expected near 7450.\nBitcoin broke below the midband at 78,800.\nFunding rates remain positively skewed.\nHidden bearish divergence visible across multiple timeframes.\nBitcoin is trending lower on daily and daily-adjacent time frames.\nFreddy Mend is analyzing SPIR Spire Global's breakout potential.\nWeekly trend is up above $4.50\nExtreme weekly volatility at 200 simple\nRSI higher than December 2024 levels\nWeekly below 157 confirms monthly downtrend\nWeekly above 1330 confirms uptrend potential\nAndreas Palm is analyzing SAB.\nAndreas Palm is analyzing EDIT.\nMG semiconductors show weekly local highs.\nDavid Murphy asks about Nvidia's price action.\nAndrew Plus inquires about IBM's investment suitability.\nDead Reckoning sees C A R weekly and daily reversal progress\nDead Reckoning expects C A R to break through and rise to 7580 bucks\nLuffy notes Bitcoin needs to hold 200 simple on daily timeframe.\nLuffy predicts Bitcoin may break down from current position.\nLuffy expects Bitcoin to finish below 200 simple.\nZTS monthly and weekly retirement buy is risky\nRGTI Regetti shows consolidation potential\nLS1's view: $315 invalidation point if below yesterday's low\nZenotra: SpaceX IPO not my game\nMr. Cowboy NZ: downside targets 184-185 region\nWeekly rejection at $58 confirms bearish momentum\nMonthly low at $46.5 indicates potential correction\nHigher lows suggest bullish bias if above last week's low\nMr. Cowboy NZ's agents have made no trades recently.\nTyler Dur's analysis suggests RIVN faces a rejective lower high.\nMonthly closes above $60 signal potential all-time highs.\nEthereum remains unaffected by analyst predictions\nBitcoin's 2025 low approaches 1370-1380 range\nUniswap ranked 16th on CMC, not Chainlink\nRain is undervalued compared to other memecoins.\nRain's chart shows potential for new highs in June.\nMr. Escobar says URG closes Friday at 162.\nMr. Escobar's upside target is $2 on a weekly close.\nAndrew Plus expects CLF to extend towards $14.\nSPY and NASDAQ are pulling back\nshitcoin is a down only chart",
+      "mappedTopics" : "Bitcoin's downside targets\nBitcoin's downside targets\nBitcoin downside continuation signals\nBitcoin downside continuation signals\nBitcoin price targets and reversal signals\nBitcoin's second failed bounce\nBitcoin's downtrend and correction signals\nBitcoin price correction analysis\nBitcoin's short-term consolidation and potential breakdown\nhigher lows forming in summer\nBitcoin price correction potential\nBitcoin's second failed bounce\nBitcoin's short-term downside risks\nBitcoin's downside targets and reversal signs\nBitcoin's upside potential and bearish evidence\nBitcoin bearish divergence and consolidation\nBitcoin's second failed bounce in two weeks\nRain token valuation and market positioning\nBitcoin market analysis and positioning\nshitcoin",
+      "mapSequence" : "sequential",
+      "mode" : "sharedChaptersSummary",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 21,
+      "nativeTranscriptRedactions" : 179,
+      "outputTokens" : 3624,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "sharedVideoMapChunk=20,sharedVideoMapCompose=1",
+      "summaryDigestCount" : 20,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true,
+    "summaryText" : "**Bitcoin's downside targets**\n- Bitcoin is trading near $30,000 resistance level.\n\n**Bitcoin's downside targets**\n- Bitcoin may fall near 29,000 dollars.\n- Bearish divergence appears on daily RSI.\n- Short-term correction expected near 7450.\n\n**Bitcoin downside continuation signals**\n- Bitcoin broke below the midband at 78,800.\n- Funding rates remain positively skewed.\n- Hidden bearish divergence visible across multiple timeframes.\n\n**Bitcoin downside continuation signals**\n- Bitcoin is trending lower on daily and daily-adjacent time frames.\n\n**Bitcoin price targets and reversal signals**\n- Freddy Mend is analyzing SPIR Spire Global's breakout potential.\n\n**Bitcoin's second failed bounce**\n- Weekly trend is up above $4.50\n- Extreme weekly volatility at 200 simple\n- RSI higher than December 2024 levels\n\n**Bitcoin's downtrend and correction signals**\n- Weekly below 157 confirms monthly downtrend\n- Weekly above 1330 confirms uptrend potential\n\n**Bitcoin price correction analysis**\n- Andreas Palm is analyzing SAB.\n- Andreas Palm is analyzing EDIT.\n- MG semiconductors show weekly local highs.\n\n**Bitcoin's short-term consolidation and potential breakdown**\n- David Murphy asks about Nvidia's price action.\n- Andrew Plus inquires about IBM's investment suitability.\n\n**higher lows forming in summer**\n- Dead Reckoning sees C A R weekly and daily reversal progress\n- Dead Reckoning expects C A R to break through and rise to 7580 bucks\n\n**Bitcoin price correction potential**\n- Luffy notes Bitcoin needs to hold 200 simple on daily timeframe.\n- Luffy predicts Bitcoin may break down from current position.\n- Luffy expects Bitcoin to finish below 200 simple.\n\n**Bitcoin's second failed bounce**\n- ZTS monthly and weekly retirement buy is risky\n- RGTI Regetti shows consolidation potential\n\n**Bitcoin's short-term downside risks**\n- LS1's view: $315 invalidation point if below yesterday's low\n- Zenotra: SpaceX IPO not my game\n- Mr. Cowboy NZ: downside targets 184-185 region\n\n**Bitcoin's downside targets and reversal signs**\n- Weekly rejection at $58 confirms bearish momentum\n- Monthly low at $46.5 indicates potential correction\n- Higher lows suggest bullish bias if above last week's low\n\n**Bitcoin's upside potential and bearish evidence**\n- Mr. Cowboy NZ's agents have made no trades recently.\n- Tyler Dur's analysis suggests RIVN faces a rejective lower high.\n\n**Bitcoin bearish divergence and consolidation**\n- Monthly closes above $60 signal potential all-time highs.\n\n**Bitcoin's second failed bounce in two weeks**\n- Ethereum remains unaffected by analyst predictions\n- Bitcoin's 2025 low approaches 1370-1380 range\n- Uniswap ranked 16th on CMC, not Chainlink\n\n**Rain token valuation and market positioning**\n- Rain is undervalued compared to other memecoins.\n- Rain's chart shows potential for new highs in June.\n\n**Bitcoin market analysis and positioning**\n- Mr. Escobar says URG closes Friday at 162.\n- Mr. Escobar's upside target is $2 on a weekly close.\n- Andrew Plus expects CLF to extend towards $14.\n\n**shitcoin**\n- SPY and NASDAQ are pulling back\n- shitcoin is a down only chart"
+  },
+  "video" : {
+    "channel" : "Krown",
+    "cueCount" : 3327,
+    "duration" : "1:56:16",
+    "durationSeconds" : 6976,
+    "id" : "WsCf_rCJxnM",
+    "sourceURL" : "https://www.youtube.com/watch?v=WsCf_rCJxnM",
+    "title" : "Bitcoin's Second Failed Bounce in Two Weeks — Targets Lower.",
+    "transcriptCharacters" : 153301
+  }
+}

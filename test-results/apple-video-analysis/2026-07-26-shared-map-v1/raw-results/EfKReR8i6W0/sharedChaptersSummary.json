@@ -1,0 +1,53 @@
+{
+  "approach" : "sharedChaptersSummary",
+  "elapsedSeconds" : 58.552810667000003,
+  "response" : {
+    "chaptersText" : "00:00 War on Iran intensifying\n03:34 Iran targets expanding globally\n08:35 Crisis dynamics shift\n17:22 Political treachery in NDAA\n26:30 Nuclear escalation risks\n30:38 Saudi nuclear program implications\n36:35 Alliance Stability and Rivalry\n47:37 Military ethics and oversight\n49:56 Military leadership and corruption",
+    "debug" : {
+      "chapterCandidateMap" : "L00002 | 00:08 | War on Iran intensifying\nL00016 | 03:34 | Iran targets expanding globally\nL00036 | 08:35 | Crisis dynamics shift\nL00043 | 10:21 | Commodity flow disruption\nL00072 | 17:22 | Political treachery in NDAA\nL00078 | 18:48 | Midterms intensifying political divisions\nL00110 | 26:30 | Nuclear escalation risks\nL00126 | 30:38 | Saudi nuclear program implications\nL00150 | 36:35 | Alliance Stability and Rivalry\nL00158 | 38:30 | Status Quo and Global Discontent\nL00196 | 47:37 | Military ethics and oversight\nL00204 | 49:56 | Military leadership and corruption\nL00210 | 51:36 | Future of European Stability\nL00211 | 51:52 | Optimism About US Military",
+      "chapterCandidates" : 14,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 9,
+      "chunks" : 7,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 7,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 17081,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "Colonel Wilkerson assesses Iranian resolve and strategic shifts.\nIran's targeting of Red Sea oil infrastructure.\n60% of global commodities pass through Red Sea.\nChina's satellite aiding Iranian targeting.\nJonathan Pard's treason legalizing intelligence sharing with Israel\nDonald Trump facing defeat in Republican primaries\nRubio's list of communists including Amy Goodman and Ben Cohen\nIran is waiting for the ripe moment to build a nuclear weapon.\nChina and Russia are behind Iran's nuclear ambitions.\nUS alliances are increasingly viewed as vassal-like.\nGulf states may prioritize US proximity over national independence.\nUS military is used for domestic security instead of defense.\nMilitary culture lacks ethical oversight and transparency.\nWilkerson reflects on a half-century of service to a nation with systemic corruption.",
+      "mappedTopics" : "Iran-US conflict escalation\nIran crisis escalation\nIran crisis escalation\nnuclear weapons proliferation in the Middle East\nUS alliances and strategic adversaries\nUS military transformation and international cooperation\nUS military transformation and international cooperation",
+      "mapSequence" : "sequential",
+      "mode" : "sharedChaptersSummary",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 8,
+      "nativeTranscriptRedactions" : 3,
+      "outputTokens" : 1070,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "sharedVideoMapChunk=7,sharedVideoMapCompose=1",
+      "summaryDigestCount" : 7,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true,
+    "summaryText" : "The video outlines escalating tensions surrounding Iran, US alliances, and military transformation, with key figures and organizations playing central roles.\n\n**Iran-US conflict escalation**\n- Colonel Wilkerson assesses Iranian resolve and strategic shifts.\n\n**Iran crisis escalation**\n- Iran's targeting of Red Sea oil infrastructure.\n- 60% of global commodities pass through Red Sea.\n- China's satellite aiding Iranian targeting.\n\n**Nuclear weapons proliferation in the Middle East**\n- Iran is waiting for the ripe moment to build a nuclear weapon.\n- China and Russia are behind Iran's nuclear ambitions.\n\n**US alliances and strategic adversaries**\n- US alliances are increasingly viewed as vassal-like.\n- Gulf states may prioritize US proximity over national independence.\n\n**US military transformation and international cooperation**\n- US military is used for domestic security instead of defense.\n- Military culture lacks ethical oversight and transparency.\n- Wilkerson reflects on a half-century of service to a nation with systemic corruption.\n\n**Other developments**\n- Jonathan Pard's treason legalizing intelligence sharing with Israel.\n- Donald Trump facing defeat in Republican primaries.\n- Rubio's list of communists including Amy Goodman and Ben Cohen."
+  },
+  "video" : {
+    "channel" : "Glenn Diesen",
+    "cueCount" : 1237,
+    "duration" : "52:54",
+    "durationSeconds" : 3174,
+    "id" : "EfKReR8i6W0",
+    "sourceURL" : "https://www.youtube.com/watch?v=EfKReR8i6W0",
+    "title" : "Lawrence Wilkerson: Iran War Escalates Toward Global Crisis",
+    "transcriptCharacters" : 55820
+  }
+}

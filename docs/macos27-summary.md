@@ -2,6 +2,9 @@
 
 Last updated: 2026-07-24
 
+The internal Apple chapters and shared chapters+summary prototype is documented
+in `docs/apple-intelligence-video-map.md`.
+
 ## Product Decision
 
 The macOS 27 product exposes one local summary choice in the existing `Summary model` picker:

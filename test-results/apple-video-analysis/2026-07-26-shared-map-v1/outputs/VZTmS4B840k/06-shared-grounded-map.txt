@@ -1,0 +1,38 @@
+TOPICS
+AGI and agent integration
+agentic era trust and delegation
+agentic interface evolution
+model improvement and scaling challenges
+AI agent security and enterprise readiness
+frontier models and compute value
+AI in personalized medicine
+
+POINTS
+Greg Brockman discusses unifying chat GPT and coding tools.
+Greg Brockman emphasizes earned trust with AI systems.
+Greg Brockman discusses control over browser/computer by agents.
+reasoning models diagnose 20-year-long ailments
+models use peer-reviewed literature for diagnoses
+Large language models continue improving through more data and compute.
+Compute demand exceeds available capacity across industries
+OpenAI invests heavily in vertical supply chain integration
+Sadia Nadell views models as a commodity asset.
+Greg Brockman believes AI can improve health diagnostics.
+Greg Brockman cites 230 million weekly health queries using AI.
+Greg Brockman emphasizes AI's role in drug discovery for NF1.
+
+CHAPTER CANDIDATES
+L00001 | 00:00 | Fourth time on product direction
+L00028 | 05:22 | Agents transforming operations
+L00036 | 07:02 | Trust in AI systems
+L00040 | 07:48 | Agent control of devices
+L00070 | 14:04 | Early reasoning model applications
+L00080 | 16:19 | Shift from conversational intelligence
+L00105 | 21:24 | AI Model Progress Discussion
+L00110 | 22:36 | Scaling Laws and Implementation Issues
+L00140 | 28:46 | Compute Investment Strategy
+L00150 | 30:38 | AI Agent Security Initiative
+L00168 | 34:26 | Compute Value as Revenue Center
+L00177 | 36:13 | Competition Drives Model Improvement
+L00200 | 41:18 | AI in Health Diagnostics
+L00205 | 42:26 | AI in Medical Efficiency

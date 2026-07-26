@@ -1,0 +1,52 @@
+{
+  "approach" : "chaptersOnly",
+  "elapsedSeconds" : 37.560340167,
+  "response" : {
+    "chaptersText" : "00:00 Iran-US military confrontation begins\n04:02 US leaders address Iran's aggressive naval actions\n08:55 US casualties in Iran conflict\n15:06 US war against Iran escalates\n20:48 Cuban influence report\n26:29 US-Israel strategic choices\n28:09 JD Vance baby announcement",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:00 | Iran-US military confrontation begins\nL00020 | 04:02 | US leaders address Iran's aggressive naval actions\nL00045 | 08:55 | US casualties in Iran conflict\nL00046 | 09:10 | Congressman Ry's reaction to US deaths\nL00073 | 15:06 | US war against Iran escalates\nL00078 | 16:08 | China targets US election integrity\nL00100 | 20:48 | Cuban influence report\nL00127 | 26:29 | US-Israel strategic choices\nL00135 | 28:09 | JD Vance baby announcement",
+      "chapterCandidates" : 9,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 7,
+      "chunks" : 5,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 5,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 11945,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "US forces launched strikes against Iranian military capabilities\nIran attacked three US ships in the Strait of Hormuz\nTwo US service members killed defending against Iranian missile and drone attack on a base in Jordan.\nIran is capturing random Jews in Iran and putting them in jail.\nKen Clippenstein is accused of being a thirdworldest communist Cuban agent.\nJD Vance went to Tel Aviv for partying, not Gaza.\nDouble standards arise from perceived good/bad status of nations.",
+      "mappedTopics" : "Iran's military escalation against US bases\nIran's attack on US bases\nIran's ground invasion of US bases\nCuban influence on US citizens\nUS-Israel conflict moral framing",
+      "mapSequence" : "sequential",
+      "mode" : "chaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 5,
+      "nativeTranscriptRedactions" : 20,
+      "outputTokens" : 573,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "chapterMapChunk=5",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "Nux Taku",
+    "cueCount" : 857,
+    "duration" : "29:23",
+    "durationSeconds" : 1763,
+    "id" : "UvjW6qASU48",
+    "sourceURL" : "https://www.youtube.com/watch?v=UvjW6qASU48",
+    "title" : "Iran launches ground invasion of US bases. They got vaporized.",
+    "transcriptCharacters" : 38362
+  }
+}

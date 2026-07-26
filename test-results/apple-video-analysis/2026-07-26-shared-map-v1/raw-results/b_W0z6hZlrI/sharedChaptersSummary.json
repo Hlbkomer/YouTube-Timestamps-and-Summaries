@@ -1,0 +1,53 @@
+{
+  "approach" : "sharedChaptersSummary",
+  "elapsedSeconds" : 26.200614250000001,
+  "response" : {
+    "chaptersText" : "00:00 Odyssey launch and travel\n00:46 Controversial narrative and tone\n06:05 Casting and character impact\n07:11 Creative philosophy critique\n08:29 Character motivation dissonance",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:01 | Odyssey launch and travel\nL00004 | 00:46 | Controversial narrative and tone\nL00028 | 06:05 | Casting and character impact\nL00033 | 07:11 | Creative philosophy critique\nL00039 | 08:29 | Character motivation dissonance",
+      "chapterCandidates" : 5,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 5,
+      "chunks" : 2,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 2,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 5236,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "The movie is technically impressive and ambitiously framed.\nThe narrative uses flashbacks to reveal Troy's fall.\nMatt Damon's leadership leads to a cave trap with a cyclops.\nSurvivors encounter medieval space marines and a woman named Cersei.\nMatt Damon faces divine punishment and loses cattle.\nThe journey concludes in Ithaca after 20 years.\nAnne Hathaway's suitors pressure her to marry.\nThe film sparks controversy over casting choices.\nElliot Paige's portrayal is criticized as unrealistic.\nZenia's character is minimally present and irrelevant.\nJohn Leguisumo's casting is seen as awkward.\nThe film's reception mirrors past cultural debates.\nNolan's devotion to grounded tone robs the film of wonder.\nOdicius's decisions imply adventure but are emotionally detached.\nDialogue feels on the nose and clumsy.",
+      "mappedTopics" : "The Odyssey cinematic reception\ncreative philosophy and character agency",
+      "mapSequence" : "sequential",
+      "mode" : "sharedChaptersSummary",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 3,
+      "nativeTranscriptRedactions" : 16,
+      "outputTokens" : 653,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "sharedVideoMapChunk=2,sharedVideoMapCompose=1",
+      "summaryDigestCount" : 2,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true,
+    "summaryText" : "The Odyssey cinematic adaptation is met with mixed reactions, with technical achievements and narrative choices sparking debate over tone, agency, and representation.\n\n**Technical and Narrative Elements**\n- The movie is technically impressive and ambitiously framed.\n- The narrative uses flashbacks to reveal Troy's fall.\n- Matt Damon’s leadership leads to a cave trap with a cyclops.\n- Survivors encounter medieval space marines and a woman named Cersei.\n- Matt Damon faces divine punishment and loses cattle.\n- The journey concludes in Ithaca after 20 years.\n\n**Character and Casting Issues**\n- Anne Hathaway’s suitors pressure her to marry.\n- The film sparks controversy over casting choices.\n- Elliot Paige’s portrayal is criticized as unrealistic.\n- Zenia’s character is minimally present and irrelevant.\n- John Leguisumo’s casting is seen as awkward.\n\n**Creative and Thematic Reflections**\n- Nolan’s devotion to grounded tone robs the film of wonder.\n- Odicius’s decisions imply adventure but are emotionally detached.\n- Dialogue feels on the nose and clumsy."
+  },
+  "video" : {
+    "channel" : "The Critical Drinker",
+    "cueCount" : 332,
+    "duration" : "12:07",
+    "durationSeconds" : 727,
+    "id" : "b_W0z6hZlrI",
+    "sourceURL" : "https://www.youtube.com/watch?v=b_W0z6hZlrI",
+    "title" : "The Odyssey - A Disastrous Triumph",
+    "transcriptCharacters" : 14934
+  }
+}

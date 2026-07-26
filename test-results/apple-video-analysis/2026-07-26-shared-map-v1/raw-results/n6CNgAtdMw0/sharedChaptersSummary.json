@@ -1,0 +1,53 @@
+{
+  "approach" : "sharedChaptersSummary",
+  "elapsedSeconds" : 137.875111,
+  "response" : {
+    "chaptersText" : "00:00 Introduction to Ankolive vs Guskov\n06:36 Tamarov vs Ersk\n16:12 Dual vs Wellington Turman Analysis\n19:20 Doulattov's first-round advantage\n28:02 Kunayv vs Fortune matchup\n32:00 Kunai's Pace Concerns\n38:22 Vagav's takedown defense\n43:10 Peterson takedown strategy\n48:14 Card placement confusion\n51:46 Market betting analysis\n56:32 Patterson's Standing Advantages\n1:02:32 Top regional prospects\n1:14:58 Nuru Alivv vs Mike Davis\n1:18:02 Prospects and competition trends\n1:22:22 Hussein vs Gibson Matchup\n1:28:00 Weight Considerations",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:01 | Introduction to Ankolive vs Guskov\nL00031 | 06:36 | Tamarov vs Ersk\nL00074 | 16:12 | Dual vs Wellington Turman Analysis\nL00081 | 17:41 | Wellington Turman vs Doltov Matchup\nL00086 | 18:38 | Doulattov's reach advantage\nL00090 | 19:20 | Doulattov's first-round advantage\nL00120 | 25:00 | Advanced striker evaluation\nL00132 | 28:02 | Kunayv vs Fortune matchup\nL00144 | 30:19 | Kunai's Tactical Edge\nL00152 | 32:00 | Kunai's Pace Concerns\nL00181 | 38:22 | Vagav's takedown defense\nL00186 | 39:12 | Seig's cardio issues\nL00202 | 43:10 | Peterson takedown strategy\nL00210 | 44:45 | Walker submission threat\nL00227 | 48:14 | Card placement confusion\nL00235 | 49:53 | Experienced striker advantage\nL00245 | 51:46 | Market betting analysis\nL00265 | 56:32 | Patterson's Standing Advantages\nL00270 | 57:21 | Ponzanio's Durability Concerns\nL00294 | 1:02:32 | Top regional prospects\nL00297 | 1:03:06 | Key regional matchups\nL00320 | 1:08:12 | Prospect Analysis\nL00331 | 1:10:36 | Abu Dhabi Context\nL00353 | 1:14:58 | Nuru Alivv vs Mike Davis\nL00367 | 1:18:02 | Prospects and competition trends\nL00387 | 1:22:22 | Hussein vs Gibson Matchup\nL00392 | 1:23:26 | Regional Scene Competitiveness\nL00405 | 1:26:04 | Prospect Analysis\nL00414 | 1:28:00 | Weight Considerations",
+      "chapterCandidates" : 29,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 16,
+      "chunks" : 15,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 15,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 39764,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "Ankolive is a minus 550 favorite to win against Guskov.\nTamarov was as high as plus 135.\nErsk was inches away from winning a world title over Alexander Pantoia.\nDual's win condition is likely by decision.\nDual's shoulder injury affects fight readiness.\nDual's recent losses involve submission finishes.\nDoulattov has a 3-in reach advantage at 6'3 170 lbs.\nWellington Turman's conditioning is untested beyond first round.\nDoulattov is favored to finish in first round.\nZanukov's recovery pace is critical for this fight.\nSeeki has spent time with the Toporia training team.\nSeeki's takedown defense is a concern.\nKunai's defensive wrestling is 93% effective against top 15 heavyweights.\nFortune's cardio is suspect at 36 years old.\nKunai favors decisions despite standing cage control reliance.\nVagav's takedown defense is very strong.\nSeig struggles to establish control after takedowns.\nThomas Peterson has 87% takedown defense.\nWalter Valker tends to flop on leg locks.\nZion Williamson has large legs and a gimmick.\nJacobe has more experience than Muhammad Sai.\nJacobe trained at altitude for 15 minutes.\nMuhammad Sai is a UFC debutant.\nSam Patterson's 6'3, 78-inch reach makes 155 lbs reach implausible.\nSantiago Ponzanio's 39-year-old durability is diminishing after 16 months off.\nBomb Fiend shows early offense and pace.\nSolo lands clean strikes in early rounds.\nSolo shows durability issues in earlier fights.\nTukulov is a legitimate prospect with nine and one amateur record.\nNuru Alivv is a minus 230 favorite against Mike Davis.\nMike Davis struggled in offensive wrestling exchanges against Alivv.\nAbdul Hussein's wrestling is legit and pace is legit.\nAbdul Hussein's cardio is legit and striking is okay.\nAbdul Hussein is favored to win against Cody Gibson.\nCody Gibson has struggled with knockout losses.\nAbdul Hussein has faced regional-level opponents.",
+      "mappedTopics" : "Ankolive vs Guskov UFC Abu Dhabi\nTamarov vs Ersk\nWellington Turman vs Islam Dual\nDoulattov vs Wellington Turman matchup analysis\nZanukov vs Seeki\nKunai vs Fortune\nVagav vs Seig fight analysis\nPeterson vs Walker submission dynamics\nJacobe vs Muhammad Sai UFC debut\nSam Patterson vs Santiago Ponzanio\nSolo durability and fatigue concerns\nTukulov vs Machado\nNuru Alivv vs Mike Davis\nAbdul Hussein vs Cody Gibson\nAbdul Hussein vs Cody Gibson",
+      "mapSequence" : "sequential",
+      "mode" : "sharedChaptersSummary",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 16,
+      "nativeTranscriptRedactions" : 0,
+      "outputTokens" : 2624,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "sharedVideoMapChunk=15,sharedVideoMapCompose=1",
+      "summaryDigestCount" : 15,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true,
+    "summaryText" : "The video presents a series of fight analyses and predictions across various matchups, highlighting key factors such as reach, conditioning, injury status, and prior performance. Each segment focuses on specific fighters, organizations, and conditions that influence the outcome.\n\n**Ankolive vs Guskov UFC Abu Dhabi**\n- Ankolive is a minus 550 favorite to win.\n\n**Tamarov vs Ersk**\n- Tamarov was as high as plus 135.\n- Ersk was inches away from winning a world title over Alexander Pantoia.\n\n**Wellington Turman vs Islam Dual**\n- Dual's win condition is likely by decision.\n- Dual's shoulder injury affects fight readiness.\n- Dual's recent losses involve submission finishes.\n\n**Doulattov vs Wellington Turman matchup analysis**\n- Doulattov has a 3-in reach advantage at 6'3 170 lbs.\n- Wellington Turman's conditioning is untested beyond first round.\n- Doulattov is favored to finish in first round.\n\n**Zanukov vs Seeki**\n- Zanukov's recovery pace is critical for this fight.\n- Seeki has spent time with the Toporia training team.\n- Seeki's takedown defense is a concern.\n\n**Kunai vs Fortune**\n- Kunai's defensive wrestling is 93% effective against top 15 heavyweights.\n- Fortune's cardio is suspect at 36 years old.\n- Kunai favors decisions despite standing cage control reliance.\n\n**Vagav vs Seig fight analysis**\n- Vagav's takedown defense is very strong.\n- Seig struggles to establish control after takedowns.\n\n**Peterson vs Walker submission dynamics**\n- Thomas Peterson has 87% takedown defense.\n- Walter Valker tends to flop on leg locks.\n- Zion Williamson has large legs and a gimmick.\n\n**Jacobe vs Muhammad Sai UFC debut**\n- Jacobe has more experience than Muhammad Sai.\n- Jacobe trained at altitude for 15 minutes.\n- Muhammad Sai is a UFC debutant.\n\n**Sam Patterson vs Santiago Ponzanio**\n- Sam Patterson's 6'3, 78-inch reach makes 155 lbs reach implausible.\n- Santiago Ponzanio's 39-year-old durability is diminishing after 16 months off.\n\n**Solo durability and fatigue concerns**\n- Bomb Fiend shows early offense and pace.\n- Solo lands clean strikes in early rounds.\n- Solo shows durability issues in earlier fights.\n\n**Tukulov vs Machado**\n- Tukulov is a legitimate prospect with nine and one amateur record.\n\n**Nuru Alivv vs Mike Davis**\n- Nuru Alivv is a minus 230 favorite against Mike Davis.\n- Mike Davis struggled in offensive wrestling exchanges against Alivv.\n\n**Abdul Hussein vs Cody Gibson**\n- Abdul Hussein's wrestling is legit and pace is legit.\n- Abdul Hussein's cardio is legit and striking is okay.\n- Abdul Hussein is favored to win against Cody Gibson.\n- Cody Gibson has struggled with knockout losses.\n- Abdul Hussein has faced regional-level opponents."
+  },
+  "video" : {
+    "channel" : "Bookie Beatdown",
+    "cueCount" : 2634,
+    "duration" : "1:31:18",
+    "durationSeconds" : 5478,
+    "id" : "n6CNgAtdMw0",
+    "sourceURL" : "https://www.youtube.com/watch?v=n6CNgAtdMw0",
+    "title" : "UFC Abu Dhabi Picks, Bets, Props | Ankalaev vs Guskov Fight Previews, Predictions",
+    "transcriptCharacters" : 120667
+  }
+}

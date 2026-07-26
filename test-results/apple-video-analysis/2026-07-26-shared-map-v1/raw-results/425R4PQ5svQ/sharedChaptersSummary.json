@@ -1,0 +1,53 @@
+{
+  "approach" : "sharedChaptersSummary",
+  "elapsedSeconds" : 178.94480995800001,
+  "response" : {
+    "chaptersText" : "00:00 War with Iran: Strategic Shift\n07:19 Trump's second-term popularity\n12:47 Proxy warfare update\n24:31 Conventional Iranian capability revealed\n28:32 Democrats funding military equipment\n34:31 Mdani's failed invasion claims\n39:24 Netanyahu's legal stance\n47:04 Mandani's Arrest Discussions\n59:15 Military ties clarification\n1:07:30 NDA Act military merger\n1:11:53 Military Sharing Clarification\n1:15:39 Gil's Congressional Advocacy\n1:26:26 Hassan's extremist ideology revealed\n1:30:04 Young Democrats distance from Hassan\n1:36:29 Democratic party collapse\n1:40:04 Progressive taxation critique\n1:49:18 Hassan extremist rhetoric\n2:01:40 London crime data\n2:07:55 Film comparison: Odyssey vs Lord of the Rings\n2:14:53 Cultural critique of Odyssey",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:00 | War with Iran: Strategic Shift\nL00013 | 02:42 | President's aggressive rhetoric on Iran\nL00035 | 07:19 | Trump's second-term popularity\nL00041 | 08:28 | US-Lebanon aviation policy\nL00061 | 12:47 | Proxy warfare update\nL00064 | 13:22 | Saudi-Iran strategic realignment\nL00094 | 19:52 | Houthi threat escalation\nL00117 | 24:31 | Conventional Iranian capability revealed\nL00124 | 26:01 | Ortega's dictatorship and repression\nL00136 | 28:32 | Democrats funding military equipment\nL00163 | 34:31 | Mdani's failed invasion claims\nL00169 | 35:41 | Netanyahu's war crime accusations\nL00187 | 39:24 | Netanyahu's legal stance\nL00194 | 40:52 | Criticism of Netanyahu's silence\nL00224 | 47:04 | Mandani's Arrest Discussions\nL00245 | 51:19 | Rubio on ICC Limitations\nL00252 | 52:42 | ICC Authority Debate\nL00254 | 53:04 | Communist Influence Warning\nL00283 | 59:15 | Military ties clarification\nL00297 | 1:02:07 | Military merger controversy\nL00323 | 1:07:30 | NDA Act military merger\nL00326 | 1:08:08 | Congress NDAA vote\nL00342 | 1:11:53 | Military Sharing Clarification\nL00358 | 1:15:39 | Gil's Congressional Advocacy\nL00385 | 1:22:13 | Ideological References Discussion\nL00392 | 1:23:53 | ABA and Implicit Bias Debate\nL00405 | 1:26:26 | Hassan's extremist ideology revealed\nL00421 | 1:30:04 | Young Democrats distance from Hassan\nL00432 | 1:32:26 | Hassan extremist views\nL00449 | 1:36:29 | Democratic party collapse\nL00464 | 1:40:04 | Progressive taxation critique\nL00471 | 1:41:39 | Center-left responsibility discussion\nL00505 | 1:49:18 | Hassan extremist rhetoric\nL00517 | 1:52:08 | AI-generated Odyssey controversy\nL00527 | 1:54:11 | AI vs Hollywood competition\nL00560 | 2:01:40 | London crime data\nL00563 | 2:02:27 | UK demographic trends\nL00589 | 2:07:55 | Film comparison: Odyssey vs Lord of the Rings\nL00594 | 2:09:15 | Statistical manipulation in Rotten Tomatoes\nL00620 | 2:14:53 | Cultural critique of Odyssey\nL00622 | 2:15:21 | Discussion of censorship and personal restrictions",
+      "chapterCandidates" : 41,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 20,
+      "chunks" : 21,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 21,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 54518,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "Zoran Mani is declaring war on Israel.\nThe United States will bomb and destroy one bridge or power plant near Tehran.\nTrump's approval exceeds 80% among Republicans in second term.\nTrump criticized Houthi attacks on boats.\nSaudi Arabia is receiving US non-enriched nuclear energy.\nHouthi attacks threaten the Strait of Hormuz.\nHouthi control of mountain areas enables nuclear enrichment.\nSecretary Rubio's criticism of Ortega's dictatorship deepens repression.\nZoran Mdani lacks legal authority to invade Poland.\nZoran Mdani claimed to arrest Benjamin Netanyahu.\nNetanyahu is described as a war criminal.\nZoran Mandani argues Netanyahu should be arrested for ICC crimes.\nZoran Mandani is exploring arresting Netanyahu.\nRubio rejects ICC jurisdiction over non-members.\nRubio says ICC has no power here.\nShapiro signed artillery shells for Ukraine.\nHouse passed a bill to merge US and Israeli militaries.\nCongress voted to merge US military with Israel's.\nIDF has experience with terror tunnels.\nNDA Act includes section 219.\nNick's criticism of military merger with Israel.\nMilitary sharing is not a merger.\nNick struggles with anti-Semitic alliances.\nABA website states 'All of us have implicit biases'\nHassan supports Mao, a Chinese communist who murdered 60 million people\nHassan defends America deserved 911 multiple times\nHassan supports terrorism and extremist ideologies\nHassan supports pedophiles like Hamas and Hezbollah and Iran Islamic regime in Iran.\nHassan killed 40 to 60 million people estimated starving to death.\nHassan compares Trump to genocidal dictators and Hamas.\nHassan supports universal healthcare and four or five ways to achieve it.\nHassan opposes progressive taxation from the very rich.\nHassan equates terrorism with left-wing policies.\nHassan praised menacing politicians with AR-15 threats.\nAI is a competition to Hollywood's stranglehold on entertainment.\nLondon has an average of one rape every 53 seconds.\nThe majority of UK mayors are Muslim.\nOdyssey's 97% score is pushed by notification bias\nPoll data shows 56% positive ratings for Odyssey\nWoke narratives distort historical objectivity\nOdyssey criticizes Christopher Nolan's gender portrayal.\nFeminist rewrote Odyssey script to be gayer and more feminine.",
+      "mappedTopics" : "winning is awesome\nwinning over terrorism\nSaudi-Iran proxy conflict escalation\nHouthi attacks and strategic advantage\nUS military strategy and political accountability\nZoran Mdani's war rhetoric and Netanyahu allegations\nNetanyahu's legal predicament and criticism\nNetanyahu and ICC\nICC jurisdiction and American sovereignty\nmilitary merger legislation\nmilitary merger debate\nmilitary merger criticism\nimplicit biases and ideological references\nHassan's extremist political views\nHassan extremist views\nprogressive taxation and terrorism debate\nleftist extremism and threats\nHollywood vs AI competition\nUK crime statistics and cultural narratives\nOdyssey vs Lord of the Rings cultural debate\nOdyssey vs Lord of the Rings cultural debate",
+      "mapSequence" : "sequential",
+      "mode" : "sharedChaptersSummary",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 22,
+      "nativeTranscriptRedactions" : 112,
+      "outputTokens" : 3040,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "sharedVideoMapChunk=21,sharedVideoMapCompose=1",
+      "summaryDigestCount" : 21,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true,
+    "summaryText" : "The video outlines escalating geopolitical tensions, domestic policy developments, and cultural debates. The host discusses strategic military partnerships and legal challenges surrounding leadership accountability.\n\n**Geopolitical tensions**\n- Zoran Mdani is declaring war on Israel.\n- The United States will bomb and destroy one bridge or power plant near Tehran.\n- Trump criticized Houthi attacks on boats.\n- Saudi Arabia is receiving US non-enriched nuclear energy.\n- Houthi attacks threaten the Strait of Hormuz.\n- Houthi control of mountain areas enables nuclear enrichment.\n- Secretary Rubio's criticism of Ortega's dictatorship deepens repression.\n\n**Military and political developments**\n- Shapiro signed artillery shells for Ukraine.\n- House passed a bill to merge US and Israeli militaries.\n- Congress voted to merge US military with Israel's.\n- IDF has experience with terror tunnels.\n- NDA Act includes section 219.\n- Nick's criticism of military merger with Israel.\n- Military sharing is not a merger.\n- Nick struggles with anti-Semitic alliances.\n\n**Leadership and legal issues**\n- Zoran Mdani lacks legal authority to invade Poland.\n- Zoran Mdani claimed to arrest Benjamin Netanyahu.\n- Netanyahu is described as a war criminal.\n- Zoran Mandani argues Netanyahu should be arrested for ICC crimes.\n- Zoran Mandani is exploring arresting Netanyahu.\n- Rubio rejects ICC jurisdiction over non-members.\n- Rubio says ICC has no power here.\n\n**Ideological and cultural controversies**\n- Hassan supports Mao, a Chinese communist who murdered 60 million people.\n- Hassan defends America deserved 911 multiple times.\n- Hassan supports terrorism and extremist ideologies.\n- Hassan supports pedophiles like Hamas and Hezbollah and Iran Islamic regime in Iran.\n- Hassan killed 40 to 60 million people estimated starving to death.\n- Hassan compares Trump to genocidal dictators and Hamas.\n- Hassan supports universal healthcare and four or five ways to achieve it.\n- Hassan opposes progressive taxation from the very rich.\n- Hassan equates terrorism with left-wing policies.\n- Hassan praises menacing politicians with AR-15 threats.\n- AI is a competition to Hollywood's stranglehold on entertainment.\n- Odyssey's 97% score is pushed by notification bias.\n- Poll data shows 56% positive ratings for Odyssey.\n- Woke narratives distort historical objectivity.\n- Odyssey criticizes Christopher Nolan's gender portrayal.\n- Feminist rewrote Odyssey script to be gayer and more feminine."
+  },
+  "video" : {
+    "channel" : "Nuxanor",
+    "cueCount" : 3985,
+    "duration" : "2:17:04",
+    "durationSeconds" : 8224,
+    "id" : "425R4PQ5svQ",
+    "sourceURL" : "https://www.youtube.com/watch?v=425R4PQ5svQ",
+    "title" : "FAIRNESS IS IRRELEVANT... ONLY VICTORY MATTERS.",
+    "transcriptCharacters" : 180141
+  }
+}
