@@ -12,10 +12,10 @@ const rawRoot = path.join(root, "raw-results");
 const outputRoot = path.join(root, "outputs");
 fs.mkdirSync(outputRoot, { recursive: true });
 
-function load(videoID, approach) {
+function load(folderName, approach) {
   return JSON.parse(
     fs.readFileSync(
-      path.join(rawRoot, videoID, `${approach}.json`),
+      path.join(rawRoot, folderName, `${approach}.json`),
       "utf8",
     ),
   );
@@ -36,15 +36,16 @@ function writeText(filePath, text) {
 
 const rows = [];
 for (const video of manifest) {
-  const chaptersOnly = load(video.id, "chaptersOnly");
-  const separate = load(video.id, "separate");
-  const shared = load(video.id, "sharedChaptersSummary");
+  const folderName = video.folderName || video.id;
+  const chaptersOnly = load(folderName, "chaptersOnly");
+  const separate = load(folderName, "separate");
+  const shared = load(folderName, "sharedChaptersSummary");
   const chapterResponse = chaptersOnly.response;
   const separateResponse = separate.response;
   const separateChapterResponse = separateResponse.chapters || {};
   const separateSummaryResponse = separateResponse.summary || {};
   const sharedResponse = shared.response;
-  const videoOutputRoot = path.join(outputRoot, video.id);
+  const videoOutputRoot = path.join(outputRoot, folderName);
 
   writeText(
     path.join(videoOutputRoot, "01-chapters-only.txt"),
@@ -93,6 +94,7 @@ for (const video of manifest) {
 
   rows.push({
     id: video.id,
+    folderName,
     title: video.title,
     duration: video.duration,
     chapterOnlyOK: chapterResponse.ok === true,
@@ -172,7 +174,7 @@ const tableRows = rows.map((row) => {
   const speedup = row.speedupPercent == null
     ? "n/a"
     : `${row.speedupPercent.toFixed(1)}%`;
-  return `| ${row.id} | ${row.duration} | ${row.chapterCount} | ${separateLabel} | ${sharedLabel} | ${speedup} | ${row.separateSummaryCharacters} | ${row.sharedSummaryCharacters} |`;
+  return `| ${row.folderName} | ${row.duration} | ${row.chapterCount} | ${separateLabel} | ${sharedLabel} | ${speedup} | ${row.separateSummaryCharacters} | ${row.sharedSummaryCharacters} |`;
 });
 
 const comparison = `# Apple Intelligence shared video-map comparison
@@ -192,7 +194,7 @@ ${tableRows.join("\n")}
 - Shared used ${comparableSharedCalls} model calls versus ${comparableSeparateCalls}: ${comparableSeparateCalls - comparableSharedCalls} fewer calls
 - The separate path failed on 425R4PQ5svQ because the existing adaptive summary repeatedly returned model-internal \`TOOL CALL\` text on chunk 15 of 15. The shared compact map succeeded on the same transcript.
 
-See \`outputs/<video-id>/\` for the readable chapters, summaries, and grounded shared map. See \`raw-results/<video-id>/\` for complete response metadata.
+See \`outputs/<number-description-video-id>/\` for the readable chapters, summaries, and grounded shared map. See \`raw-results/<number-description-video-id>/\` for complete response metadata.
 `;
 fs.writeFileSync(path.join(root, "comparison.md"), comparison, "utf8");
 process.stdout.write(`${comparison}\n`);

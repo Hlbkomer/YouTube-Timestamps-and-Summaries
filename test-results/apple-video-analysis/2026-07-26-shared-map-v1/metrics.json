@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-26T00:25:33.108Z",
+  "generatedAt": "2026-07-26T01:23:45.778Z",
   "implementation": "shared-map-v1-compact-candidates",
   "success": {
     "chaptersOnly": 10,
@@ -20,6 +20,7 @@
   "rows": [
     {
       "id": "b_W0z6hZlrI",
+      "folderName": "01-movie-review-b_W0z6hZlrI",
       "title": "The Odyssey - A Disastrous Triumph",
       "duration": "12:07",
       "chapterOnlyOK": true,
@@ -40,6 +41,7 @@
     },
     {
       "id": "VZTmS4B840k",
+      "folderName": "02-openai-interview-VZTmS4B840k",
       "title": "OpenAI President Greg Brockman: Our Plan To Merge Chat And Agents",
       "duration": "44:40",
       "chapterOnlyOK": true,
@@ -60,6 +62,7 @@
     },
     {
       "id": "WsCf_rCJxnM",
+      "folderName": "03-crypto-WsCf_rCJxnM",
       "title": "Bitcoin's Second Failed Bounce in Two Weeks — Targets Lower.",
       "duration": "1:56:16",
       "chapterOnlyOK": true,
@@ -80,6 +83,7 @@
     },
     {
       "id": "Z1sUt6gAbUg",
+      "folderName": "04-news-Z1sUt6gAbUg",
       "title": "'CLOUDED IN MYSTERY': Hidden Iran facility fuels new Trump warning",
       "duration": "3:47",
       "chapterOnlyOK": true,
@@ -100,6 +104,7 @@
     },
     {
       "id": "UvjW6qASU48",
+      "folderName": "05-lux-UvjW6qASU48",
       "title": "Iran launches ground invasion of US bases. They got vaporized.",
       "duration": "29:23",
       "chapterOnlyOK": true,
@@ -120,6 +125,7 @@
     },
     {
       "id": "n6CNgAtdMw0",
+      "folderName": "06-mma-betting-n6CNgAtdMw0",
       "title": "UFC Abu Dhabi Picks, Bets, Props | Ankalaev vs Guskov Fight Previews, Predictions",
       "duration": "1:31:18",
       "chapterOnlyOK": true,
@@ -140,6 +146,7 @@
     },
     {
       "id": "EfKReR8i6W0",
+      "folderName": "07-politics-EfKReR8i6W0",
       "title": "Lawrence Wilkerson: Iran War Escalates Toward Global Crisis",
       "duration": "52:54",
       "chapterOnlyOK": true,
@@ -160,6 +167,7 @@
     },
     {
       "id": "Lb_1d68vx-g",
+      "folderName": "08-joe-rogan-Lb_1d68vx-g",
       "title": "Joe Rogan Experience #2479 - Bob Lazar & Luigi Vendittelli",
       "duration": "2:59:38",
       "chapterOnlyOK": true,
@@ -180,6 +188,7 @@
     },
     {
       "id": "CMQwmnd3Ak8",
+      "folderName": "09-asmongold-hasan-commentary-CMQwmnd3Ak8",
       "title": "Asmongold’s Girlfriend Just Destroyed Hasan..",
       "duration": "34:30",
       "chapterOnlyOK": true,
@@ -200,6 +209,7 @@
     },
     {
       "id": "425R4PQ5svQ",
+      "folderName": "10-nuxanor-commentary-425R4PQ5svQ",
       "title": "FAIRNESS IS IRRELEVANT... ONLY VICTORY MATTERS.",
       "duration": "2:17:04",
       "chapterOnlyOK": true,

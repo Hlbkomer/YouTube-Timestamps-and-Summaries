@@ -2,6 +2,7 @@ import Foundation
 
 private struct ManifestVideo: Decodable {
     let id: String
+    let folderName: String
     let title: String
     let channel: String
     let durationSeconds: Int
@@ -79,7 +80,7 @@ struct AppleVideoAnalysisRunner {
                 encoding: .utf8
             )
             let videoOutputURL = outputRootURL.appendingPathComponent(
-                video.id,
+                video.folderName,
                 isDirectory: true
             )
             try FileManager.default.createDirectory(
