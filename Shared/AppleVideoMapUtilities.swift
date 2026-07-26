@@ -19,7 +19,8 @@ nonisolated enum AppleVideoMapUtilities {
         anchorSeconds: [String: Int],
         includeSummaryPoints: Bool,
         maximumPoints: Int = 3,
-        maximumChapters: Int = 3
+        maximumChapters: Int = 3,
+        discardInvalidChapters: Bool = false
     ) -> Digest? {
         guard let expression = try? NSRegularExpression(
             pattern: #"^(TOPIC|POINT|CHAPTER|HANDOFF)\s*:\s*(.+)$"#,
@@ -76,7 +77,8 @@ nonisolated enum AppleVideoMapUtilities {
                 anchorSeconds: anchorSeconds,
                 includeSummaryPoints: includeSummaryPoints,
                 maximumPoints: maximumPoints,
-                maximumChapters: maximumChapters
+                maximumChapters: maximumChapters,
+                discardInvalidChapters: discardInvalidChapters
             )
         }
 
@@ -120,6 +122,9 @@ nonisolated enum AppleVideoMapUtilities {
                 let seconds = anchorSeconds[anchorID],
                 isUsableTitle(title)
             else {
+                if discardInvalidChapters {
+                    continue
+                }
                 return nil
             }
             chapters.append(
@@ -144,7 +149,8 @@ nonisolated enum AppleVideoMapUtilities {
         anchorSeconds: [String: Int],
         includeSummaryPoints: Bool,
         maximumPoints: Int,
-        maximumChapters: Int
+        maximumChapters: Int,
+        discardInvalidChapters: Bool
     ) -> Digest? {
         guard
             let firstBrace = text.firstIndex(of: "{"),
@@ -219,6 +225,9 @@ nonisolated enum AppleVideoMapUtilities {
                     anchorSeconds: anchorSeconds
                 )
             else {
+                if discardInvalidChapters {
+                    continue
+                }
                 return nil
             }
             chapters.append(chapter)
@@ -370,7 +379,8 @@ nonisolated enum AppleVideoMapUtilities {
         return !title.isEmpty
             && title.count <= 90
             && words.count <= 12
-            && title.range(of: #"[.!?]"#, options: .regularExpression) == nil
+            && title.range(of: #"[!?]"#, options: .regularExpression) == nil
+            && !title.hasSuffix(".")
             && !sentenceLikeStarts.contains { lowercasedTitle.hasPrefix($0) }
     }
 

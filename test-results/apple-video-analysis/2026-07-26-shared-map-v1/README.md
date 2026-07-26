@@ -5,7 +5,7 @@ This folder contains the internal ten-video comparison described in `docs/apple-
 - `comparison.md`: concise timing and success table.
 - `metrics.json`: machine-readable aggregate and per-video metrics.
 - `manifest.json`: the ten-video corpus.
-- `outputs/<number-description-video-id>/`: readable chapters, separate/shared summaries, and the shared grounded map. See `outputs/README.md` for the six-file legend.
+- `outputs/<number-description-video-id>/`: readable chapters, separate/shared summaries, and the shared grounded map. See `outputs/README.md` for the seven-file legend.
 - `raw-results/<number-description-video-id>/`: complete response and debug payloads.
 - `sources/`: the two additional transcripts fetched for this run. The other eight reuse the stored provider-test corpus through manifest-relative paths.
 
@@ -16,6 +16,12 @@ The separate approach is:
 The shared approach is:
 
 `one anchored transcript map -> deterministic chapters + summary composition`
+
+The lean standalone chapter approach is:
+
+`one anchored transcript pass -> topics + chapter candidates + handoffs`
+
+It does not extract summary points and is the intended Apple-chapters path when the summary comes from Grok or ChatGPT.
 
 All generation ran locally on the same M1 Max machine.
 

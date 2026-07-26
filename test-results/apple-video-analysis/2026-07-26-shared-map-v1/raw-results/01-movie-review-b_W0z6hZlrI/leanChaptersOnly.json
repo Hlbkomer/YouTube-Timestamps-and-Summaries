@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 14.959515541,
+  "response" : {
+    "chaptersText" : "00:00 Long wait for home\n08:42 Traumatized veteran's quest\n10:18 Dialogue issues and character performance",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:01 | Long wait for home\nL00003 | 00:31 | Controversial 2026 film\nL00040 | 08:42 | Traumatized veteran's quest\nL00048 | 10:18 | Dialogue issues and character performance",
+      "chapterCandidates" : 4,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 3,
+      "chunks" : 2,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 2,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 4512,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "The Odyssey's divisive reception\nThe protagonist's emotional state and narrative direction",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 2,
+      "nativeTranscriptRedactions" : 16,
+      "outputTokens" : 180,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=2",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "The Critical Drinker",
+    "cueCount" : 332,
+    "duration" : "12:07",
+    "durationSeconds" : 727,
+    "id" : "b_W0z6hZlrI",
+    "sourceURL" : "https://www.youtube.com/watch?v=b_W0z6hZlrI",
+    "title" : "The Odyssey - A Disastrous Triumph",
+    "transcriptCharacters" : 14934
+  }
+}

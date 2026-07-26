@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 36.896961458,
+  "response" : {
+    "chaptersText" : "00:00 Asmongold's girlfriend conflict\n09:43 QTCinderella defends Asmongold\n11:24 Ksi defends Asmongold publicly\n15:58 9/11 display and framing discussion\n24:16 Hasan's death threats discussion\n31:13 Destiny's bans and threats",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:00 | Asmongold's girlfriend conflict\nL00045 | 09:43 | QTCinderella defends Asmongold\nL00053 | 11:24 | Ksi defends Asmongold publicly\nL00073 | 15:58 | 9/11 display and framing discussion\nL00075 | 16:25 | 9/11 display interpretation\nL00111 | 24:16 | Hasan's death threats discussion\nL00112 | 24:24 | Hasan's threats and memes\nL00148 | 31:13 | Destiny's bans and threats\nL00153 | 32:13 | Restraining order justification",
+      "chapterCandidates" : 9,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 6,
+      "chunks" : 5,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 5,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 13571,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "Asmongold's girlfriend drama\nQTCinderella defends Asmongold from Stavros\nHasan's 9/11 display and associated controversies\nHasan extremism and threats\nDestiny vs Hasan conflict",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 5,
+      "nativeTranscriptRedactions" : 58,
+      "outputTokens" : 425,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=5",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "MorePegasus",
+    "cueCount" : 1077,
+    "duration" : "34:30",
+    "durationSeconds" : 2070,
+    "id" : "CMQwmnd3Ak8",
+    "sourceURL" : "https://www.youtube.com/watch?v=CMQwmnd3Ak8",
+    "title" : "Asmongold’s Girlfriend Just Destroyed Hasan..",
+    "transcriptCharacters" : 45705
+  }
+}

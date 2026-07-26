@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 39.646780583000002,
+  "response" : {
+    "chaptersText" : "00:00 War on Iran intensifying\n10:41 Railroads threaten global economy\n12:59 Trump's strategic entrapment\n21:00 US accountability crisis\n31:34 US aggression toward Iran\n33:57 US hatred for Iran\n44:43 Global cooperation needed for crises",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:00 | War on Iran intensifying\nL00045 | 10:41 | Railroads threaten global economy\nL00054 | 12:59 | Trump's strategic entrapment\nL00088 | 21:00 | US accountability crisis\nL00091 | 21:50 | Ukraine-Iran regional mess\nL00130 | 31:34 | US aggression toward Iran\nL00139 | 33:57 | US hatred for Iran\nL00184 | 44:43 | Global cooperation needed for crises\nL00192 | 46:36 | Historical patterns of war and institutions",
+      "chapterCandidates" : 9,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 7,
+      "chunks" : 5,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 5,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 14828,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "Iran-US conflict escalates\nUS-Iran conflict escalation\nIran nuclear escalation\nUS-Iran conflict escalation\nmilitary transformation and geopolitical shifts",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 5,
+      "nativeTranscriptRedactions" : 3,
+      "outputTokens" : 381,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=5",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "Glenn Diesen",
+    "cueCount" : 1237,
+    "duration" : "52:54",
+    "durationSeconds" : 3174,
+    "id" : "EfKReR8i6W0",
+    "sourceURL" : "https://www.youtube.com/watch?v=EfKReR8i6W0",
+    "title" : "Lawrence Wilkerson: Iran War Escalates Toward Global Crisis",
+    "transcriptCharacters" : 55820
+  }
+}

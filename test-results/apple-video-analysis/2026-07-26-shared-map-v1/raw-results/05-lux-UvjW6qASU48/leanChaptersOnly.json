@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 30.324087040999999,
+  "response" : {
+    "chaptersText" : "00:00 Trump's military strategy against Iran\n07:31 analysis of US-China election fraud\n08:55 US service members killed in Iran conflict\n19:55 Cuban Espionage and Leftism\n24:18 Civil war on the left",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:00 | Trump's military strategy against Iran\nL00002 | 00:15 | Iran's directive to US military leaders\nL00038 | 07:31 | analysis of US-China election fraud\nL00045 | 08:55 | US service members killed in Iran conflict\nL00096 | 19:55 | Cuban Espionage and Leftism\nL00101 | 21:02 | Cuban Influence on Americans\nL00117 | 24:18 | Civil war on the left\nL00120 | 24:53 | Revolution against Western civilization",
+      "chapterCandidates" : 8,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 5,
+      "chunks" : 4,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 4,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 11101,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "Iran's military capabilities and US response\ngeopolitical analysis of US-China tensions\nThird Worldism and Cuban Espionage\nWestern civilization collapse",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 4,
+      "nativeTranscriptRedactions" : 20,
+      "outputTokens" : 334,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=4",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "Nux Taku",
+    "cueCount" : 857,
+    "duration" : "29:23",
+    "durationSeconds" : 1763,
+    "id" : "UvjW6qASU48",
+    "sourceURL" : "https://www.youtube.com/watch?v=UvjW6qASU48",
+    "title" : "Iran launches ground invasion of US bases. They got vaporized.",
+    "transcriptCharacters" : 38362
+  }
+}

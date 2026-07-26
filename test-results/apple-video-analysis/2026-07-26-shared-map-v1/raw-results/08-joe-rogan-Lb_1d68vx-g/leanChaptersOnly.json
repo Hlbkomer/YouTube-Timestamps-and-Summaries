@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 160.73832633399999,
+  "response" : {
+    "chaptersText" : "00:00 Introduction to S-4 recreation\n09:17 Lazar's 1989 claims\n18:22 Propulsion system challenges\n34:27 Project location uncertainty\n39:56 Tim Burchett classified topic\n50:50 Discussion with Luigi about questions\n1:04:13 Technological advancement trend\n1:16:18 Nuclear weapons and UFOs\n1:24:36 AI and exponential change\n1:36:15 Lunar reactor explanation\n1:44:21 115 material properties discussion\n1:53:40 Particle collider dimensions\n2:03:20 Oldest massive monuments\n2:11:43 Ark of the Covenant mystery\n2:19:48 dangerous technology\n2:31:24 Craft's darkness contradicts model\n2:38:48 S4 interior observations\n2:46:23 Lazar's pictures and skepticism\n2:52:57 Google Earth filter error\n2:57:32 secret government project",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:01 | Introduction to S-4 recreation\nL00002 | 00:21 | AI and Blender use in reconstruction\nL00036 | 09:17 | Lazar's 1989 claims\nL00045 | 11:08 | Gene Huff's involvement confirmed\nL00073 | 18:22 | Propulsion system challenges\nL00079 | 19:43 | Scientific collaboration restrictions\nL00140 | 34:27 | Project location uncertainty\nL00142 | 34:56 | budget constraints\nL00163 | 39:56 | Tim Burchett classified topic\nL00164 | 40:14 | Disclosure of classified info\nL00207 | 50:50 | Discussion with Luigi about questions\nL00210 | 51:29 | Navy involvement in unidentified phenomena\nL00262 | 1:04:13 | Technological advancement trend\nL00266 | 1:05:08 | Focus on technological progress\nL00280 | 1:08:24 | AI poses existential threat\nL00314 | 1:16:18 | Nuclear weapons and UFOs\nL00322 | 1:18:20 | Betty and Barney Hill map\nL00347 | 1:24:36 | AI and exponential change\nL00352 | 1:25:53 | AI and human obsolescence\nL00392 | 1:36:15 | Lunar reactor explanation\nL00424 | 1:44:21 | 115 material properties discussion\nL00432 | 1:46:15 | Gary Nolan's crash site research\nL00462 | 1:53:40 | Particle collider dimensions\nL00471 | 1:55:38 | Labyrinth with Tic Tac object\nL00505 | 2:03:20 | Oldest massive monuments\nL00514 | 2:05:14 | Ancient Peru research\nL00544 | 2:11:43 | Ark of the Covenant mystery\nL00578 | 2:19:48 | dangerous technology\nL00591 | 2:22:56 | Dennis\nL00627 | 2:31:24 | Craft's darkness contradicts model\nL00633 | 2:33:03 | Reverse flag visibility issue\nL00656 | 2:38:48 | S4 interior observations\nL00666 | 2:41:07 | 1941 map anomalies\nL00688 | 2:46:23 | Lazar's pictures and skepticism\nL00718 | 2:52:57 | Google Earth filter error\nL00736 | 2:57:15 | alien evidence disclosure\nL00737 | 2:57:32 | secret government project",
+      "chapterCandidates" : 37,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 20,
+      "chunks" : 20,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 20,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 58446,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "AI recreation of S-4 experiences\nBob Lazar's alien technology claims\nPropulsion system and material analysis\nengineered origin of humanity\nTim Burchett classified information\nalien contact and government cover-ups\ntechnology and innovation\nAI and human survival\nUFOs and advanced civilizations\nAI and technological transformation\nelement 115 propulsion\nelement 115 metallurgy analysis\nEgyptian underground structures and advanced technology\nAncient construction mysteries\nancient technology and time manipulation\nancient technology\nLazar's craft lighting and visibility\nS4 location verification\nLazar, Lazar, and Google Earth filter anomalies\nalien spacecraft evidence",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 20,
+      "nativeTranscriptRedactions" : 1,
+      "outputTokens" : 1564,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=20",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "PowerfulJRE",
+    "cueCount" : 4948,
+    "duration" : "2:59:38",
+    "durationSeconds" : 10778,
+    "id" : "Lb_1d68vx-g",
+    "sourceURL" : "https://www.youtube.com/watch?v=Lb_1d68vx-g",
+    "title" : "Joe Rogan Experience #2479 - Bob Lazar & Luigi Vendittelli",
+    "transcriptCharacters" : 208961
+  }
+}

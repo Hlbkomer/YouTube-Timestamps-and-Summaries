@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 45.973887167000001,
+  "response" : {
+    "chaptersText" : "00:00 Fourth time discussing product direction\n08:17 new agent capability\n17:04 Agentic form factor rethinking\n25:20 Compute-driven market dynamics\n33:42 Market growth and revenue\n35:36 Compute value and market dynamics\n41:37 AI improves health diagnostics",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:00 | Fourth time discussing product direction\nL00005 | 00:51 | Zooming out to AGI and conversational intelligence\nL00042 | 08:17 | new agent capability\nL00045 | 08:53 | slack integration\nL00083 | 17:04 | Agentic form factor rethinking\nL00090 | 18:24 | Bidirectional voice models goal\nL00122 | 25:20 | Compute-driven market dynamics\nL00127 | 26:20 | Intelligence as multi-domain priority\nL00164 | 33:42 | Market growth and revenue\nL00174 | 35:36 | Compute value and market dynamics\nL00201 | 41:37 | AI improves health diagnostics\nL00205 | 42:26 | AI reduces diagnostic errors",
+      "chapterCandidates" : 12,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 7,
+      "chunks" : 6,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 6,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 16480,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "Unified AI product direction and agent integration\nagents\nagents, OpenAI\ncompute constraints and differentiation\nAI in enterprise transformation\nAI in personalized medicine",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 6,
+      "nativeTranscriptRedactions" : 0,
+      "outputTokens" : 478,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=6",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "Alex Kantrowitz",
+    "cueCount" : 1303,
+    "duration" : "44:40",
+    "durationSeconds" : 2680,
+    "id" : "VZTmS4B840k",
+    "sourceURL" : "https://www.youtube.com/watch?v=VZTmS4B840k",
+    "title" : "OpenAI President Greg Brockman: Our Plan To Merge Chat And Agents",
+    "transcriptCharacters" : 58907
+  }
+}

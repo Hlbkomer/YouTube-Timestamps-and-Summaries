@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 4.4824931250000004,
+  "response" : {
+    "chaptersText" : "00:00 Trump on Iran nuclear pledge",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:00 | Trump on Iran nuclear pledge\nL00003 | 00:26 | Deal readiness and ambiguity",
+      "chapterCandidates" : 2,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 1,
+      "chunks" : 1,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 1,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 1549,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "Iran nuclear threat and military strategy",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 1,
+      "nativeTranscriptRedactions" : 0,
+      "outputTokens" : 79,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=1",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "Fox News",
+    "cueCount" : 105,
+    "duration" : "3:47",
+    "durationSeconds" : 227,
+    "id" : "Z1sUt6gAbUg",
+    "sourceURL" : "https://www.youtube.com/watch?v=Z1sUt6gAbUg",
+    "title" : "'CLOUDED IN MYSTERY': Hidden Iran facility fuels new Trump warning",
+    "transcriptCharacters" : 4399
+  }
+}

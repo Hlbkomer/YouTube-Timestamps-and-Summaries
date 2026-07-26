@@ -233,6 +233,58 @@ struct YouTube_Timestamps_and_SummariesTests {
         ) == nil)
     }
 
+    @Test func appleVideoMapLeanTransportRejectsUnusedSummaryPoints() {
+        #expect(AppleVideoMapUtilities.parseDigest(
+            """
+            {"topic":"Model comparison","chapters":[["L0001","Opening Comparison"]],"handoff":"performance results"}
+            """,
+            anchorSeconds: ["L0001": 0],
+            includeSummaryPoints: false,
+            maximumPoints: 0
+        )?.points.isEmpty == true)
+
+        #expect(AppleVideoMapUtilities.parseDigest(
+            """
+            {"topic":"Model comparison","points":["A summary point that should not be generated."],"chapters":[["L0001","Opening Comparison"]],"handoff":"performance results"}
+            """,
+            anchorSeconds: ["L0001": 0],
+            includeSummaryPoints: false,
+            maximumPoints: 0
+        ) == nil)
+    }
+
+    @Test func appleVideoMapChapterTitlesAllowInternalAbbreviations() {
+        #expect(AppleVideoMapUtilities.isUsableTitle(
+            "Machado vs. Tukulov analysis"
+        ))
+        #expect(AppleVideoMapUtilities.isUsableTitle(
+            "U.S. military strategy"
+        ))
+        #expect(!AppleVideoMapUtilities.isUsableTitle(
+            "This is a complete sentence."
+        ))
+    }
+
+    @Test func appleVideoMapLeanParserDropsOnlyInvalidChapterCandidates() {
+        let parsed = AppleVideoMapUtilities.parseDigest(
+            """
+            {"topic":"Bitcoin market analysis","chapters":[["L0001","Heat up here."],["L0002","Bitcoin downside risk"]],"handoff":"market structure"}
+            """,
+            anchorSeconds: ["L0001": 0, "L0002": 90],
+            includeSummaryPoints: false,
+            maximumPoints: 0,
+            discardInvalidChapters: true
+        )
+
+        #expect(parsed?.chapters == [
+            AppleVideoMapUtilities.ChapterCandidate(
+                anchorID: "L0002",
+                seconds: 90,
+                title: "Bitcoin downside risk"
+            ),
+        ])
+    }
+
     @Test func appleVideoMapChapterCompilerAddsZeroAndLimitsNoise() {
         let candidates = [
             AppleVideoMapUtilities.ChapterCandidate(

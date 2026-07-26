@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 103.319579291,
+  "response" : {
+    "chaptersText" : "00:00 Main event preview begins\n07:40 Ersk vs Car\n15:07 Turman's Octagon fight history\n22:27 Zanukov's striking dominance\n29:38 Kunayv's takedown defense\n37:30 Vagav vs Seig analysis\n45:28 Scramble and leg control discussion\n52:31 Kickboxing matchup analysis\n58:17 Patterson vs Ponzi matchup breakdown\n1:02:55 Dair Imov vs Nasaredine Imov\n1:07:30 Top prospect analysis\n1:14:58 Mike Davis vs Nurulo Ali\n1:17:50 Mike Davis vs Joe Selei\n1:22:06 Abdul Hussein vs Cody Gibson\n1:29:44 Prospects for upcoming fights",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:01 | Main event preview begins\nL00035 | 07:40 | Ersk vs Car\nL00039 | 08:45 | Terro vs Ersk\nL00070 | 15:07 | Turman's Octagon fight history\nL00080 | 17:29 | Dolatov's strategic role\nL00106 | 22:27 | Zanukov's striking dominance\nL00112 | 23:33 | Zapki's competitive edge\nL00140 | 29:38 | Kunayv's takedown defense\nL00146 | 30:39 | Fortune's exhaustion\nL00176 | 37:30 | Vagav vs Seig analysis\nL00186 | 39:12 | Vagav vs Seig betting\nL00214 | 45:28 | Scramble and leg control discussion\nL00248 | 52:31 | Kickboxing matchup analysis\nL00275 | 58:17 | Patterson vs Ponzi matchup breakdown\nL00283 | 1:00:12 | Ishmael Bonfi vs Axel Solola matchup\nL00296 | 1:02:55 | Dair Imov vs Nasaredine Imov\nL00317 | 1:07:30 | Top prospect analysis\nL00325 | 1:09:29 | Prospects and betting analysis\nL00353 | 1:14:58 | Mike Davis vs Nurulo Ali\nL00366 | 1:17:50 | Mike Davis vs Joe Selei\nL00386 | 1:22:06 | Abdul Hussein vs Cody Gibson\nL00390 | 1:23:01 | Abdul Hussein vs Cody Gibson\nL00422 | 1:29:44 | Prospects for upcoming fights\nL00425 | 1:30:17 | Prospect evaluation discussion",
+      "chapterCandidates" : 24,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 15,
+      "chunks" : 13,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 13,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 36722,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "UFC Abu Dhabi fight preview\nSteve Ersk vs Tamarov\nWellington Turman vs Dolatov matchup analysis\nZapki vs Zak Zanukov\nKunayv vs Fortune\nVagav vs Seig\nPeterson vs Walker betting analysis\nJacobe vs Guskov fight previews\nIshmael Bonfi vs Axel Solola betting analysis\nProspects and betting analysis\nMike Davis vs Nurulo Ali\nAbdul Hussein vs Cody Gibson\nUFC Abu Dhabi fight analysis",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 13,
+      "nativeTranscriptRedactions" : 0,
+      "outputTokens" : 1063,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=13",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "Bookie Beatdown",
+    "cueCount" : 2634,
+    "duration" : "1:31:18",
+    "durationSeconds" : 5478,
+    "id" : "n6CNgAtdMw0",
+    "sourceURL" : "https://www.youtube.com/watch?v=n6CNgAtdMw0",
+    "title" : "UFC Abu Dhabi Picks, Bets, Props | Ankalaev vs Guskov Fight Previews, Predictions",
+    "transcriptCharacters" : 120667
+  }
+}

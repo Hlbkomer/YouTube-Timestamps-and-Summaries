@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 126.039851708,
+  "response" : {
+    "chaptersText" : "00:00 Bitcoin's downside and upcoming market analysis\n18:20 Short-term Bitcoin pullback\n24:40 Bitcoin approaching critical lows\n28:21 Freddy M's analysis\n43:03 major lower high detected\n48:35 local high forming\n55:27 Weekly bearish divergence warning\n1:02:16 Weekly downside risk elevated\n1:08:24 Long-term downside analysis\n1:15:08 Bullish outlook for SCD\n1:22:00 Bullish outlook on Bitcoin\n1:25:43 Micro Strategy options strategy\n1:36:30 Ethereum turning into shitcoin\n1:43:51 Short-term pullback possible\n1:49:26 Upside target discussion\n1:53:53 Bitcoin below 75,000 and lower highs",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:03 | Bitcoin's downside and upcoming market analysis\nL00075 | 18:20 | Short-term Bitcoin pullback\nL00081 | 19:24 | Bitcoin downside signals\nL00111 | 24:40 | Bitcoin approaching critical lows\nL00127 | 27:33 | price trend analysis\nL00132 | 28:21 | Freddy M's analysis\nL00161 | 33:48 | Higher high potential\nL00167 | 35:00 | Extreme volatility and RSI\nL00207 | 43:03 | major lower high detected\nL00235 | 48:35 | local high forming\nL00245 | 50:46 | deeper pullback\nL00268 | 55:27 | Weekly bearish divergence warning\nL00275 | 56:53 | Potential next macro low identified\nL00302 | 1:02:16 | Weekly downside risk elevated\nL00313 | 1:04:16 | Long-term allocation framework discussed\nL00333 | 1:08:24 | Long-term downside analysis\nL00346 | 1:11:06 | Upcoming JTMB analysis\nL00366 | 1:15:08 | Bullish outlook for SCD\nL00374 | 1:16:52 | Price targets for $37 and $39\nL00399 | 1:22:00 | Bullish outlook on Bitcoin\nL00417 | 1:25:43 | Micro Strategy options strategy\nL00442 | 1:30:52 | Bullish divergence and price targets\nL00454 | 1:33:01 | Option trading risks\nL00470 | 1:36:30 | Ethereum turning into shitcoin\nL00502 | 1:43:51 | Short-term pullback possible\nL00529 | 1:49:26 | Upside target discussion\nL00536 | 1:50:56 | Weekly highs and lows analysis\nL00540 | 1:51:46 | Extended rally and potential highs\nL00551 | 1:53:53 | Bitcoin below 75,000 and lower highs\nL00559 | 1:55:43 | Down-only chart and lower highs",
+      "chapterCandidates" : 30,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 16,
+      "chunks" : 16,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 1,
+      "formatRecoveries" : 16,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 47023,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "Bitcoin's downside and upcoming market analysis\nBitcoin downside continuation\nBitcoin downside probability\ncrypto market analysis\nBitcoin price analysis and technical indicators\nlower high\nshort-term bearish divergence\nBitcoin consolidation and higher lows\nBitcoin correction potential\nBitcoin's short-term downside risk\nStock valuation analysis\nBitcoin market analysis and stock discussion\nBitcoin market analysis and threats\nEthereum bearish outlook\nBullish outlook for crypto assets\nBitcoin reaching lower highs",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 16,
+      "nativeTranscriptRedactions" : 179,
+      "outputTokens" : 1266,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=16",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "Krown",
+    "cueCount" : 3327,
+    "duration" : "1:56:16",
+    "durationSeconds" : 6976,
+    "id" : "WsCf_rCJxnM",
+    "sourceURL" : "https://www.youtube.com/watch?v=WsCf_rCJxnM",
+    "title" : "Bitcoin's Second Failed Bounce in Two Weeks — Targets Lower.",
+    "transcriptCharacters" : 153301
+  }
+}

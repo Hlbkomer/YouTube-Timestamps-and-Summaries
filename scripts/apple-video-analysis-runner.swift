@@ -17,6 +17,7 @@ private struct ManifestVideo: Decodable {
 struct AppleVideoAnalysisRunner {
     private static let allApproaches = [
         "separate",
+        "leanChaptersOnly",
         "chaptersOnly",
         "sharedChaptersSummary",
     ]
@@ -92,6 +93,28 @@ struct AppleVideoAnalysisRunner {
             )
 
             var chapterRun: TimedResponse?
+            if approaches.contains("leanChaptersOnly") {
+                let leanChapterRun = await runVideoMap(
+                    mode: "leanChaptersOnly",
+                    transcript: transcript,
+                    video: video
+                )
+                try writePayload(
+                    video: video,
+                    approach: "leanChaptersOnly",
+                    elapsedSeconds: leanChapterRun.elapsedSeconds,
+                    response: leanChapterRun.response,
+                    to: videoOutputURL.appendingPathComponent(
+                        "leanChaptersOnly.json"
+                    )
+                )
+                report(
+                    videoID: video.id,
+                    approach: "leanChaptersOnly",
+                    run: leanChapterRun
+                )
+            }
+
             if approaches.contains("chaptersOnly") || approaches.contains("separate") {
                 let savedChapterURL = videoOutputURL.appendingPathComponent(
                     "chaptersOnly.json"

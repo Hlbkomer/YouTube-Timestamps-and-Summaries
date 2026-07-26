@@ -4,12 +4,13 @@ Status: internal `DEBUG` prototype. It is not exposed in the chapter model picke
 
 ## Goal
 
-Test two local Apple Intelligence configurations:
+Test three local Apple Intelligence configurations:
 
-1. Apple Intelligence creates chapters only.
+1. Apple Intelligence creates chapters from the full semantic video map.
 2. Apple Intelligence creates chapters and the summary from one shared transcript analysis.
+3. Apple Intelligence creates standalone chapters from a lean chapter-only map.
 
-The production comparison is the existing behavior: generate Apple chapters and the current adaptive Apple summary in two independent transcript passes.
+The separate comparison combines full-map Apple chapters with the current adaptive Apple summary in two independent transcript passes.
 
 ## Architecture
 
@@ -35,6 +36,29 @@ The prototype builds a reusable, timestamp-aware semantic video map:
 10. In shared chapters+summary mode, reuse the same points in the existing grounded reduction and final-composition stages. The raw transcript is never analyzed a second time.
 
 The model proposes semantic candidates; deterministic code owns timestamp validity and final chapter density.
+
+## Lean standalone chapters
+
+The first chapters-only benchmark was not truly lean: it asked for the same
+topic, summary points, chapter candidates, and handoff as the shared map, then
+discarded the points. That made the shared mode look artificially close to
+chapters-only and made standalone chapters slower than necessary.
+
+The follow-up `leanChaptersOnly` mode is the intended architecture when Apple
+Intelligence creates chapters while Grok or ChatGPT creates the summary:
+
+- it requests only a topic, chapter candidates, and a continuity handoff;
+- it reserves 420 response tokens instead of 800, fitting more transcript into
+  each anchored chunk;
+- it allows four chapter candidates per larger chunk instead of three;
+- it keeps the same deterministic timestamp compiler and final density caps;
+- it accepts internal title abbreviations such as `vs.` and `U.S.` while still
+  rejecting sentence-ending punctuation;
+- it discards only an invalid chapter candidate instead of rejecting an
+  otherwise valid lean chunk.
+
+Candidate-level rejection is deliberately limited to the lean path. The stored
+full-map and shared-map baselines retain their original strict parsing behavior.
 
 ## Why permissive `String` intermediates remain
 
@@ -84,6 +108,33 @@ Full outputs and per-video metrics are in:
 
 `test-results/apple-video-analysis/2026-07-26-shared-map-v1/`
 
+### Lean chapter follow-up
+
+Only the new lean chapter approach was regenerated. All summary, shared-map,
+and original map-based timings were reused.
+
+- Lean chapters: 10/10 succeeded.
+- Map-based chapters: 885.5 seconds and 108 calls.
+- Lean chapters: 698.8 seconds and 89 calls.
+- Lean chapters were 21.1% faster and used 19 fewer calls.
+- Lean produced 98 final chapters versus 113 from the full map.
+- Across the nine videos with a usable stored Apple summary:
+  - lean chapters + stored summary: estimated 1,110.1 seconds and 143 calls;
+  - shared chapters + summary: 791.3 seconds and 96 calls;
+  - shared remained 28.7% faster and used 47 fewer calls.
+
+The first lean run exposed two deterministic validation problems:
+
+1. `Machado vs. Tukulov analysis` was rejected because all periods were banned.
+   The validator now permits internal abbreviations but not sentence-ending
+   periods.
+2. `Heat up here.` was an unusable title inside an otherwise valid JSON map.
+   The lean parser now drops that candidate and preserves the valid topic,
+   handoff, and other candidates.
+
+Both fixes are covered by unit tests. The final corpus succeeded without
+regenerating any stored summaries.
+
 ## Quality review
 
 Chapter generation is promising:
@@ -92,6 +143,17 @@ Chapter generation is promising:
 - lists are generally sparse and coherent across 4-minute to 3-hour videos;
 - chapters-only and shared modes produce the same chapter list from the same map;
 - no subscription or network model is required.
+
+The lean chapter path has a clear speed advantage, but is intentionally
+sparser:
+
+- it preserved the full 16- and 20-chapter caps on the crypto and Joe Rogan
+  videos;
+- several long-video titles became more focused because the model was no longer
+  asked to write summary points;
+- the short news clip and some medium videos lost useful secondary boundaries;
+- exact wording and timestamps vary between local model runs, so exact-list
+  equality is not a meaningful quality metric.
 
 The shared-summary architecture is faster and more robust, but the current point schema is not ready for production:
 
@@ -104,7 +166,10 @@ These are extraction-quality problems, not timestamp problems.
 
 ## Recommendation
 
-Continue with the shared video map, but keep it internal for now.
+Use the lean map for the internal Apple-chapters + Grok/ChatGPT combination.
+Use the shared map when Apple Intelligence creates both chapters and summary.
+Keep both internal until the saved chapter lists receive a manual quality
+review.
 
 The next quality experiment should change point strings into compact subject/claim tuples, for example:
 

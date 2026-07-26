@@ -1,0 +1,52 @@
+{
+  "approach" : "leanChaptersOnly",
+  "elapsedSeconds" : 136.390012458,
+  "response" : {
+    "chaptersText" : "00:00 War with Iran progressing well\n08:28 US easing restrictions on Lebanon flights\n15:44 Trump on 911 and cults\n24:31 US stance on Iran's aggression\n37:32 Netanyahu's war crimes discussion\n41:20 Zoran Namani's contradictions\n49:27 Zoran Maldani's opposition\n57:35 Political party internal conflict\n1:06:36 US-Israel military cooperation\n1:11:20 Leftist Jews and anti-Semitic threats\n1:15:39 Gil and woke Smithsonian controversies\n1:20:02 Racial overtones and organizational culture\n1:28:31 healthcare extremism\n1:36:40 Left extremism critique\n1:47:49 David Apacman criticism\n1:54:24 AI threatens Hollywood dominance\n2:05:09 Woke movies and conservative debate\n2:09:43 Consensus manipulation in reviews",
+    "debug" : {
+      "chapterCandidateMap" : "L00001 | 00:00 | War with Iran progressing well\nL00013 | 02:42 | President's aggressive rhetoric on Iran\nL00041 | 08:28 | US easing restrictions on Lebanon flights\nL00045 | 09:15 | Iran's condemnation of Israel\nL00075 | 15:44 | Trump on 911 and cults\nL00082 | 17:06 | Rubio's compliance stance\nL00117 | 24:31 | US stance on Iran's aggression\nL00124 | 26:01 | Ortega's election suppression\nL00178 | 37:32 | Netanyahu's war crimes discussion\nL00190 | 40:00 | Netanyahu's arrest promise\nL00196 | 41:20 | Zoran Namani's contradictions\nL00236 | 49:27 | Zoran Maldani's opposition\nL00237 | 49:40 | Zoran Maldani and Pzekian\nL00275 | 57:35 | Political party internal conflict\nL00276 | 57:48 | Party ideology clarification\nL00319 | 1:06:36 | US-Israel military cooperation\nL00326 | 1:08:08 | NDA Act and military merger\nL00340 | 1:11:20 | Leftist Jews and anti-Semitic threats\nL00358 | 1:15:39 | Gil and woke Smithsonian controversies\nL00376 | 1:20:02 | Racial overtones and organizational culture\nL00385 | 1:22:13 | Brandon Gill and implicit bias debate\nL00413 | 1:28:31 | healthcare extremism\nL00421 | 1:30:04 | Hassan controversy\nL00450 | 1:36:40 | Left extremism critique\nL00454 | 1:37:37 | Left influence in youth groups\nL00498 | 1:47:49 | David Apacman criticism\nL00509 | 1:50:17 | leftist senator threats\nL00528 | 1:54:24 | AI threatens Hollywood dominance\nL00532 | 1:55:17 | Mel Gibson vs. Nolan cinematic universe\nL00574 | 2:05:09 | Woke movies and conservative debate\nL00596 | 2:09:43 | Consensus manipulation in reviews\nL00604 | 2:11:31 | war and cultural contradictions\nL00610 | 2:12:42 | protagonist as patriotic hero",
+      "chapterCandidates" : 33,
+      "chapterCompiler" : "deterministic-anchor-v1",
+      "chapters" : 18,
+      "chunks" : 17,
+      "chunkStrategy" : "token-aware-anchored-thought-lines",
+      "contextSize" : 4096,
+      "deterministicFallbacks" : 0,
+      "formatRecoveries" : 17,
+      "guardrails" : "permissiveContentTransformations",
+      "inputTokens" : 49883,
+      "kind" : "videoMap",
+      "languageCode" : "en",
+      "languageLabel" : "English",
+      "layer" : "native-debug",
+      "mappedPoints" : "",
+      "mappedTopics" : "Winning is the only objective\nMiddle East conflict and US foreign policy\nUS foreign policy and Iran\nIran military threat and US response\nNetanyahu's war crimes and political narratives\nNetanyahu's arrest promise and contradictions\nZoran Maldani's political claims\nDemocrats and military policy\nMilitary alliance with Israel\nJewish influence and political alliances\nleft-wing extremism and terrorism ideology\nextremism\nleft extremism and political extremism\nextremism, left\nHollywood culture war\nWoke movies and consensus manipulation\nwar and heroism ethics",
+      "mapSequence" : "sequential",
+      "mode" : "leanChaptersOnly",
+      "model" : "Apple Intelligence",
+      "modelCalls" : 17,
+      "nativeTranscriptRedactions" : 112,
+      "outputTokens" : 1411,
+      "rawTranscriptPasses" : 1,
+      "reasoningTokens" : 0,
+      "reductionLevels" : 0,
+      "retries" : 0,
+      "retryReasons" : "",
+      "retryStages" : "",
+      "stageCalls" : "leanChapterMapChunk=17",
+      "summaryDigestCount" : 0,
+      "timestampMode" : "deterministic-line-anchors"
+    },
+    "ok" : true
+  },
+  "video" : {
+    "channel" : "Nuxanor",
+    "cueCount" : 3985,
+    "duration" : "2:17:04",
+    "durationSeconds" : 8224,
+    "id" : "425R4PQ5svQ",
+    "sourceURL" : "https://www.youtube.com/watch?v=425R4PQ5svQ",
+    "title" : "FAIRNESS IS IRRELEVANT... ONLY VICTORY MATTERS.",
+    "transcriptCharacters" : 180141
+  }
+}
