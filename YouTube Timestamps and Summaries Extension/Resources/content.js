@@ -3075,8 +3075,7 @@ function renderTimestampsResult(kind = "timestamps") {
             <div class="timestamp-list">
                 ${parsed.map((item) => `
                     <a class="timestamp-link" href="${escapeHTML(buildTimestampHref(item.seconds))}" data-seconds="${item.seconds}"${tracksActiveChapter ? " data-chapter=\"true\"" : ""}>
-                        <span class="timestamp-time">${escapeHTML(item.time)}</span>
-                        <span class="timestamp-label">${escapeHTML(item.label)}</span>
+                        <span class="timestamp-time">${escapeHTML(item.time)}</span><span class="timestamp-label">${escapeHTML(item.label)}</span>
                     </a>
                 `).join("")}
             </div>
@@ -3475,9 +3474,7 @@ function render() {
             }
 
             .timestamp-link {
-                display: flex;
-                gap: 8px;
-                align-items: flex-start;
+                display: block;
                 width: 100%;
                 color: var(--text);
                 text-align: left;
@@ -3501,7 +3498,7 @@ function render() {
                 color: var(--accent);
                 font-weight: 700;
                 font-variant-numeric: tabular-nums;
-                flex: 0 0 auto;
+                margin-inline-end: 8px;
             }
 
             .timestamp-label {
