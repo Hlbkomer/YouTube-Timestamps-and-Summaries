@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Prevent an empty native panel shell from authorizing panel opening or automatic generation until caption tracks, a completed transcript, real YouTube chapters, or an existing result provide positive content evidence. Also require an explicitly transcript-labelled control before transcript discovery clicks inside YouTube's transcript-section renderer. Together these close the remaining captionless-live paths where YouTube reused empty shells or generic controls for the structured Description panel.
 - Prefer freshly requested YouTube player caption URLs for transcript acquisition, while retaining page-embedded caption URLs and the existing transcript-panel/timed-text sources as fallbacks. This removes repeated empty page-caption requests without changing transcript sharing, caption selection, or generated output.
 - Prevent captionless live videos from opening YouTube's Description engagement panel during transcript discovery. An empty transcript-section shell no longer authorizes a generic description expansion; only a real transcript control can be clicked.
 - Consolidate the duplicate ChatGPT and Grok summary instructions into one shared, versioned provider prompt builder and one production-version switch. Carry verified title, channel, cleaned description, duration, and caption source through the selected-provider summary boundary while keeping production on the exact legacy Prompt 1 contract.

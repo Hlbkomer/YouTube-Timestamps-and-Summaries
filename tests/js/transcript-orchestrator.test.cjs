@@ -5,22 +5,39 @@ const path = require("node:path");
 
 const {
     createTranscriptOrchestrator,
+    isTranscriptOpenControlLabel,
     transcriptOpenControl,
 } = require("../../YouTube Timestamps and Summaries Extension/Resources/transcript-orchestrator.js");
 
+test("transcript controls require explicit transcript semantics", () => {
+    assert.equal(isTranscriptOpenControlLabel("Show transcript"), true);
+    assert.equal(isTranscriptOpenControlLabel("Zobraziť prepis"), true);
+    assert.equal(isTranscriptOpenControlLabel("More"), false);
+    assert.equal(isTranscriptOpenControlLabel("Description"), false);
+    assert.equal(isTranscriptOpenControlLabel(""), false);
+});
+
 test("transcript discovery requires a real transcript control", () => {
     const visibleTranscript = {
+        textContent: "Show transcript",
         getAttribute: () => null,
     };
     const collapsedTranscript = {
+        textContent: "Zobraziť prepis",
         getAttribute: () => null,
     };
     const disabledTranscript = {
         disabled: true,
+        textContent: "Show transcript",
+        getAttribute: () => null,
+    };
+    const genericSectionControl = {
+        textContent: "More",
         getAttribute: () => null,
     };
 
     assert.equal(transcriptOpenControl([], []), null);
+    assert.equal(transcriptOpenControl([], [genericSectionControl]), null);
     assert.equal(
         transcriptOpenControl([visibleTranscript], [collapsedTranscript]),
         visibleTranscript

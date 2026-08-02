@@ -88,7 +88,7 @@ function panel({ title = "", targetID = "", labels = [], hasMacroMarkers = false
     };
 }
 
-function controllerFor(panels, state) {
+function controllerFor(panels, state, overrides = {}) {
     const document = {
         querySelectorAll(selector) {
             return selector === "ytd-engagement-panel-section-list-renderer" ? panels : [];
@@ -113,6 +113,7 @@ function controllerFor(panels, state) {
         },
         normalizeText: (value) => String(value || "").trim(),
         visibleText: (element) => element?.textContent || element?.getAttribute?.("aria-label") || "",
+        ...overrides,
     });
 }
 
@@ -157,6 +158,20 @@ test("native panel mounting rejects Description surfaces with tab-list-like mark
     assert.equal(controllerFor([targetedDescription], {}).getMount(), null);
 });
 
+test("an empty native shell cannot be opened without usable analysis evidence", () => {
+    const parentPanel = panel({
+        title: "In this video",
+        labels: ["Transcript"],
+    });
+    const controller = controllerFor([parentPanel], {}, {
+        canUseNativePanel: () => false,
+    });
+
+    assert.equal(controller.getMount()?.panel, parentPanel);
+    assert.equal(controller.open(controller.getMount()), false);
+    assert.equal(parentPanel.getAttribute("visibility"), "ENGAGEMENT_PANEL_VISIBILITY_HIDDEN");
+});
+
 test("transcript discovery never expands a generic Description panel", () => {
     const contentSource = fs.readFileSync(path.resolve(
         __dirname,
@@ -169,7 +184,15 @@ test("transcript discovery never expands a generic Description panel", () => {
     );
     assert.match(
         contentSource,
-        /transcriptOpenControl\(\s*nativeTranscriptOpenButtons\(\),\s*nativeTranscriptSectionOpenButtons\(\)\s*\)/,
+        /transcriptOpenControl\(\s*nativeTranscriptOpenButtons\(\),\s*nativeTranscriptSectionOpenButtons\(\),\s*visibleText\s*\)/,
+    );
+    assert.match(
+        contentSource,
+        /nativeTranscriptSectionOpenButtons\(\)[\s\S]{0,700}isTranscriptOpenControlLabel\(visibleText\(element\)\)/,
+    );
+    assert.match(
+        contentSource,
+        /const nativeMountAvailable = Boolean\(nativePanel\.getMount\(\)\)\s*&& nativePanelContentAvailable\(videoKey\)/,
     );
 });
 

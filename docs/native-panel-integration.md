@@ -456,7 +456,7 @@ The imported list is highlighted only inside the extension view; YouTube's playe
 
 ## Fallback Behavior
 
-The standalone sidebar remains available when the native `In this video` panel cannot be found **and** the shared transcript detector has confirmed a usable transcript. Native placement remains independent from transcript availability because imported YouTube chapters and Key moments can still be useful without transcript-backed generation.
+The standalone sidebar remains available when the native `In this video` panel cannot be found **and** the shared transcript detector has confirmed a usable transcript. Native placement does not require a completed transcript when YouTube already exposes caption-track evidence, imported chapters, or an existing result. It does require one of those positive content signals: an empty native shell alone is never opened because YouTube can repurpose that shell as Description on captionless live pages.
 
 The fallback remains important because:
 
@@ -466,7 +466,7 @@ The fallback remains important because:
 
 If neither a genuine native shell nor a usable transcript exists, the extension leaves the page untouched: it does not mount the fallback, start automatic generation, show a transcript error, or open YouTube's structured Description engagement panel. While passive transcript discovery is pending, fallback placement also remains pending so an error-only sidebar never flashes before disappearing. One availability state in `transcript-orchestrator.js` owns `unknown`, `pending`, `available`, and `unavailable`; placement and generation consume that state instead of running separate transcript detectors.
 
-The native transcript fallback may expand a collapsed video description only when `ytd-video-description-transcript-section-renderer` already exists. A generic description `More` control is not evidence that a transcript exists. This guard is paired with strict native-shell recognition so a transcript-free Description surface cannot be mistaken for, or opened in place of, `In this video`.
+The native transcript fallback never expands a generic video description. Even inside `ytd-video-description-transcript-section-renderer`, a control must carry recognized transcript semantics such as `Show transcript` or localized `Prepis`; renderer ancestry alone is not evidence because captionless live pages can expose an empty or reused shell containing unrelated controls. This guard is paired with strict native-shell recognition so a transcript-free Description surface cannot be mistaken for, or opened in place of, `In this video`.
 
 When the configured preference is to use YouTube chapters when available, a newly committed video can have a short, legitimate chapter-source discovery phase before generation begins. The unified Chapters surface renders `Checking for YouTube chapters...` during that phase instead of the generic empty-state copy. Its tab uses the same busy ellipsis as generation, and a duplicate YouTube-owned Chapters chip is hidden only while the decision is pending. Discovery then resolves directly to migrated YouTube/Key moments chapters or to transcript-backed generation; if the native source cannot be migrated, its chip is restored.
 

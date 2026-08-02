@@ -1,9 +1,29 @@
 (function (globalScope) {
-    function transcriptOpenControl(visibleControls = [], sectionControls = []) {
+    const TRANSCRIPT_OPEN_CONTROL_PATTERN = /\b(?:transcript|transcription|transkript|transkrip|prepis|přepis|transcripci[oó]n|trascrizione)\b/i;
+
+    function isTranscriptOpenControlLabel(value) {
+        return TRANSCRIPT_OPEN_CONTROL_PATTERN.test(String(value || ""));
+    }
+
+    function transcriptOpenControlLabel(control) {
+        return [
+            control?.innerText,
+            control?.textContent,
+            control?.getAttribute?.("aria-label"),
+            control?.getAttribute?.("title"),
+        ].filter(Boolean).join(" ");
+    }
+
+    function transcriptOpenControl(
+        visibleControls = [],
+        sectionControls = [],
+        labelForControl = transcriptOpenControlLabel
+    ) {
         return [...visibleControls, ...sectionControls].find((control) => (
             control
             && control.disabled !== true
             && control.getAttribute?.("aria-disabled") !== "true"
+            && isTranscriptOpenControlLabel(labelForControl(control))
         )) || null;
     }
 
@@ -112,6 +132,7 @@
 
     const transcriptOrchestrator = {
         createTranscriptOrchestrator,
+        isTranscriptOpenControlLabel,
         transcriptOpenControl,
     };
     globalScope.YouTubeTimestampsTranscriptOrchestrator = transcriptOrchestrator;

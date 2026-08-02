@@ -380,7 +380,7 @@
 
         function open(mount) {
             const panel = mount?.panel;
-            if (!panel) {
+            if (!panel || deps.canUseNativePanel?.() === false) {
                 return false;
             }
 
@@ -1214,6 +1214,9 @@
         }
 
         function syncTabs(mount = getMount()) {
+            if (deps.canUseNativePanel?.() === false) {
+                mount = null;
+            }
             if (!mount) {
                 cleanupTabs();
                 cleanupHeaderActions();

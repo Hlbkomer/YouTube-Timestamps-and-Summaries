@@ -17,7 +17,10 @@ const {
 const chapterState = globalThis.YouTubeTimestampsChapterState;
 const contentState = globalThis.YouTubeTimestampsContentState;
 const transcriptOrchestration = globalThis.YouTubeTimestampsTranscriptOrchestrator;
-const { transcriptOpenControl } = transcriptOrchestration;
+const {
+    isTranscriptOpenControlLabel,
+    transcriptOpenControl,
+} = transcriptOrchestration;
 const generationOrchestration = globalThis.YouTubeTimestampsGenerationOrchestrator;
 const {
     automaticGenerationKinds,
@@ -228,6 +231,7 @@ const nativePanel = globalThis.YouTubeTimestampsNativePanel.createNativePanelCon
     prefetchTranscriptForCopy,
     copyHeaderResult,
     isTimestampChapterDiscoveryPending,
+    canUseNativePanel: () => nativePanelContentAvailable(),
     render,
     maybeGenerateTimestamps,
     maybeGenerateSummary,
@@ -999,6 +1003,30 @@ function hasNativeYouTubeChapters(videoKey = currentVideoKey || getVideoKey() ||
     }
 
     return nativeChapterDetectionStatus(videoKey) === "available";
+}
+
+function hasPageCaptionEvidence(videoKey = currentVideoKey || getVideoKey() || "") {
+    if (!videoKey) {
+        return false;
+    }
+
+    return captionTracksFromPlayerResponse(playerResponseForVideo(videoKey)).length > 0
+        || captionTracksFromPlayerResponse(getInitialPlayerResponse(videoKey)).length > 0;
+}
+
+function nativePanelContentAvailable(videoKey = currentVideoKey || getVideoKey() || "") {
+    if (!videoKey) {
+        return false;
+    }
+
+    return hasPageCaptionEvidence(videoKey)
+        || transcriptOrchestrator.hasAvailableTranscript(videoKey)
+        || hasNativeYouTubeChapters(videoKey)
+        || Boolean(state.timestampsText || state.summaryText)
+        || Boolean(
+            cachedGenerationResult(videoKey, "timestamps")
+            || cachedGenerationResult(videoKey, "summary")
+        );
 }
 
 function shouldGenerateChaptersInsteadOfNative(videoKey = currentVideoKey || getVideoKey() || "") {
@@ -1903,12 +1931,10 @@ function actionableTranscriptButton(element) {
 function nativeTranscriptOpenButtons() {
     const selectorCandidates = NATIVE_TRANSCRIPT_OPEN_BUTTON_SELECTORS
         .flatMap((selector) => querySelectorAllSafe(document, selector))
-        .map(actionableTranscriptButton);
+        .map(actionableTranscriptButton)
+        .filter((element) => isTranscriptOpenControlLabel(visibleText(element)));
     const textCandidates = querySelectorAllSafe(document, "button, [role='button'], tp-yt-paper-button")
-        .filter((element) => {
-            const text = visibleText(element);
-            return /(transcript|transkript|transkrip|prepis|přepis)/i.test(text);
-        });
+        .filter((element) => isTranscriptOpenControlLabel(visibleText(element)));
 
     return uniqueElements([...selectorCandidates, ...textCandidates]).filter(isVisibleElement);
 }
@@ -1925,20 +1951,23 @@ function nativeTranscriptSectionOpenButtons() {
         querySelectorAllSafe(
             transcriptSection,
             "button, a, [role='button'], .yt-spec-button-shape-next, button-view-model, yt-button-view-model"
-        ).map(actionableTranscriptButton)
+        )
+            .map(actionableTranscriptButton)
+            // YouTube can leave this renderer as an empty/reused shell on a
+            // captionless live video. Its ancestry is not proof that a generic
+            // child such as More opens a transcript.
+            .filter((element) => isTranscriptOpenControlLabel(visibleText(element)))
     );
 }
 
 async function openNativeTranscriptPanel(kind) {
     // Some YouTube builds leave an empty transcript-section shell on live or
-    // captionless videos. The shell alone is not evidence of a transcript.
-    // Never click the generic description expander: it opens the Description
-    // engagement panel and leaves a transcript-free page visibly changed.
-    // A real control inside the transcript section can be clicked directly
-    // even while the surrounding description is collapsed.
+    // captionless videos. The shell alone is not evidence of a transcript, so
+    // only an explicitly transcript-labelled control can authorize a click.
     const button = transcriptOpenControl(
         nativeTranscriptOpenButtons(),
-        nativeTranscriptSectionOpenButtons()
+        nativeTranscriptSectionOpenButtons(),
+        visibleText
     );
     if (!button) {
         logTranscriptDebug(kind, "transcript: native transcript button not found");
@@ -2345,8 +2374,9 @@ function getPanelMount() {
     const nativeMount = nativePanel.getMount();
     if (nativeMount) {
         // Placement and chapter-source discovery are independent. Mount the
-        // unified surface as soon as YouTube's shell exists; Chapters can keep
-        // resolving without blocking Summary or the surrounding panel.
+        // unified surface as soon as YouTube's shell and positive analysis
+        // evidence exist. A transient empty shell is not enough because
+        // YouTube can repurpose it as the structured Description panel.
         if (nativePanel.open(nativeMount)) {
             return {
                 type: "native",
@@ -3848,7 +3878,8 @@ async function maybeAutogenerateAnalysis() {
     }
 
     const videoKey = watchVideoKey();
-    const nativeMountAvailable = Boolean(nativePanel.getMount());
+    const nativeMountAvailable = Boolean(nativePanel.getMount())
+        && nativePanelContentAvailable(videoKey);
     if (!nativeMountAvailable && !transcriptOrchestrator.hasAvailableTranscript(videoKey)) {
         // Passive discovery owns fallback eligibility. Do not escalate to
         // generation or create transcript errors on a page where the extension
