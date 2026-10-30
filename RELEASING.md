@@ -126,6 +126,16 @@ gh release create "v$VERSION" \
 
 Do not run this command as part of candidate preparation. It creates the public release immediately.
 
+## Website maintenance
+
+The app has one public website at `https://hlbkomer.github.io/YouTube-Timestamps-and-Summaries/`, published by GitHub Pages from this repository's `main:/docs`.
+
+Home, Support, Privacy and Terms use `docs/_layouts/site.html` and `docs/assets/site.css`. Keep those pages visually consistent. Use short, factual copy; avoid marketing slogans, technical feature badges, repeated screenshots and duplicate download banners.
+
+The separate `Hlbkomer/hlbkomer.github.io` repository only preserves the old root homepage and policy/support URLs as redirects to the matching project pages. Generate those files with `python3 scripts/prepare-root-site.py`, then copy the generated HTML files and README into a checkout of that repository. Remove the obsolete root `styles.css` and the three generated images under `readme-assets/`; preserve the Google verification file and unrelated assets. Do not restore a second copy of the website there.
+
+For website changes, verify the shared navigation, responsive layout, image loading and existing download link. After deploying, check the actual GitHub Pages output and legacy redirects. Website-only changes do not require rebuilding or replacing the app download.
+
 ## Final Checks
 
 Before attaching a release build:
