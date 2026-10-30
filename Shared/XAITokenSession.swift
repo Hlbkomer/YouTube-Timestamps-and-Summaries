@@ -197,7 +197,7 @@ final class XAITokenSession {
         request.timeoutInterval = 20
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("TimestampsSummariesForYT/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue(GenerationSettings.providerUserAgent, forHTTPHeaderField: "User-Agent")
         return try await response(for: request)
     }
 

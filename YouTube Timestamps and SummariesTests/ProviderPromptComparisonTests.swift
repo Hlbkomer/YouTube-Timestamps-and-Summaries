@@ -21,7 +21,7 @@ struct ProviderPromptComparisonTests {
         var model: String {
             switch self {
             case .chatGPT:
-                return GenerationSettings.chatGPTTerraModelID
+                return GenerationSettings.chatGPTSolModelID
             case .grok:
                 return GenerationSettings.defaultGrokModelID
             }
@@ -87,6 +87,7 @@ struct ProviderPromptComparisonTests {
 
     private struct StreamResult {
         let text: String
+        let responseModel: String?
         let timeToFirstOutputMs: Int?
         let inputTokens: Int?
         let outputTokens: Int?
@@ -152,6 +153,176 @@ struct ProviderPromptComparisonTests {
                  .invalidResponse(let message):
                 return message
             }
+        }
+    }
+
+    /// Opt-in backend compatibility check, separate from historical comparisons.
+    /// Uses the signed host's existing OAuth session; never exports credentials.
+    @Test func runChatGPTModelSmokeWhenRequested() async throws {
+        guard ProcessInfo.processInfo.environment["YTS_CHATGPT_MODEL_SMOKE"] == "1" else {
+            return
+        }
+        let model = GenerationSettings.chatGPTSolModelID
+        let token = try await CodexAuthService().accessToken()
+        let transcript = """
+        [00:00] Today we are growing basil from seed on a sunny windowsill.
+        [00:20] Fill a shallow tray with moist seed compost and sow the seeds lightly.
+        [00:40] Cover the tray loosely until germination, keeping the compost damp.
+        [01:00] Once seedlings appear, remove the cover and move them into bright light.
+        [01:20] Rotate the tray daily so the seedlings do not lean toward the window.
+        [01:40] Water from below to avoid damaging the delicate stems.
+        [02:00] When the seedlings have two sets of true leaves, transplant them into pots.
+        [02:20] Pinch the growing tips to encourage a bushy plant rather than tall stems.
+        [02:40] Harvest leaves regularly, but leave enough foliage for continued growth.
+        """
+        let chapterRequest = ProviderSummaryRequest(
+            version: .production,
+            instructions: "You create accurate YouTube chapter timestamps from transcripts.",
+            prompt: """
+            Create chronological YouTube chapter timestamps from this transcript.
+            The detected caption language is English. Write the timestamp titles in English.
+
+            Rules:
+            - Use only the bracketed transcript timestamps as the source of truth.
+            - Never invent, estimate, shift, or extrapolate times.
+            - Output only timestamp-title lines.
+            - Use MM:SS Title, or H:MM:SS Title after one hour.
+            - Create useful chapter-level topic changes across the whole video.
+            - Use concise natural chapter titles, not transcript quotes.
+            - Prefer the earliest transcript timestamp where a topic begins.
+
+            Transcript:
+            \(transcript)
+            """
+        )
+        let summaryRequest = ProviderSummaryPromptBuilder.makeRequest(
+            version: .production,
+            transcript: stripTranscriptTimestamps(transcript),
+            languageCode: "en",
+            languageLabel: "English"
+        )
+        for (kind, prompt) in [("chapters", chapterRequest), ("summary", summaryRequest)] {
+            let startedAt = Date()
+            let result = try await requestSummary(
+                provider: .chatGPT,
+                token: token,
+                request: prompt,
+                model: model
+            )
+            #expect(result.responseModel == model)
+            if kind == "chapters" {
+                let allowedTimes = Set(["00:00", "00:20", "00:40", "01:00", "01:20", "01:40", "02:00", "02:20", "02:40"])
+                let times = result.text.split(whereSeparator: \.isNewline).compactMap {
+                    $0.split(separator: " ", maxSplits: 1).first.map(String.init)
+                }
+                #expect(times.count >= 3)
+                #expect(times.allSatisfy { allowedTimes.contains($0) })
+                #expect(times == times.sorted())
+                #expect(Set(times).count == times.count)
+            } else {
+                #expect(result.text.lowercased().contains("basil"))
+                #expect(result.text.lowercased().contains("seed"))
+            }
+            let metrics: [String: Any] = [
+                "kind": kind,
+                "requestedModel": model,
+                "responseModel": result.responseModel ?? "unknown",
+                "reasoningEffort": "providerDefault",
+                "durationMs": Int(Date().timeIntervalSince(startedAt) * 1_000),
+                "timeToFirstOutputMs": result.timeToFirstOutputMs ?? -1,
+                "inputTokens": result.inputTokens ?? -1,
+                "outputTokens": result.outputTokens ?? -1,
+                "reasoningTokens": result.reasoningTokens ?? -1,
+            ]
+            let json = try JSONSerialization.data(withJSONObject: metrics, options: [.prettyPrinted, .sortedKeys])
+            Attachment.record(String(decoding: json, as: UTF8.self), named: "\(model)-\(kind)-metrics.json")
+            Attachment.record(result.text, named: "\(model)-\(kind).txt")
+            print("CHATGPT_MODEL_SMOKE \(String(decoding: json, as: UTF8.self))")
+        }
+    }
+
+    /// Opt-in Grok compatibility check using the signed host's existing OAuth
+    /// session. Credentials remain in Keychain and are never exported.
+    @Test func runGrokModelSmokeWhenRequested() async throws {
+        guard ProcessInfo.processInfo.environment["YTS_GROK_MODEL_SMOKE"] == "1" else {
+            return
+        }
+        let model = GenerationSettings.grok47ModelID
+        let token = try await XAITokenSession().accessToken()
+        let transcript = """
+        [00:00] Today we are growing basil from seed on a sunny windowsill.
+        [00:20] Fill a shallow tray with moist seed compost and sow the seeds lightly.
+        [00:40] Cover the tray loosely until germination, keeping the compost damp.
+        [01:00] Once seedlings appear, remove the cover and move them into bright light.
+        [01:20] Rotate the tray daily so the seedlings do not lean toward the window.
+        [01:40] Water from below to avoid damaging the delicate stems.
+        [02:00] When the seedlings have two sets of true leaves, transplant them into pots.
+        [02:20] Pinch the growing tips to encourage a bushy plant rather than tall stems.
+        [02:40] Harvest leaves regularly, but leave enough foliage for continued growth.
+        """
+        let chapterRequest = ProviderSummaryRequest(
+            version: .production,
+            instructions: "You create accurate YouTube chapter timestamps from transcripts.",
+            prompt: """
+            Create chronological YouTube chapter timestamps from this transcript.
+            The detected caption language is English. Write the timestamp titles in English.
+
+            Rules:
+            - Use only the bracketed transcript timestamps as the source of truth.
+            - Never invent, estimate, shift, or extrapolate times.
+            - Output only timestamp-title lines.
+            - Use MM:SS Title, or H:MM:SS Title after one hour.
+            - Create useful chapter-level topic changes across the whole video.
+            - Use concise natural chapter titles, not transcript quotes.
+            - Prefer the earliest transcript timestamp where a topic begins.
+
+            Transcript:
+            \(transcript)
+            """
+        )
+        let summaryRequest = ProviderSummaryPromptBuilder.makeRequest(
+            version: .production,
+            transcript: stripTranscriptTimestamps(transcript),
+            languageCode: "en",
+            languageLabel: "English"
+        )
+        for (kind, prompt) in [("chapters", chapterRequest), ("summary", summaryRequest)] {
+            let startedAt = Date()
+            let result = try await requestSummary(
+                provider: .grok,
+                token: token,
+                request: prompt,
+                model: model
+            )
+            #expect(result.responseModel == model)
+            if kind == "chapters" {
+                let allowedTimes = Set(["00:00", "00:20", "00:40", "01:00", "01:20", "01:40", "02:00", "02:20", "02:40"])
+                let times = result.text.split(whereSeparator: \.isNewline).compactMap {
+                    $0.split(separator: " ", maxSplits: 1).first.map(String.init)
+                }
+                #expect(times.count >= 3)
+                #expect(times.allSatisfy { allowedTimes.contains($0) })
+                #expect(times == times.sorted())
+                #expect(Set(times).count == times.count)
+            } else {
+                #expect(result.text.lowercased().contains("basil"))
+                #expect(result.text.lowercased().contains("seed"))
+            }
+            let metrics: [String: Any] = [
+                "kind": kind,
+                "requestedModel": model,
+                "responseModel": result.responseModel ?? "unknown",
+                "reasoningEffort": "low",
+                "durationMs": Int(Date().timeIntervalSince(startedAt) * 1_000),
+                "timeToFirstOutputMs": result.timeToFirstOutputMs ?? -1,
+                "inputTokens": result.inputTokens ?? -1,
+                "outputTokens": result.outputTokens ?? -1,
+                "reasoningTokens": result.reasoningTokens ?? -1,
+            ]
+            let json = try JSONSerialization.data(withJSONObject: metrics, options: [.prettyPrinted, .sortedKeys])
+            Attachment.record(String(decoding: json, as: UTF8.self), named: "\(model)-\(kind)-metrics.json")
+            Attachment.record(result.text, named: "\(model)-\(kind).txt")
+            print("GROK_MODEL_SMOKE \(String(decoding: json, as: UTF8.self))")
         }
     }
 
@@ -379,8 +550,10 @@ struct ProviderPromptComparisonTests {
     private func requestSummary(
         provider: Provider,
         token: String,
-        request summaryRequest: ProviderSummaryRequest
+        request summaryRequest: ProviderSummaryRequest,
+        model requestedModel: String? = nil
     ) async throws -> StreamResult {
+        let model = requestedModel ?? provider.model
         var request = URLRequest(url: provider.endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 10 * 60
@@ -401,13 +574,13 @@ struct ProviderPromptComparisonTests {
         case .grok:
             request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
             request.setValue(
-                "TimestampsSummariesForYT/1.0",
+                GenerationSettings.providerUserAgent,
                 forHTTPHeaderField: "User-Agent"
             )
         }
 
         var body: [String: Any] = [
-            "model": provider.model,
+            "model": model,
             "instructions": summaryRequest.instructions,
             "input": [
                 [
@@ -424,12 +597,14 @@ struct ProviderPromptComparisonTests {
             "store": false,
         ]
         if provider == .grok {
-            let reasoning = GenerationSettings.grokReasoningRequestValue(for: provider.model)
+            let reasoning = GenerationSettings.grokReasoningRequestValue(for: model)
             guard reasoning == ["effort": "low"] else {
                 throw ComparisonError.requestFailed(
-                    "Grok 4.5 comparison request did not resolve to low reasoning."
+                    "The configured Grok comparison model did not resolve to low reasoning."
                 )
             }
+            body["reasoning"] = reasoning
+        } else if let reasoning = GenerationSettings.chatGPTReasoningRequestValue(for: model) {
             body["reasoning"] = reasoning
         }
         request.httpBody = try JSONSerialization.data(
@@ -537,6 +712,7 @@ struct ProviderPromptComparisonTests {
 
         return StreamResult(
             text: finalText,
+            responseModel: terminalResponse?["model"] as? String,
             timeToFirstOutputMs: firstOutputAt.map {
                 Int($0.timeIntervalSince(requestStartedAt) * 1_000)
             },

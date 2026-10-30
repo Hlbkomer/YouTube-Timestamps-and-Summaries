@@ -6,6 +6,7 @@
         sidebarCopy: "[data-copy-active]",
         chapterSourceSwitch: "[data-chapter-source-switch]",
         openApp: "[data-open-app]",
+        retryStatus: "[data-retry-status]",
         timestamp: "[data-seconds]",
     };
     const extensionOwnedNativeSelector = [
@@ -32,6 +33,7 @@
                 sidebarCopy: controlFromEvent(event, selectors.sidebarCopy),
                 chapterSourceSwitch: controlFromEvent(event, selectors.chapterSourceSwitch),
                 openApp: controlFromEvent(event, selectors.openApp),
+                retryStatus: controlFromEvent(event, selectors.retryStatus),
                 timestamp: controlFromEvent(event, selectors.timestamp),
             };
             const control = controls.nativeTab
@@ -40,6 +42,7 @@
                 || controls.sidebarCopy
                 || controls.chapterSourceSwitch
                 || controls.openApp
+                || controls.retryStatus
                 || controls.timestamp;
             if (!control) {
                 return false;
@@ -63,6 +66,8 @@
                 );
             } else if (controls.openApp) {
                 callbacks.openApp();
+            } else if (controls.retryStatus) {
+                callbacks.retryStatus?.();
             } else if (controls.timestamp) {
                 callbacks.jumpToTime(Number(controls.timestamp.getAttribute("data-seconds") || 0));
             }

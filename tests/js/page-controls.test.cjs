@@ -41,6 +41,7 @@ function harness() {
         copySidebarResult: () => calls.push(["sidebar-copy"]),
         switchChapterSource: (source) => calls.push(["chapter-source", source]),
         openApp: () => calls.push(["open-app"]),
+        retryStatus: () => calls.push(["retry-status"]),
         jumpToTime: (seconds) => calls.push(["jump", seconds]),
     });
     return { calls, handler };
@@ -118,4 +119,16 @@ test("native-panel reconciliation can ignore mutations inside extension controls
     assert.equal(isExtensionOwnedNativeControlNode(extensionTab), true);
     assert.equal(isExtensionOwnedNativeControlNode(extensionTabText), true);
     assert.equal(isExtensionOwnedNativeControlNode(youtubeTab), false);
+});
+
+test("status retry button uses stable routing", () => {
+    const { calls, handler } = harness();
+
+    assert.equal(handler(clickEvent(control({ "data-retry-status": "" }))), true);
+    assert.equal(handler(clickEvent(control({ "data-open-app": "" }))), true);
+
+    assert.deepEqual(calls, [
+        ["retry-status"],
+        ["open-app"],
+    ]);
 });

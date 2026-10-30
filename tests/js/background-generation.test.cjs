@@ -80,8 +80,8 @@ test("successful native generation jobs reach completion for every production ro
             kind: "selectedProviderTimestamps",
             settings: {
                 providerID: "openaiCodex",
-                modelID: "gpt-5.6-terra",
-                modelLabel: "GPT-5.6 Terra",
+                modelID: "gpt-6.1-sol",
+                modelLabel: "GPT-6.1 Sol",
             },
             expectedAction: "generateCodexTimestamps",
             debug: {},
@@ -91,10 +91,10 @@ test("successful native generation jobs reach completion for every production ro
             kind: "selectedProviderSummary",
             settings: {
                 providerID: "openaiCodex",
-                modelID: "gpt-5.6-terra",
-                modelLabel: "GPT-5.6 Terra",
-                summaryModelID: "gpt-5.6-terra",
-                summaryModelLabel: "GPT-5.6 Terra",
+                modelID: "gpt-6.1-sol",
+                modelLabel: "GPT-6.1 Sol",
+                summaryModelID: "gpt-6.1-sol",
+                summaryModelLabel: "GPT-6.1 Sol",
                 summaryEngine: "selectedModel",
             },
             expectedAction: "generateCodexSummary",
@@ -134,6 +134,35 @@ test("successful native generation jobs reach completion for every production ro
             },
         },
         {
+            name: "Gemini Chapters",
+            kind: "selectedProviderTimestamps",
+            settings: { providerID: "googleGemini", modelID: "gemini-flash-latest", modelLabel: "Gemini Flash (latest)" },
+            expectedAction: "generateGeminiTimestamps",
+            engineLabel: "Gemini 3.8 Flash",
+            debug: { reasoningEffort: "low", inputTokens: 100, outputTokens: 20, reasoningTokens: 10 },
+        },
+        {
+            name: "Gemini Summary",
+            kind: "selectedProviderSummary",
+            settings: {
+                providerID: "googleGemini", modelID: "gemini-flash-latest", modelLabel: "Gemini Flash (latest)",
+                summaryModelID: "gemini-flash-latest", summaryModelLabel: "Gemini Flash (latest)", summaryEngine: "selectedModel",
+            },
+            expectedAction: "generateGeminiSummary",
+            engineLabel: "Gemini 3.8 Flash",
+            debug: { reasoningEffort: "low", inputTokens: 200, outputTokens: 50 },
+        },
+        {
+            name: "Gemini with Apple Summary",
+            kind: "selectedProviderSummary",
+            settings: {
+                providerID: "googleGemini", modelID: "gemini-flash-latest", modelLabel: "Gemini Flash (latest)",
+                summaryModelID: "appleIntelligence", summaryEngine: "appleIntelligence",
+            },
+            expectedAction: "generateContent",
+            debug: {},
+        },
+        {
             name: "Apple Summary",
             kind: "selectedProviderSummary",
             settings: {
@@ -162,6 +191,7 @@ test("successful native generation jobs reach completion for every production ro
             return {
                 ok: true,
                 text: `${testCase.name} result`,
+                engineLabel: testCase.engineLabel,
                 debug: testCase.debug,
             };
         });
@@ -177,6 +207,10 @@ test("successful native generation jobs reach completion for every production ro
         assert.equal(completed.status, "completed", testCase.name);
         assert.equal(completed.error, "", testCase.name);
         assert.equal(completed.text, `${testCase.name} result`, testCase.name);
+        if (testCase.engineLabel) {
+            assert.equal(completed.engineLabel, testCase.engineLabel, testCase.name);
+            assert.equal(completed.debug.engineLabel, testCase.engineLabel, testCase.name);
+        }
         assert.deepEqual(actions, ["getGenerationSettings", testCase.expectedAction]);
         assert.doesNotMatch(completed.debug.messages, /background exception/);
     }
@@ -214,8 +248,8 @@ test("selected-provider summaries forward video context without changing timesta
                 ok: true,
                 settings: {
                     providerID: "openaiCodex",
-                    modelID: "gpt-5.6-terra",
-                    summaryModelID: "gpt-5.6-terra",
+                    modelID: "gpt-6.1-sol",
+                    summaryModelID: "gpt-6.1-sol",
                     summaryEngine: "selectedModel",
                 },
             };

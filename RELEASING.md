@@ -54,7 +54,7 @@ This produces:
 
 - an `.xcarchive`
 - an exported `.app`
-- a zipped app artifact ready for release uploads
+- a zipped release artifact containing the `.app` and an `Applications` shortcut, ready for release uploads
 
 Default output location:
 
@@ -70,7 +70,7 @@ To build, notarize, staple, and regenerate the release zip:
 NOTARIZE=1 NOTARY_PROFILE=yts-notary ./scripts/build-release.sh
 ```
 
-After notarization, the script staples the exported `.app` and rebuilds the `.zip` artifact.
+The script submits a temporary app-only zip to Apple, staples the exported `.app`, and then rebuilds the public `.zip` artifact with the `Applications` shortcut. Keeping the shortcut out of the notarization upload prevents the external symlink from becoming part of Apple's validation input.
 
 ## Useful Overrides
 
@@ -82,6 +82,7 @@ You can override the defaults with environment variables:
 - `NOTARIZE`
 - `NOTARY_PROFILE`
 - `ZIP_PATH`
+- `NOTARY_ZIP_PATH` (temporary app-only upload, removed after a successful notarization submission)
 
 Example:
 
@@ -102,7 +103,14 @@ Recommended artifact:
 
 The release script creates this stable filename by default. The website points to GitHub's latest-release download URL, so do not rename it for public releases unless the website download URL changes too.
 
-When notarization is enabled, a successful script exit guarantees that the ticket was stapled and validated and that the final app passed Gatekeeper assessment. The pre-notarization Gatekeeper result is informational because rejection is expected before a ticket exists.
+After extraction, the release zip has two top-level items:
+
+- `Timestamps & Summaries for YT.app`
+- `Applications`, a Finder-visible symlink to `/Applications`
+
+Users can install the app by dragging it onto the included `Applications` shortcut.
+
+When notarization is enabled, a successful script exit guarantees that the ticket was stapled and validated and that the final app passed Gatekeeper assessment. The script also extracts the finished public ZIP into local temporary storage outside cloud-managed project folders, verifies its app signature, confirms the `Applications` symlink target, and reruns stapler and Gatekeeper checks against that extracted copy. It unregisters the temporary host before cleanup because Gatekeeper can register it without launching it. The pre-notarization Gatekeeper result is informational because rejection is expected before a ticket exists.
 
 After a tested candidate is approved, committed, tagged, pushed, and verified, publish it with the matching public title and prepared notes. For example:
 
@@ -124,6 +132,7 @@ Before attaching a release build:
 
 - confirm the Xcode app/extension `MARKETING_VERSION`, shared build number, and WebExtension manifest version all match the intended release
 - run the JavaScript and Swift regression suites, `git diff --check`, property-list/manifest validation, and a Release build or archive
+- extract the final zip and confirm it contains the app plus an `Applications` shortcut targeting `/Applications`; drag the app onto the shortcut to verify the install flow
 - open the exported app on a clean machine or user account
 - test both a fresh install and an upgrade from the previous public build; verify Safari still shows the toolbar button and enables the extension without deleting/reinstalling it
 - confirm Apple Intelligence is available on the test Mac only if it is selected for summaries
@@ -131,14 +140,14 @@ Before attaching a release build:
 - confirm Safari can enable the extension
 - confirm ChatGPT sign-in works from the companion app
 - confirm Grok completes its normal Safari loopback sign-in and that the manual callback/code recovery path remains available
-- confirm Grok 4.5 diagnostics report `reasoning effort: low` for both a generated Chapters request and a provider Summary request; Grok 4.3 should retain its provider default
+- confirm Grok 4.7, Grok 4.6, and Grok 4.5 diagnostics report `reasoning effort: low` for both generated Chapters and provider Summary requests; Grok 4.3 should retain its provider default
 - confirm the selected model and summary engine settings are shared with the Safari sidebar
 - confirm disconnected providers are disabled in the provider picker and their status labels remain concise
 - confirm the Safari toolbar popup contains only Settings
 - confirm YouTube creator chapters and automatic Key moments use the compact Chapters view and show YouTube attribution
 - on a video with native chapters and an available transcript, confirm Summary starts automatically even though provider timestamp generation is skipped
 - confirm the companion-app chapter preference chooses the default source, and the inline footer can generate/view cached chapters and switch back to YouTube chapters
-- confirm Chapters, Summary, Transcript, and Timeline keep correct content, pressed state, and inactive color through repeated tab switching
+- confirm Chapters, Summary, and Transcript keep correct content, pressed state, and inactive color through repeated tab switching; Timeline stays hidden
 - from Chapters, press the native Close control without visiting Transcript first and confirm the panel stays closed; reopen with the video-description `Show transcript`, close again, and repeat the Close -> reopen -> Close cycle at least three times while confirming Chapters/Summary remain in the one integrated panel
 - while Chapters is visible, press the video-description `Show transcript` action and confirm it selects Transcript without scrolling to, stacking, or later revealing a second transcript-only panel
 - confirm chapter/summary/transcript copy controls respond on the first click and show the success animation

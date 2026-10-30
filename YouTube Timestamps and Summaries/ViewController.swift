@@ -20,6 +20,9 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
     private let safariBundleIdentifier = "com.apple.Safari"
     private let codexAuthService = CodexAuthService()
     private let xaiAuthService = XAIAuthService()
+    private let geminiAPIClient = GeminiAPIClient()
+    private var geminiConnecting = false
+    private var geminiConnectionError: String?
     private let remoteModelCatalogService = RemoteModelCatalogService()
     private var hasSizedWindow = false
     private var statusMessage: String?
@@ -114,6 +117,15 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         case "signOutGrok":
             signOutGrok()
 
+        case "connectGemini":
+            connectGemini(body)
+
+        case "disconnectGemini":
+            disconnectGemini()
+
+        case "openGeminiAPIKeys":
+            NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/api-keys")!)
+
         default:
             break
         }
@@ -130,6 +142,42 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         settings.save()
         Task { @MainActor in
             await pushState(message: "Settings updated.")
+        }
+    }
+
+    private func connectGemini(_ body: [String: Any]) {
+        guard !geminiConnecting else { return }
+        let key = body["apiKey"] as? String ?? ""
+        geminiConnecting = true
+        geminiConnectionError = nil
+        Task { @MainActor in
+            await pushState(message: "Checking Gemini API access...")
+            do {
+                try await geminiAPIClient.connect(apiKey: key)
+                geminiConnecting = false
+                await pushState(message: "Gemini is connected. Select Google Gemini in Generation Setup to use it.")
+            } catch {
+                geminiConnecting = false
+                geminiConnectionError = error is GeminiAPIError
+                    ? error.localizedDescription
+                    : "The Gemini API key could not be saved in Keychain."
+                await pushState(message: geminiConnectionError)
+            }
+        }
+    }
+
+    private func disconnectGemini() {
+        guard !geminiConnecting else { return }
+        do {
+            try geminiAPIClient.disconnect()
+            geminiConnectionError = nil
+            Task { @MainActor in
+                await pushState(message: "Gemini API key removed.")
+            }
+        } catch {
+            Task { @MainActor in
+                await pushState(message: "The Gemini API key could not be removed from Keychain. Please try again.")
+            }
         }
     }
 
@@ -478,9 +526,15 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
         )
         let codexConnected = (codexStatus["connected"] as? Bool) == true
         let grokConnected = (grokStatus["connected"] as? Bool) == true
-        let selectedProviderConnected = settings.providerID == GenerationSettings.grokProviderID
-            ? grokConnected
-            : codexConnected
+        var geminiStatus = geminiAPIClient.statusPayload()
+        geminiStatus["connecting"] = geminiConnecting
+        if let geminiConnectionError { geminiStatus["error"] = geminiConnectionError }
+        let selectedProviderConnected: Bool
+        switch settings.providerID {
+        case GenerationSettings.grokProviderID: selectedProviderConnected = grokConnected
+        case GenerationSettings.geminiProviderID: selectedProviderConnected = (geminiStatus["connected"] as? Bool) == true
+        default: selectedProviderConnected = codexConnected
+        }
         let effectiveSettings = effectiveGenerationSettings(
             settings,
             appleIntelligenceAvailable: appleIntelligenceState.available,
@@ -497,6 +551,7 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             "appleIntelligenceAvailability": appleIntelligenceState.availability,
             "codex": mergedCodexStatus(codexStatus),
             "grok": grokStatus,
+            "gemini": geminiStatus,
             "codexLogin": codexLoginSession?.payload ?? NSNull(),
             "grokLogin": grokLoginSession?.payload ?? NSNull(),
             "settings": effectiveSettings.payload,
@@ -594,8 +649,7 @@ final class ViewController: NSViewController, WKNavigationDelegate, WKScriptMess
             do {
                 let remoteOptions = try await xaiAuthService.modelOptions().filter { option in
                     guard let id = option["id"]?.lowercased() else { return false }
-                    return id != GenerationSettings.defaultGrokModelID
-                        && id != "\(GenerationSettings.defaultGrokModelID)-latest"
+                    return id == GenerationSettings.grokProviderModelID(for: id)
                 }
                 if !remoteOptions.isEmpty {
                     options = mergedModelOptions(primary: remoteOptions, fallback: options)

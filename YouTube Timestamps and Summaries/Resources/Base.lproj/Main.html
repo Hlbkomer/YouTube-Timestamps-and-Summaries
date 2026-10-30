@@ -83,6 +83,21 @@
             </div>
         </section>
 
+        <section class="panel gemini-panel">
+            <p class="section-label">Optional Gemini API Connection</p>
+            <p id="gemini-status" class="connection-status" role="status">Checking Gemini…</p>
+            <label class="field compact-field">
+                <span>Gemini API key</span>
+                <input id="gemini-api-key" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="gemini-key-hint">
+            </label>
+            <p id="gemini-key-hint" class="hint">Your key is stored in macOS Keychain. Usage is billed to your Google API project and can use eligible developer credits.</p>
+            <div class="button-row">
+                <button id="gemini-connect" class="primary" type="button">Connect Gemini</button>
+                <button id="gemini-disconnect" class="secondary" type="button" hidden>Remove API Key</button>
+                <button id="gemini-api-keys" class="secondary" type="button">Open Google AI Studio</button>
+            </div>
+        </section>
+
         <section class="panel status-panel">
             <div>
                 <p class="section-label">Extension Status</p>

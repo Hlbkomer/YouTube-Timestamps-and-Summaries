@@ -96,7 +96,7 @@ final class GrokGenerationService {
                 """
             },
             normalize: { rawText, transcript in
-                Self.cleanTimestamps(rawText, transcript: transcript)
+                ProviderTimestampText.cleaned(rawText, transcript: transcript)
             },
             emptyResponseMessage: "Grok did not return usable timestamps."
         )
@@ -216,7 +216,7 @@ final class GrokGenerationService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("TimestampsSummariesForYT/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue(GenerationSettings.providerUserAgent, forHTTPHeaderField: "User-Agent")
 
         var body: [String: Any] = [
             "model": model,
@@ -338,16 +338,16 @@ final class GrokGenerationService {
     }
 
     /// Derive reasoning at the final network boundary from the exact provider
-    /// model being serialized. This prevents a caller from omitting Grok 4.5's
-    /// explicit low effort and silently falling through to xAI's default.
+    /// model being serialized. This prevents a caller from omitting the explicit
+    /// low effort and silently falling through to xAI's high default.
     private static func reasoningRequestValue(
         forProviderModel model: String
     ) throws -> [String: String]? {
         let reasoning = GenerationSettings.grokReasoningRequestValue(for: model)
-        guard !GenerationSettings.isGrok45ModelID(model)
+        guard !GenerationSettings.requiresExplicitLowGrokReasoning(model)
             || reasoning == ["effort": "low"] else {
             throw GrokGenerationError.requestFailed(
-                "Grok 4.5 request configuration is invalid."
+                "Grok low-reasoning request configuration is invalid."
             )
         }
         return reasoning
@@ -465,41 +465,5 @@ final class GrokGenerationService {
         return (json["error_description"] as? String)
             ?? (json["message"] as? String)
             ?? (json["error"] as? String)
-    }
-
-    private static func cleanTimestamps(_ text: String, transcript: String) -> String {
-        let validTimes = Set(
-            transcript
-                .split(whereSeparator: \.isNewline)
-                .compactMap { line -> String? in
-                    let prefix = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard let closingBracket = prefix.firstIndex(of: "]"), prefix.hasPrefix("[") else {
-                        return nil
-                    }
-                    return String(prefix[prefix.index(after: prefix.startIndex)..<closingBracket])
-                }
-        )
-        let timestampPattern = try? NSRegularExpression(pattern: "^(\\d{1,2}:\\d{2}(?::\\d{2})?)\\s+(.+?)\\s*$")
-
-        return text
-            .split(whereSeparator: \.isNewline)
-            .compactMap { line -> String? in
-                let value = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
-                let range = NSRange(value.startIndex..<value.endIndex, in: value)
-                guard let match = timestampPattern?.firstMatch(in: value, range: range), match.numberOfRanges == 3,
-                      let timeRange = Range(match.range(at: 1), in: value),
-                      let titleRange = Range(match.range(at: 2), in: value)
-                else {
-                    return nil
-                }
-
-                let time = String(value[timeRange])
-                let title = String(value[titleRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !title.isEmpty, validTimes.contains(time) else {
-                    return nil
-                }
-                return "\(time) \(title)"
-            }
-            .joined(separator: "\n")
     }
 }

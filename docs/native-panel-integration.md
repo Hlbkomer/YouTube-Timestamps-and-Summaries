@@ -1,6 +1,6 @@
 # Native YouTube Panel Integration
 
-Date: 2026-07-20
+Updated: 2026-10-18
 
 This note documents the implemented move from the extension-owned YouTube sidebar toward YouTube's native `In this video` engagement panel. The original investigation remains in [chapter-integration-investigation.md](chapter-integration-investigation.md); this file describes the current implementation.
 
@@ -10,7 +10,7 @@ This note documents the implemented move from the extension-owned YouTube sideba
 - Import YouTube's creator chapters, automatic chapters, and `Key moments` into the compact extension Chapters view by default.
 - Generate our own transcript-based chapters when YouTube does not provide chapters, when the global setting says to always generate, or when the Chapters footer overrides the current video.
 - Keep `Summary` in the same native panel.
-- Reuse YouTube's native `Transcript` and `Timeline` tabs when they exist.
+- Reuse YouTube's native `Transcript` tab and hide the native `Timeline` chip in the integrated row.
 - Keep the old standalone sidebar as a fallback when the native panel is unavailable and a transcript is confirmed.
 - Avoid patching YouTube player scrubber-bar internals.
 
@@ -89,7 +89,7 @@ Key `native-panel.js` flow:
 - `createNativePanelController()` receives explicit hooks for state, rendering, transcript copy, and generation retries.
 - `getMount()` finds the native `In this video` panel and returns its shell, content body, and tab list.
 - `syncTabs()` injects, orders, selects, and resyncs extension-owned native chips.
-- `syncNativeOwnedTabVisibility()` hides YouTube's native `Chapters` or `Key moments` chip while imported or replacement chapters use the compact extension view.
+- `syncNativeOwnedTabVisibility()` always hides the native `Timeline` chip in the integrated row, and hides YouTube's native `Chapters` or `Key moments` chip while imported or replacement chapters use the compact extension view. The existing reversible visibility marker restores the original inline display during cleanup.
 - `syncNativeOwnedTabSelectionAppearance()` temporarily suppresses native Transcript/Timeline pressed styling while an extension tab owns the shared content surface, without changing YouTube's internal chip classes.
 - `syncContentVisibility()` hides YouTube-owned body content while an extension tab is active and restores it for native tabs.
 - `syncHeaderCopyButton()` owns the header copy button beside YouTube's close button.
@@ -100,7 +100,7 @@ Key `page-controls.js` flow:
 - `createPageControlHandler()` routes only extension-owned controls identified by extension data attributes.
 - The same handler is attached at the stable window and document capture boundaries, with the standalone Shadow Root as a fallback.
 - Replaced YouTube chip rows and headers therefore do not create a period where extension tabs or Copy lack a listener.
-- YouTube-owned Transcript, Timeline, chapter/Key moments, and Close controls do not match the click router. Transcript, Timeline, and Close remain visible native interactions; the native chapter chip is presentation-only and is hidden when its data has been migrated.
+- YouTube-owned Transcript, Timeline, chapter/Key moments, and Close controls do not match the click router. Transcript and Close remain visible native interactions; Timeline is hidden by product choice; the native chapter chip is presentation-only and is hidden when its data has been migrated.
 - `isExtensionOwnedNativeControlNode()` identifies observer records created inside injected tabs and header actions so reconciliation ignores its own DOM work.
 
 Key `youtube-helpers.js` flow:
@@ -112,14 +112,13 @@ Key `youtube-helpers.js` flow:
 
 ## User-Facing Behavior
 
-The extension opens and augments YouTube's native `In this video` panel for its own results. It does not prevent, replace, or redirect the Close, Transcript, or Timeline controls inside that panel. Because the extension can make the existing shell visible while YouTube's private state still considers it closed, it observes Close and finalizes hiding that same shell after YouTube receives the click. The separate `Show transcript` command in the video description is routed through the existing in-panel Transcript chip when the integrated shell is available, because YouTube otherwise opens a second transcript-only engagement panel without Chapters or Summary.
+The extension opens and augments YouTube's native `In this video` panel for its own results. It does not prevent or replace native Close or Transcript clicks. Timeline is hidden in the integrated tab row without removing its DOM or intercepting its native events. Because the extension can make the existing shell visible while YouTube's private state still considers it closed, it observes Close and finalizes hiding that same shell after YouTube receives the click. The separate `Show transcript` command in the video description is routed through the existing in-panel Transcript chip when the integrated shell is available, because YouTube otherwise opens a second transcript-only engagement panel without Chapters or Summary.
 
 The intended tab order is:
 
 1. `Chapters`
 2. `Summary`
 3. `Transcript`
-4. `Timeline`
 
 ### Close and reopen ownership contract
 
@@ -137,7 +136,9 @@ Keep these invariants together:
 
 The automated regression tests cover direct Close from Chapters, Close from a reopened Transcript sibling, and three repeated Close -> `Show transcript` -> Close cycles. The manual release matrix repeats the same sequence in Safari because YouTube's private state cannot be reproduced completely by DOM mocks.
 
-`Timeline` is shown only when YouTube provides it. `Transcript` is YouTube-owned. `Summary` and the unified compact `Chapters` view are extension-owned tabs injected into the native tab row.
+`Timeline` is hidden in the integrated tab row, including when YouTube replaces or localizes the chip. `Transcript` remains visible and YouTube-owned. `Summary` and the unified compact `Chapters` view are extension-owned tabs injected into the native tab row.
+
+The [October 18 history audit](timeline-history-audit-2026-10-18.md) records the earlier decision to preserve an available Timeline tab. The subsequent explicit user request to hide Timeline supersedes that presentation policy. Native Timeline recognition, handoff, and sibling-close handling remain for compatibility with YouTube state; the historical Timeline interaction tests below cover those internal paths, rather than a visible Timeline button.
 
 If YouTube already has native chapters:
 
@@ -464,7 +465,7 @@ The fallback remains important because:
 - transcript-backed generation should remain usable on layouts that omit the native shell
 - localized or experimental YouTube layouts may not have the same native structure
 
-If neither a genuine native shell nor a usable transcript exists, the extension leaves the page untouched: it does not mount the fallback, start automatic generation, show a transcript error, or open YouTube's structured Description engagement panel. While passive transcript discovery is pending, fallback placement also remains pending so an error-only sidebar never flashes before disappearing. One availability state in `transcript-orchestrator.js` owns `unknown`, `pending`, `available`, and `unavailable`; placement and generation consume that state instead of running separate transcript detectors.
+If neither a genuine native shell nor a usable transcript exists, the extension leaves the page untouched: it does not mount the fallback, start automatic generation, show a transcript error, or open YouTube's structured Description engagement panel. Parent-shell recognition fails closed on every explicit `target-id`; the currently observed parent is targetless, while Description, Transcript, comments, ads, and chapter-data siblings carry their own targets. This prevents a targeted Description surface from qualifying during post-live initialization even if it temporarily retains stale `In this video` title or chip semantics. The controller also remembers when it changed a hidden parent shell to expanded and restores that hidden state if the element is subsequently retargeted or the caption/chapter/result evidence disappears. While passive transcript discovery is pending, fallback placement also remains pending so an error-only sidebar never flashes before disappearing. One availability state in `transcript-orchestrator.js` owns `unknown`, `pending`, `available`, and `unavailable`; placement and generation consume that state instead of running separate transcript detectors.
 
 The native transcript fallback never expands a generic video description. Even inside `ytd-video-description-transcript-section-renderer`, a control must carry recognized transcript semantics such as `Show transcript` or localized `Prepis`; renderer ancestry alone is not evidence because captionless live pages can expose an empty or reused shell containing unrelated controls. This guard is paired with strict native-shell recognition so a transcript-free Description surface cannot be mistaken for, or opened in place of, `In this video`.
 

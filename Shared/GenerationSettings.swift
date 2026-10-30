@@ -15,17 +15,21 @@ nonisolated struct GenerationSettings {
 
     static let chatGPTProviderID = "openaiCodex"
     static let grokProviderID = "xaiOAuth"
+    static let geminiProviderID = "googleGemini"
+    static let defaultGeminiModelID = "gemini-flash-latest"
+    static let geminiFlashLiteModelID = "gemini-3.5-flash-lite"
+    static let geminiArgonModelID = "gemini-4-argon"
+    static let geminiThinkingLevel = "LOW"
     private static let legacyGrokBuildProviderID = "grokBuild"
     private static let legacyGrokBuildModelID = "grok-build-0.1"
-    private static let legacyChatGPTSolAlias = "gpt-5.6"
-    private static let legacyChatGPT54ModelID = "gpt-5.4"
-    private static let legacyChatGPT54MiniModelID = "gpt-5.4-mini"
-    static let chatGPTSolModelID = "gpt-5.6-sol"
-    static let chatGPTTerraModelID = "gpt-5.6-terra"
-    static let chatGPTLunaModelID = "gpt-5.6-luna"
+    static let chatGPTSolModelID = "gpt-6.1-sol"
+    static let chatGPTLunaModelID = "gpt-6-luna"
+    static let grok45ModelID = "grok-4.5"
+    static let grok46ModelID = "grok-4.6"
+    static let grok47ModelID = "grok-4.7"
     static let defaultProviderID = chatGPTProviderID
-    static let defaultModelID = chatGPTTerraModelID
-    static let defaultGrokModelID = "grok-4.5"
+    static let defaultModelID = chatGPTLunaModelID
+    static let defaultGrokModelID = grok47ModelID
     static let defaultSummaryEngine = "selectedModel"
     static let appleIntelligenceModelID = "appleIntelligence"
     static let appleIntelligenceLabel = "Apple Intelligence"
@@ -40,6 +44,15 @@ nonisolated struct GenerationSettings {
     static let preferNativeChapters = "preferNative"
     static let alwaysGenerateChapters = "alwaysGenerate"
     static let defaultChapterPreference = preferNativeChapters
+
+    static var providerUserAgent: String {
+        let version = ((Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let reportedVersion = version.isEmpty ? "unknown" : version
+        return "TimestampsSummariesForYT/\(reportedVersion)"
+    }
 
     let providerID: String
     let modelID: String
@@ -138,7 +151,11 @@ nonisolated struct GenerationSettings {
         providerModels: [[String: String]],
         appleModels: [[String: String]]
     ) -> [[String: String]] {
-        providerModels + appleModels
+        // Apple Intelligence sorts alphabetically before every cloud provider.
+        // providerModels contains the selected provider's models only.
+        appleModels.sorted {
+            ($0["label"] ?? "").localizedCaseInsensitiveCompare($1["label"] ?? "") == .orderedAscending
+        } + sortedModelOptions(providerModels)
     }
 
     static var providerOptions: [[String: String]] {
@@ -151,15 +168,35 @@ nonisolated struct GenerationSettings {
                 "id": grokProviderID,
                 "label": "Grok (SuperGrok)",
             ],
-        ]
+            [
+                "id": geminiProviderID,
+                "label": "Gemini",
+            ],
+        ].sorted {
+            ($0["label"] ?? "").localizedCaseInsensitiveCompare($1["label"] ?? "") == .orderedAscending
+        }
     }
 
     static func modelOptions(for providerID: String) -> [[String: String]] {
         switch normalizedProviderID(providerID) {
+        case geminiProviderID:
+            return [
+                ["id": geminiArgonModelID, "label": "Gemini 4 Argon"],
+                ["id": defaultGeminiModelID, "label": "Gemini Flash (latest)"],
+                ["id": geminiFlashLiteModelID, "label": "Gemini 3.5 Flash-Lite"],
+            ]
         case grokProviderID:
             return [
                 [
                     "id": defaultGrokModelID,
+                    "label": "Grok 4.7",
+                ],
+                [
+                    "id": grok46ModelID,
+                    "label": "Grok 4.6",
+                ],
+                [
+                    "id": grok45ModelID,
                     "label": "Grok 4.5",
                 ],
                 [
@@ -171,27 +208,26 @@ nonisolated struct GenerationSettings {
             return [
                 [
                     "id": chatGPTSolModelID,
-                    "label": "GPT-5.6 Sol",
-                ],
-                [
-                    "id": chatGPTTerraModelID,
-                    "label": "GPT-5.6 Terra",
+                    "label": "GPT-6.1 Sol",
                 ],
                 [
                     "id": chatGPTLunaModelID,
-                    "label": "GPT-5.6 Luna",
-                ],
-                [
-                    "id": "gpt-5.5",
-                    "label": "GPT-5.5 Thinking",
+                    "label": "GPT-6 Luna",
                 ],
             ]
         }
     }
 
     static func sortedModelOptions(_ options: [[String: String]]) -> [[String: String]] {
-        options.enumerated()
+        let geminiOrder = modelOptions(for: geminiProviderID).compactMap { $0["id"] }
+        return options.enumerated()
             .sorted { lhs, rhs in
+                // Flash latest has no numeric version. Use the curated Gemini
+                // order so it stays between Argon and the older Lite generation.
+                if let lhsIndex = geminiOrder.firstIndex(of: lhs.element["id"] ?? ""),
+                   let rhsIndex = geminiOrder.firstIndex(of: rhs.element["id"] ?? "") {
+                    return lhsIndex < rhsIndex
+                }
                 let lhsVersion = modelVersionComponents(lhs.element["id"] ?? "")
                 let rhsVersion = modelVersionComponents(rhs.element["id"] ?? "")
                 let componentCount = max(lhsVersion.count, rhsVersion.count)
@@ -205,7 +241,7 @@ nonisolated struct GenerationSettings {
                 }
 
                 // Keep the curated/API order for variants of the same version,
-                // such as GPT-5.6 Sol, Terra, and Luna.
+                // such as GPT-6.1 Sol and GPT-6 Luna.
                 return lhs.offset < rhs.offset
             }
             .map(\.element)
@@ -237,22 +273,76 @@ nonisolated struct GenerationSettings {
     }
 
     static func defaultModelID(for providerID: String) -> String {
-        normalizedProviderID(providerID) == grokProviderID
-            ? defaultGrokModelID
-            : defaultModelID
+        switch normalizedProviderID(providerID) {
+        case grokProviderID: return defaultGrokModelID
+        case geminiProviderID: return defaultGeminiModelID
+        default: return defaultModelID
+        }
+    }
+
+    static func providerLabel(for providerID: String) -> String {
+        providerOptions.first { $0["id"] == providerID }?["label"] ?? "selected provider"
     }
 
     static func isGrok45ModelID(_ modelID: String) -> Bool {
         let candidate = canonicalModelID(modelID, providerID: grokProviderID)
             .lowercased()
-        return candidate == defaultGrokModelID
+        return candidate == grok45ModelID
     }
 
-    /// Every Grok 4.5 request must carry an explicit low-reasoning payload.
+    static func isGrok46ModelID(_ modelID: String) -> Bool {
+        let candidate = canonicalModelID(modelID, providerID: grokProviderID)
+            .lowercased()
+        return candidate == grok46ModelID
+    }
+
+    static func isGrok47ModelID(_ modelID: String) -> Bool {
+        let candidate = canonicalModelID(modelID, providerID: grokProviderID)
+            .lowercased()
+        return candidate == grok47ModelID
+    }
+
+    static func requiresExplicitLowGrokReasoning(_ modelID: String) -> Bool {
+        isGrok45ModelID(modelID)
+            || isGrok46ModelID(modelID)
+            || isGrok47ModelID(modelID)
+    }
+
+    /// Luna (fast default) and Sol (flagship) both use an explicit low reasoning
+    /// effort for transcript generation. Sol always reasons and does not accept
+    /// `none`; neither model is sent temperature/top_p, because Codex Responses
+    /// requests here never include sampling parameters. Other (catalog-added)
+    /// models retain the provider default.
+    static func chatGPTReasoningRequestValue(for modelID: String) -> [String: String]? {
+        let normalizedModel = normalizedModelID(
+            modelID,
+            providerID: chatGPTProviderID
+        )
+        switch normalizedModel {
+        case chatGPTLunaModelID, chatGPTSolModelID:
+            return ["effort": "low"]
+        default:
+            return nil
+        }
+    }
+
+    /// OpenAI IDs that are no longer offered. A saved selection with one of
+    /// these IDs is treated as unusable and falls back to the default Luna model.
+    private static let retiredChatGPTModelIDPrefixes = [
+        "gpt-3", "gpt-4", "gpt-5", "gpt-6-astra",
+    ]
+
+    private static func isRetiredChatGPTModelID(_ modelID: String) -> Bool {
+        let lowercased = modelID.lowercased()
+        return retiredChatGPTModelIDPrefixes.contains { lowercased.hasPrefix($0) }
+    }
+
+    /// Every curated Grok 4.5, 4.6, and 4.7 request must carry an explicit
+    /// low-reasoning payload.
     /// Older and future model families retain the provider default until
     /// separately validated.
     static func grokReasoningEffort(for modelID: String) -> String? {
-        isGrok45ModelID(modelID) ? "low" : nil
+        requiresExplicitLowGrokReasoning(modelID) ? "low" : nil
     }
 
     static func grokReasoningRequestValue(for modelID: String) -> [String: String]? {
@@ -309,6 +399,10 @@ nonisolated struct GenerationSettings {
     private static func allowsFutureModelID(_ modelID: String, providerID: String) -> Bool {
         guard !modelID.isEmpty else { return false }
         switch normalizedProviderID(providerID) {
+        case geminiProviderID:
+            // Use only the curated text models. Do not accept arbitrary
+            // image/audio/agent model IDs from saved settings or native messages.
+            return false
         case grokProviderID:
             return modelID.hasPrefix("grok-")
                 && !modelID.hasPrefix("grok-build-")
@@ -319,7 +413,7 @@ nonisolated struct GenerationSettings {
                 && !modelID.contains("imagine")
                 && !modelID.contains("voice")
         default:
-            return modelID.hasPrefix("gpt-")
+            return modelID.hasPrefix("gpt-") && !isRetiredChatGPTModelID(modelID)
         }
     }
 
@@ -331,30 +425,45 @@ nonisolated struct GenerationSettings {
 
     private static func canonicalModelID(_ modelID: String, providerID: String) -> String {
         let candidate = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedProviderID(providerID) == geminiProviderID {
+            for curatedModelID in supportedModelIDs(for: geminiProviderID)
+            where candidate.lowercased() == curatedModelID {
+                return curatedModelID
+            }
+        }
         if normalizedProviderID(providerID) == chatGPTProviderID {
-            switch candidate.lowercased() {
-            case legacyChatGPTSolAlias:
-                return chatGPTSolModelID
-            case legacyChatGPT54ModelID:
-                return chatGPTTerraModelID
-            case legacyChatGPT54MiniModelID:
-                return chatGPTLunaModelID
-            default:
-                break
+            // Matching is case-insensitive so " GPT-6-Luna " resolves to the curated ID.
+            for curatedModelID in [chatGPTSolModelID, chatGPTLunaModelID]
+            where candidate.lowercased() == curatedModelID {
+                return curatedModelID
             }
         }
         if normalizedProviderID(providerID) == grokProviderID {
             let lowercasedCandidate = candidate.lowercased()
-            if lowercasedCandidate == defaultGrokModelID
-                || lowercasedCandidate.hasPrefix("\(defaultGrokModelID)-")
-            {
-                return defaultGrokModelID
+            for curatedModelID in [defaultGrokModelID, grok46ModelID, grok45ModelID] {
+                if lowercasedCandidate == curatedModelID
+                    || lowercasedCandidate.hasPrefix("\(curatedModelID)-")
+                {
+                    return curatedModelID
+                }
             }
         }
         return candidate
     }
 
     private static func generatedModelLabel(for modelID: String, providerID: String) -> String {
+        if normalizedProviderID(providerID) == geminiProviderID, modelID.hasPrefix("gemini-") {
+            let words = modelID.dropFirst("gemini-".count).split(separator: "-").map { word in
+                switch word {
+                case "flash": return "Flash"
+                case "lite": return "Lite"
+                case "argon": return "Argon"
+                default: return String(word)
+                }
+            }
+            return "Gemini " + words.joined(separator: " ").replacingOccurrences(of: "Flash Lite", with: "Flash-Lite")
+        }
+
         if normalizedProviderID(providerID) == grokProviderID, modelID.hasPrefix("grok-") {
             let version = String(modelID.dropFirst("grok-".count))
             return "Grok " + version.replacingOccurrences(of: "-", with: " ")

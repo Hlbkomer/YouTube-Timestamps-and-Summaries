@@ -1,28 +1,25 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-23",
+  "updatedAt": "2026-10-03",
   "providers": {
     "openaiCodex": {
       "models": [
         {
-          "id": "gpt-5.6-sol",
-          "label": "GPT-5.6 Sol"
+          "id": "gpt-6.1-sol",
+          "label": "GPT-6.1 Sol"
         },
         {
-          "id": "gpt-5.6-terra",
-          "label": "GPT-5.6 Terra"
-        },
-        {
-          "id": "gpt-5.6-luna",
-          "label": "GPT-5.6 Luna"
-        },
-        {
-          "id": "gpt-5.5",
-          "label": "GPT-5.5 Thinking"
+          "id": "gpt-6-luna",
+          "label": "GPT-6 Luna"
         }
       ],
       "excludedModelIDs": [
+        "gpt-6-astra",
         "gpt-5.6",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "gpt-5.5",
         "gpt-5.4",
         "gpt-5.4-mini"
       ],

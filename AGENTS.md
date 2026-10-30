@@ -10,3 +10,10 @@
 - Keep normal development signing enabled. Do not use unsigned hosted test builds on the Mac where the Safari extension is enabled, because Launch Services may select the unsigned copy.
 
 The detailed rationale and release procedure are in `RELEASING.md` under “Development Safari Testing.”
+
+## Model settings policy — non-negotiable
+
+- Do not add per-model or per-version settings migrations, retired-ID remapping, or migration-specific branches/tests.
+- Change the provider's default when needed. Unsupported saved settings must use the existing generic validation and default fallback, without special handling for the previous model.
+- Do not retain retired model IDs solely to map them to a replacement. Valid saved user choices remain authoritative.
+- This policy concerns generation settings; it does not remove the separate security procedure that moves legacy credentials into Keychain.

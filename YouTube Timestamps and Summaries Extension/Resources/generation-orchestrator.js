@@ -105,6 +105,7 @@
         now = () => Date.now(),
         pollIntervalMs = 1000,
         waitNoticeIntervalMs = 5000,
+        maxConsecutiveTransientFailures = 6,
     }) {
         async function poll({
             jobID,
@@ -112,17 +113,34 @@
             isCurrent = () => true,
             onMessages = () => {},
             onWait = () => {},
+            onTransientError = () => {},
             timeoutError = "Timed out waiting for generation.",
         }) {
             const startedAt = now();
             const deadline = startedAt + timeoutMs;
             let lastWaitNoticeAt = startedAt;
+            let consecutiveTransientFailures = 0;
 
             while (now() < deadline) {
                 let response;
                 try {
                     response = await request(jobID);
+                    consecutiveTransientFailures = 0;
                 } catch (error) {
+                    // A single poll that never gets an answer (for example a
+                    // 20s sendMessage timeout while Safari wakes or suspends the
+                    // background page) says nothing about the job itself, which
+                    // keeps running natively. Retry within the generation budget
+                    // instead of failing the whole request.
+                    consecutiveTransientFailures += 1;
+                    if (consecutiveTransientFailures <= maxConsecutiveTransientFailures) {
+                        if (!isCurrent()) {
+                            return { stale: true };
+                        }
+                        onTransientError(error, consecutiveTransientFailures);
+                        await sleep(pollIntervalMs);
+                        continue;
+                    }
                     response = {
                         ok: false,
                         error: error?.message || "Polling the background job failed.",

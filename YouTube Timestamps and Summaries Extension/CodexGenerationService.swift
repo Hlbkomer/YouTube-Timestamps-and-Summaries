@@ -279,7 +279,7 @@ final class CodexGenerationService {
             request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-ID")
         }
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "instructions": instructions,
             "input": [
@@ -296,6 +296,9 @@ final class CodexGenerationService {
             "stream": true,
             "store": false,
         ]
+        if let reasoning = GenerationSettings.chatGPTReasoningRequestValue(for: model) {
+            body["reasoning"] = reasoning
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
 
         let (bytes, response) = try await URLSession.shared.bytes(for: request)

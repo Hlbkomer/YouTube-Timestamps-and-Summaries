@@ -1,89 +1,165 @@
 ---
 title: Timestamps & Summaries for YT
+description: Chapters and summaries for YouTube, built into Safari.
 ---
 
-# Timestamps & Summaries for YT
+<style>
+  .markdown-body { max-width: none; }
+  .yts-home { color: #172033; }
+  .yts-home * { box-sizing: border-box; }
+  .yts-home img { display: block; width: 100%; margin: 0; border: 0; }
+  .yts-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
+    gap: clamp(2rem, 6vw, 5rem);
+    align-items: center;
+    padding: clamp(2.5rem, 7vw, 6rem) 0;
+  }
+  .yts-kicker {
+    margin: 0 0 .8rem;
+    color: #1764a8;
+    font-size: .8rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .yts-hero h1 {
+    margin: 0;
+    color: #121a2b;
+    font-size: clamp(2.5rem, 6vw, 5.25rem);
+    line-height: .98;
+    letter-spacing: -.055em;
+  }
+  .yts-lede {
+    max-width: 42rem;
+    margin: 1.5rem 0 0;
+    color: #536077;
+    font-size: clamp(1.05rem, 2vw, 1.35rem);
+    line-height: 1.55;
+  }
+  .yts-actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.8rem; }
+  .yts-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 46px;
+    padding: .72rem 1.15rem;
+    border: 1px solid #d9e0e9;
+    border-radius: 12px;
+    background: #fff;
+    color: #172033 !important;
+    font-weight: 750;
+    text-decoration: none !important;
+  }
+  .yts-button-primary { border-color: #155da2; background: #155da2; color: #fff !important; }
+  .yts-proof { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.2rem; color: #69758a; font-size: .88rem; }
+  .yts-proof span { padding: .34rem .58rem; border-radius: 999px; background: #f2f6fa; }
+  .yts-window {
+    overflow: hidden;
+    border: 1px solid #dce2e9;
+    border-radius: 22px;
+    background: #f5f7f9;
+    box-shadow: 0 28px 65px rgba(23, 32, 51, .16);
+  }
+  .yts-section { padding: clamp(2.8rem, 7vw, 6rem) 0; border-top: 1px solid #e8ecf1; }
+  .yts-section h2 { margin: 0; color: #121a2b; font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.05; letter-spacing: -.04em; }
+  .yts-section-lede { max-width: 48rem; margin: 1rem 0 2rem; color: #5d687c; font-size: 1.1rem; line-height: 1.65; }
+  .yts-showcase { overflow: hidden; border: 1px solid #dce2e9; border-radius: 20px; box-shadow: 0 24px 58px rgba(23, 32, 51, .12); }
+  .yts-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  .yts-gallery figure { margin: 0; }
+  .yts-gallery figcaption { margin-top: .65rem; color: #69758a; font-size: .9rem; }
+  .yts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .yts-card { padding: 1.35rem; border: 1px solid #e1e6ec; border-radius: 16px; background: #fff; }
+  .yts-card h3 { margin: 0 0 .55rem; color: #172033; font-size: 1.08rem; }
+  .yts-card p { margin: 0; color: #667287; line-height: 1.55; }
+  .yts-release {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1.5rem;
+    align-items: center;
+    padding: clamp(1.5rem, 4vw, 2.4rem);
+    border-radius: 20px;
+    background: linear-gradient(135deg, #12233d, #165f9e);
+    color: #fff;
+  }
+  .yts-release h2 { color: #fff; }
+  .yts-release p { max-width: 43rem; margin: .8rem 0 0; color: #dbeafb; line-height: 1.55; }
+  .yts-release .yts-button { border-color: #fff; background: #fff; }
+  .yts-links { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.6rem; }
+  @media (max-width: 780px) {
+    .yts-hero, .yts-gallery, .yts-grid, .yts-release { grid-template-columns: 1fr; }
+    .yts-release { align-items: start; }
+    .yts-hero-art { order: -1; max-width: 34rem; }
+  }
+</style>
 
-Timestamps & Summaries for YT is a Safari extension and macOS companion app that helps people generate:
-
-- chronological timestamps for YouTube videos
-- short summaries for YouTube videos
-
-The extension integrates with YouTube's native `In this video` panel when available, with a standalone sidebar fallback only after a usable transcript is confirmed. If neither the native shell nor a transcript exists, it leaves the page untouched. It creates summaries with Apple Intelligence on the Mac or the selected provider, and creates chapters/timestamps when the selected provider is ready. No API key or developer backend is required.
-
-![Companion app screenshot](readme-assets/companion-app.png)
-
-![YouTube integration screenshot](readme-assets/youtube-sidebar.png)
-
-## How It Works
-
-1. The Safari extension detects a supported YouTube watch or live page.
-2. The extension fetches the available YouTube transcript for that video.
-3. Apple Intelligence can create summaries locally without a provider.
-4. If the selected provider is ready, it creates timestamp candidates from the transcript.
-5. The selected provider or Apple Intelligence creates the summary, depending on the user's setting.
-6. The extension validates timestamp candidates against real transcript cue times before showing clickable generated chapters.
-
-When YouTube already provides creator chapters or automatic `Key moments`, the extension imports them into the same compact Chapters list and skips generated timestamp creation for that video by default. The companion app can switch the default to always generate extension chapters. The Chapters footer identifies the active source and offers `Generate chapters from transcript` before a matching generated result exists, `View generated chapters` once it is cached, or `View YouTube chapters` when switching back. The action appears on a second line without terminal punctuation. The Safari toolbar popup contains only Settings; current-video source switching lives beside the result so page state has one owner. The currently playing chapter is highlighted during playback regardless of source.
-
-Imported chapters resolve only the Chapters result: Summary still starts automatically whenever its configured engine and the shared transcript are available. Lazy native chapter discovery renders `Checking for YouTube chapters...` rather than a temporary empty result. If both the native `In this video` shell and a usable transcript are absent, the page is left unchanged; when only the shell is absent, a confirmed transcript can still use the standalone fallback.
-
-During YouTube watch-to-watch navigation, the extension keeps the outgoing tab chrome stable until the destination commits, then clears the previous video's rows before rendering the new result. Async generation is matched by video key and monotonic generation ID, preventing stale work from changing the destination result or clearing its `Chapters...` busy state during tab switching. When navigation commits to the homepage or another non-video page, the integration is removed cleanly. A lightweight route guard on feeds/homepage forces watch/live links through a real navigation so Safari reliably injects the full video-page integration, while Shorts and other non-video pages remain untouched.
-
-Successful results include a small caption with the active model or Apple Intelligence choice plus elapsed generation time. Generated chapters use `Chapters generated with Grok 4.5 in 8 seconds.`; summaries use `Generated with Grok 4.5 in 15 seconds.` or `Generated with Apple Intelligence in 75 seconds.` In the native panel, generated timestamps are presented as `Chapters`; in the standalone fallback they remain `Timestamps`.
-
-## Requirements
-
-- macOS 26.4 or later
-- optional ChatGPT/Codex or Grok sign-in for timestamps and model-powered summaries.
-- Apple Intelligence enabled and compatible Apple silicon hardware only if Apple Intelligence is selected for summaries
-- captions or an available transcript for generated results; imported YouTube chapters can display without one
-
-## Data Flow
-
-- The extension reads the current YouTube video URL to identify supported video pages.
-- Transcript text is sent to the selected provider for timestamp generation.
-- Transcript text is sent to the selected provider or processed locally with Apple Intelligence for summary generation, depending on the summary setting.
-- When Apple Intelligence is selected, the single Summary tab uses the established path on macOS 26. On macOS 27, the existing Summary model picker contains one Apple Intelligence choice backed by the detailed adaptive-grounded pipeline. Connected provider models appear before it. Private Cloud Compute is deferred while its managed entitlement is pending.
-- Grok uses an explicit browser OAuth sign-in, then the sandboxed extension sends direct HTTPS requests to xAI. It does not use a command-line client or a helper process. If Safari cannot reach the temporary local callback page after approval, the companion app can complete that same sign-in from a pasted callback URL or one-time authorization code.
-- The app does not require API keys or a developer-operated backend for generation.
-
-The native YouTube panel implementation notes are documented in [native-panel-integration.md](native-panel-integration.md).
-
-The Grok and ChatGPT/Codex picker catalog behavior, model exclusions, and remote catalog maintenance process are documented in [model-catalog.md](model-catalog.md).
-
-The repository-wide maintenance findings, justified Safari workarounds, and recommended cleanup order are documented in [code-complexity-review.md](code-complexity-review.md).
-
-The July 24 implementation tracker, rollback point, completed hardening changes, and deliberately deferred complexity are documented in [code-review-hardening-2026-07-24.md](code-review-hardening-2026-07-24.md).
-
-The completed version 1.1 behavior audit, automated validation, notarization, and publication record is documented in [release-1.1-readiness.md](release-1.1-readiness.md).
-
-## Download And Support
-
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin: 1.5rem 0;">
-  <section style="border: 1px solid #d8dee4; border-radius: 12px; padding: 1rem;">
-    <h3 style="margin-top: 0;">Download</h3>
-    <p>Download the signed and notarized macOS app. The current release is <strong>1.1</strong>, published July 20, 2026.</p>
-    <p>
-      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip">Download Timestamps &amp; Summaries for YT</a>
-    </p>
-    <p><a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.1">Read the 1.1 release notes</a></p>
-    <p>After unzipping, move the app to <code>Applications</code>, open it and enable the Safari extension.</p>
+<div class="yts-home">
+  <section class="yts-hero">
+    <div>
+      <p class="yts-kicker">Safari extension for macOS</p>
+      <h1>Better YouTube Chapters</h1>
+      <p class="yts-lede">Timestamps &amp; Summaries for YT adds clean Chapters and Summary views directly to YouTube’s own <em>In this video</em> panel. Jump to the right moment, skim the key ideas, or read the transcript without leaving the page.</p>
+      <div class="yts-actions">
+        <a class="yts-button yts-button-primary" href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip">Download version 1.2</a>
+        <a class="yts-button" href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.2">What’s new</a>
+      </div>
+      <div class="yts-proof"><span>Signed &amp; notarized</span><span>Local or cloud models</span><span>No developer backend</span><span>macOS 26.4+</span></div>
+    </div>
+    <div class="yts-window yts-hero-art">
+      <img src="readme-assets/companion-app.png" alt="Companion app showing Gemini Flash latest, Apple Intelligence Summary, and connected ChatGPT, Grok, and Gemini providers">
+    </div>
   </section>
 
-  <section style="border: 1px solid #d8dee4; border-radius: 12px; padding: 1rem;">
-    <h3 style="margin-top: 0;">Support</h3>
-    <p>Need help, found a bug, or want to follow the project?</p>
-    <p>
-      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries">Project repository</a>
-    </p>
-    <p>
-      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/issues">Issue tracker</a>
-    </p>
+  <section class="yts-section">
+    <p class="yts-kicker">One familiar panel</p>
+    <h2>Chapters, summaries, and transcripts—together.</h2>
+    <p class="yts-section-lede">Version 1.2 keeps the extension inside YouTube’s native panel whenever that surface is available. Creator chapters, automatic Key moments, and transcript-generated chapters share one compact view, and the current chapter follows playback.</p>
+    <div class="yts-showcase">
+      <img src="readme-assets/youtube-sidebar.png" alt="Chapters integrated into YouTube's native panel">
+    </div>
+  </section>
+
+  <section class="yts-section">
+    <p class="yts-kicker">Built for different ways of watching</p>
+    <p class="yts-section-lede">Interface previews below use example video content.</p>
+    <div class="yts-gallery">
+      <figure>
+        <img class="yts-showcase" src="readme-assets/youtube-sidebar.png" alt="Generated chapters with clickable transcript-aligned timestamps">
+        <figcaption>Clickable chapters aligned back to real transcript cue times.</figcaption>
+      </figure>
+      <figure>
+        <img class="yts-showcase" src="readme-assets/youtube-summary.png" alt="A structured video summary inside YouTube's native panel">
+        <figcaption>A reader-friendly summary beside YouTube’s own Transcript.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="yts-section">
+    <div class="yts-grid">
+      <article class="yts-card"><h3>Use YouTube’s chapters</h3><p>Creator chapters and automatic Key moments appear in the same compact format, with an inline option to generate your own when needed.</p></article>
+      <article class="yts-card"><h3>Choose local or cloud summaries</h3><p>Keep summaries on the Mac with Apple Intelligence, or use ChatGPT/Codex, Grok, or Gemini. ChatGPT and Grok use subscription sign-in; Gemini uses your Google AI Studio API key, stored in macOS Keychain.</p></article>
+      <article class="yts-card"><h3>Fast defaults, flexible choices</h3><p>Choose GPT-6 Luna, GPT-6.1 Sol, Grok, or Gemini. Gemini defaults to Flash latest, with Flash-Lite and Argon also available. Pick Chapters and Summary models independently, with low thinking for all Gemini models. Existing valid selections remain unchanged when upgrading.</p></article>
+      <article class="yts-card"><h3>One shared transcript</h3><p>Chapters and Summary share one caption fetch, while generated times are validated against the original transcript cues.</p></article>
+      <article class="yts-card"><h3>Safe YouTube navigation</h3><p>Results are tied to the current video so old chapters cannot leak into the next watch page during YouTube’s single-page navigation.</p></article>
+      <article class="yts-card"><h3>Caption-aware behavior</h3><p>Videos without a usable transcript stay untouched, including livestreams that have ended but whose captions are still processing.</p></article>
+    </div>
+  </section>
+
+  <section class="yts-section">
+    <div class="yts-release">
+      <div>
+        <p class="yts-kicker" style="color:#9dccf4">Version 1.2</p>
+        <h2>Ready for a cleaner YouTube workflow.</h2>
+        <p>Download the signed and notarized macOS app. Unzip it, drag the app onto the included <strong>Applications</strong> shortcut, open it once, and enable the extension in Safari Settings.</p>
+      </div>
+      <a class="yts-button" href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip">Download for Mac</a>
+    </div>
+    <div class="yts-links">
+      <a href="mailto:hlbkomer@gmail.com">Contact support</a>
+      <a href="support.html">Setup &amp; support</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms of Service</a>
+      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/issues">Support &amp; issue tracker</a>
+      <a href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries">Source code</a>
+    </div>
   </section>
 </div>
-
-## Policies
-
-- [Privacy Policy](privacy.html)
-- [Terms of Service](terms.html)

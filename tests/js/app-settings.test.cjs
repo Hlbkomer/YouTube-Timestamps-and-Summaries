@@ -16,6 +16,10 @@ const grokGenerationSource = fs.readFileSync(
     ),
     "utf8"
 );
+const codexGenerationSource = fs.readFileSync(
+    path.join(root, "YouTube Timestamps and Summaries Extension/CodexGenerationService.swift"),
+    "utf8"
+);
 const backgroundSource = fs.readFileSync(
     path.join(
         root,
@@ -49,7 +53,8 @@ function element(tagName = "div") {
         hidden: false,
         textContent: "",
         value: "",
-        addEventListener() {},
+        listeners: {},
+        addEventListener(name, handler) { this.listeners[name] = handler; },
         append(...children) {
             this.children.push(...children);
             rawInnerHTML = "";
@@ -79,6 +84,7 @@ function element(tagName = "div") {
 
 function render(state) {
     const elements = new Map();
+    elements.postedMessages = [];
     const document = {
         getElementById(id) {
             if (!elements.has(id)) {
@@ -96,7 +102,7 @@ function render(state) {
         document,
         webkit: {
             messageHandlers: {
-                controller: { postMessage() {} },
+                controller: { postMessage(message) { elements.postedMessages.push(message); } },
             },
         },
         window,
@@ -107,13 +113,14 @@ function render(state) {
         providerOptions: [
             { id: "openaiCodex", label: "ChatGPT / Codex" },
             { id: "xaiOAuth", label: "Grok (SuperGrok)" },
+            { id: "googleGemini", label: "Gemini" },
         ],
         modelOptions: [],
         chapterPreferenceOptions: [],
         summaryOptions: [],
         settings: {
             providerID: "openaiCodex",
-            modelID: "gpt-5.6-terra",
+            modelID: "gpt-6.1-sol",
             chapterPreference: "preferNative",
             summaryModelID: "appleIntelligence",
         },
@@ -141,12 +148,12 @@ test("provider picker disables disconnected options without a connection hint", 
 test("Apple Intelligence uses one Summary model choice", () => {
     const elements = render({
         summaryOptions: [
-            { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
             { id: "appleIntelligence", label: "Apple Intelligence" },
+            { id: "gpt-6.1-sol", label: "GPT-6.1 Sol" },
         ],
         settings: {
             providerID: "openaiCodex",
-            modelID: "gpt-5.6-terra",
+            modelID: "gpt-6.1-sol",
             chapterPreference: "preferNative",
             summaryModelID: "appleIntelligence",
         },
@@ -155,7 +162,7 @@ test("Apple Intelligence uses one Summary model choice", () => {
     assert.equal(elements.get("summary-select").value, "appleIntelligence");
     assert.match(
         elements.get("summary-select").innerHTML,
-        /GPT-5\.6 Terra.*Apple Intelligence/
+        /Apple Intelligence.*GPT-6\.1 Sol/
     );
     assert.equal(
         (elements.get("summary-select").innerHTML.match(/<option/g) || []).length,
@@ -163,7 +170,34 @@ test("Apple Intelligence uses one Summary model choice", () => {
     );
 });
 
-test("Grok 4.5 reasoning is enforced at the final request boundary", () => {
+test("GPT-6.1 Sol and GPT-6 Luna can be selected independently for Chapters and Summary", () => {
+    const models = [
+        { id: "gpt-6.1-sol", label: "GPT-6.1 Sol" },
+        { id: "gpt-6-luna", label: "GPT-6 Luna" },
+    ];
+    const elements = render({
+        codex: { connected: true },
+        modelOptions: models,
+        summaryOptions: models,
+        settings: {
+            providerID: "openaiCodex",
+            modelID: "gpt-6.1-sol",
+            summaryModelID: "gpt-6-luna",
+            chapterPreference: "preferNative",
+        },
+    });
+    assert.equal(elements.get("model-select").value, "gpt-6.1-sol");
+    assert.equal(elements.get("summary-select").value, "gpt-6-luna");
+    assert.match(elements.get("summary-select").innerHTML, /GPT-6\.1 Sol/);
+});
+
+test("ChatGPT model reasoning policy reaches the common Chapters/Summary request boundary", () => {
+    assert.match(codexGenerationSource, /GenerationSettings\.chatGPTReasoningRequestValue\(for: model\)/);
+    assert.match(codexGenerationSource, /body\["reasoning"\] = reasoning/);
+    assert.doesNotMatch(codexGenerationSource, /"(?:temperature|top_p|top_logprobs|prompt_cache_retention)"/);
+});
+
+test("Grok 4.5 through 4.7 low reasoning is enforced at the final request boundary", () => {
     assert.equal(
         (grokGenerationSource.match(/https:\/\/api\.x\.ai\/v1\/responses/g) || []).length,
         1
@@ -175,7 +209,7 @@ test("Grok 4.5 reasoning is enforced at the final request boundary", () => {
     assert.match(grokGenerationSource, /body\["reasoning"\] = reasoning/);
     assert.match(
         grokGenerationSource,
-        /!GenerationSettings\.isGrok45ModelID\(model\)[\s\S]{0,100}reasoning == \["effort": "low"\]/
+        /!GenerationSettings\.requiresExplicitLowGrokReasoning\(model\)[\s\S]{0,100}reasoning == \["effort": "low"\]/
     );
     assert.doesNotMatch(
         grokGenerationSource,
@@ -270,13 +304,13 @@ test("model option labels are rendered as text rather than executable markup", (
     assert.doesNotMatch(elements.get("model-select").innerHTML, /<img /);
 });
 
-test("missing ChatGPT model selection falls back to GPT-5.6 Terra", () => {
+test("missing ChatGPT model selection falls back to GPT-6 Luna", () => {
     const elements = render({
         codex: { connected: true },
         grok: { connected: false },
         modelOptions: [
-            { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
-            { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+            { id: "gpt-6.1-sol", label: "GPT-6.1 Sol" },
+            { id: "gpt-6-luna", label: "GPT-6 Luna" },
         ],
         settings: {
             providerID: "openaiCodex",
@@ -285,5 +319,61 @@ test("missing ChatGPT model selection falls back to GPT-5.6 Terra", () => {
         },
     });
 
-    assert.equal(elements.get("model-select").value, "gpt-5.6-terra");
+    assert.equal(elements.get("model-select").value, "gpt-6-luna");
+});
+
+
+test("Gemini connection enables its models and keeps Apple Summary selectable", () => {
+    const models = [
+        { id: "gemini-4-argon", label: "Gemini 4 Argon" },
+        { id: "gemini-flash-latest", label: "Gemini Flash (latest)" },
+        { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite" },
+    ];
+    const elements = render({
+        gemini: { connected: true },
+        settings: { providerID: "googleGemini", modelID: "gemini-flash-latest", summaryModelID: "appleIntelligence" },
+        modelOptions: models,
+        summaryOptions: [
+            { id: "appleIntelligence", label: "Apple Intelligence" },
+            ...models,
+        ],
+    });
+    assert.equal(elements.get("provider-select").disabled, false);
+    assert.equal(elements.get("provider-select").dataset.selectedUnavailable, "false");
+    assert.equal(elements.get("model-select").disabled, false);
+    assert.equal(elements.get("summary-select").value, "appleIntelligence");
+    assert.equal(elements.get("model-select").value, "gemini-flash-latest");
+    assert.match(elements.get("summary-select").innerHTML, /Apple Intelligence.*Gemini 4 Argon.*Gemini Flash.*Gemini 3\.5 Flash-Lite/);
+    assert.equal(elements.get("gemini-status").textContent, "Gemini is connected.");
+    assert.equal(elements.get("gemini-api-key").value, "");
+    assert.equal(elements.get("gemini-disconnect").hidden, false);
+    assert.equal(elements.get("gemini-api-key").disabled, true);
+    assert.equal(elements.get("gemini-connect").hidden, true);
+    elements.get("gemini-connect").listeners.click();
+    assert.equal(elements.postedMessages.filter((message) => message.action === "connectGemini").length, 0);
+});
+
+test("Gemini key submission clears the password field and disables duplicate connection attempts", () => {
+    const elements = render({ gemini: { connected: false } });
+    const key = elements.get("gemini-api-key");
+    const button = elements.get("gemini-connect");
+    key.value = "fake-private-key";
+    button.listeners.click();
+    assert.equal(key.value, "");
+    assert.equal(key.disabled, true);
+    assert.equal(button.disabled, true);
+    assert.equal(elements.postedMessages.at(-1).action, "connectGemini");
+    assert.equal(elements.postedMessages.at(-1).apiKey, "fake-private-key");
+    button.listeners.click();
+    assert.equal(elements.postedMessages.filter((message) => message.action === "connectGemini").length, 1);
+});
+
+test("Gemini validation state and errors are visible without enabling a disconnected provider", () => {
+    const pending = render({ gemini: { connecting: true } });
+    assert.equal(pending.get("gemini-connect").disabled, true);
+    assert.equal(pending.get("gemini-api-key").disabled, true);
+    const failed = render({ gemini: { connected: false, error: "Google rejected this API key." } });
+    assert.equal(failed.get("gemini-status").textContent, "Google rejected this API key.");
+    assert.match(failed.get("provider-select").innerHTML, /value="googleGemini" disabled/);
+    assert.equal(failed.get("gemini-connect").disabled, false);
 });

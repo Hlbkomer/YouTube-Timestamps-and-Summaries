@@ -4,7 +4,7 @@ title: Terms of Service
 
 # Terms of Service
 
-Last updated: July 20, 2026
+Last updated: October 18, 2026
 
 These Terms of Service govern the use of Timestamps & Summaries for YT.
 
@@ -12,7 +12,7 @@ These Terms of Service govern the use of Timestamps & Summaries for YT.
 
 You may use the app only in compliance with applicable laws, platform rules, and third-party service terms that apply to you.
 
-You are responsible for your own use of YouTube, Safari, macOS, Apple Intelligence, ChatGPT, Grok, and any related accounts.
+You are responsible for your own use of YouTube, Safari, macOS, Apple Intelligence, ChatGPT, Grok, Google Gemini, and any related accounts or API projects.
 
 ## Third-Party Services
 
@@ -22,8 +22,9 @@ The app depends on third-party services and platforms, including:
 - Safari, macOS, and Apple Intelligence
 - ChatGPT
 - Grok when the user signs in and selects it as a provider
+- Google Gemini when the user connects an API key and selects it as a provider
 
-Those services may change, become unavailable, or impose their own restrictions.
+Those services may change, become unavailable, or impose their own restrictions. Gemini API usage is billed to the user's Google API project; users are responsible for its billing, quotas, and credit eligibility.
 
 ## No Guarantee Of Availability
 

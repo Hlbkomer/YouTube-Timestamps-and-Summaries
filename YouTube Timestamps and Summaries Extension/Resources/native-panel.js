@@ -58,6 +58,7 @@
         let nativePanelDismissTimeout = null;
         let transcriptCopyRefreshTimeout = null;
         let activeNativeContent = null;
+        const autoOpenedNativePanels = new Set();
         const wiredNativeTabLists = new WeakSet();
         const wiredHeaderActionHosts = new WeakSet();
         const wiredHeaderCopyButtons = new WeakSet();
@@ -106,9 +107,22 @@
             );
         }
 
+        function isTargetlessNativeParentCandidate(panel) {
+            // Every currently observed `In this video` parent shell is
+            // targetless. YouTube's sibling engagement surfaces have explicit
+            // identities such as `engagement-panel-structured-description`,
+            // transcript, comments, and macro-marker targets. Fail closed when
+            // a target exists even if a stale title or chip row temporarily
+            // looks like the parent during post-live initialization.
+            return Boolean(panel) && !String(panel.getAttribute?.("target-id") || "").trim();
+        }
+
         function getNativeInThisVideoPanel() {
             const panels = Array.from(doc.querySelectorAll("ytd-engagement-panel-section-list-renderer"));
             for (const panel of panels) {
+                if (!isTargetlessNativeParentCandidate(panel)) {
+                    continue;
+                }
                 const title = nativePanelTitle(panel);
                 if (title === "In this video") {
                     return panel;
@@ -121,7 +135,7 @@
             // button count: generic panels such as Description can briefly
             // expose tab-list-like markup while YouTube initializes them.
             for (const panel of panels) {
-                if (panel.getAttribute("target-id")) {
+                if (!isTargetlessNativeParentCandidate(panel)) {
                     continue;
                 }
 
@@ -367,6 +381,10 @@
                 return false;
             }
 
+            const wasVisible = isNativePanelVisible(panel);
+            if (!wasVisible) {
+                autoOpenedNativePanels.add(panel);
+            }
             panel.hidden = false;
             panel.removeAttribute("hidden");
             panel.setAttribute("visibility", NATIVE_PANEL_VISIBILITY_EXPANDED);
@@ -375,7 +393,11 @@
                 panel.style.display = "block";
             }
 
-            return isNativePanelVisible(panel);
+            const isVisible = isNativePanelVisible(panel);
+            if (!isVisible) {
+                autoOpenedNativePanels.delete(panel);
+            }
+            return isVisible;
         }
 
         function open(mount) {
@@ -736,6 +758,10 @@
         }
 
         function shouldHideNativeOwnedTab(kind) {
+            if (kind === "timeline") {
+                return true;
+            }
+
             return kind === "chapters"
                 && (
                     state().timestampsSource === "youtubeChapters"
@@ -899,11 +925,30 @@
                 return;
             }
 
+            autoOpenedNativePanels.delete(panel);
             panel.hidden = true;
             panel.setAttribute("hidden", "");
             panel.setAttribute("visibility", NATIVE_PANEL_VISIBILITY_HIDDEN);
             panel.style.removeProperty("display");
             panel.style.removeProperty("visibility");
+        }
+
+        function restoreStaleAutoOpenedPanels(activePanel = null) {
+            for (const panel of Array.from(autoOpenedNativePanels)) {
+                if (panel === activePanel) {
+                    continue;
+                }
+                if (!panel?.isConnected) {
+                    autoOpenedNativePanels.delete(panel);
+                    continue;
+                }
+
+                // This panel was hidden before the extension touched it. If it
+                // no longer qualifies as the active targetless parent shell,
+                // restore the hidden state instead of leaving a reused
+                // Description surface expanded on a captionless video.
+                hideIntegratedPanel({ panel });
+            }
         }
 
         function dismissIntegratedPanel(mount) {
@@ -1217,6 +1262,7 @@
             if (deps.canUseNativePanel?.() === false) {
                 mount = null;
             }
+            restoreStaleAutoOpenedPanels(mount?.panel || null);
             if (!mount) {
                 cleanupTabs();
                 cleanupHeaderActions();
@@ -1348,6 +1394,7 @@
             syncContentVisibility,
             syncHeaderCopyButton,
             syncNativeOwnedTabSelectionAppearance,
+            syncNativeOwnedTabVisibility,
             syncTabs,
         };
     }

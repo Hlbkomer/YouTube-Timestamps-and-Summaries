@@ -73,6 +73,8 @@ Work deliberately left for focused follow-up:
 
 Status: **Resolved.** `content-state.js` now owns the reducer and serial coordinator, with direct tests for transport failure preservation and overlapping refreshes.
 
+Follow-up: `requestStatusWithRetry` in `content-state.js` retries a status request that times out or gets no answer (Safari can suspend the background page under tab pressure) up to three attempts with a short backoff. Until the first definitive status arrives, the panel shows `Checking provider status...` rather than the unavailable/connect message, and a final transport failure shows a retryable `Couldn’t check provider status` state.
+
 Before the fix, `content.js` converted a failed `ai:getStatus` request into `null`, then immediately derived capability fields from that empty response. A transient native-message failure could therefore change previously valid capabilities to false. The same function could be started by initialization, focus, navigation, and generation-error recovery without one in-flight request owner, allowing an older response to overwrite newer state.
 
 Recommended change:

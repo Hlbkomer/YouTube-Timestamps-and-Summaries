@@ -103,7 +103,7 @@ All paths remove the generic `Summary of Video Transcript` heading. The former b
 
 Selected-provider summaries are not affected by this switch. Grok and ChatGPT summaries continue to use the model selected in the companion app on all supported macOS versions.
 
-Successful Apple summaries display the canonical name and elapsed time in the result caption, for example: “Generated with Apple Intelligence in 75 seconds.” Selected-provider summaries use the same wording with their picker model name. Generated timestamp results use the chapter-specific form, for example: “Chapters generated with Grok 4.5 in 8 seconds.”
+Successful Apple summaries display the canonical name and elapsed time in the result caption, for example: “Generated with Apple Intelligence in 75 seconds.” Selected-provider summaries use the same wording with their picker model name. Generated timestamp results use the chapter-specific form, for example: “Chapters generated with Grok 4.7 in 8 seconds.”
 
 ## Alternatives Considered
 

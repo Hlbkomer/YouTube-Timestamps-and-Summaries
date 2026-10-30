@@ -19,6 +19,11 @@ const grokPairing = document.getElementById("grok-pairing");
 const grokCallback = document.getElementById("grok-callback");
 const completeGrokLoginButton = document.getElementById("complete-grok-login");
 const cancelGrokLoginButton = document.getElementById("cancel-grok-login");
+const geminiStatus = document.getElementById("gemini-status");
+const geminiKey = document.getElementById("gemini-api-key");
+const geminiConnectButton = document.getElementById("gemini-connect");
+const geminiDisconnectButton = document.getElementById("gemini-disconnect");
+const geminiAPIKeysButton = document.getElementById("gemini-api-keys");
 
 function post(action, extra = {}) {
     webkit.messageHandlers.controller.postMessage({ action, ...extra });
@@ -30,7 +35,7 @@ function settingsLabel(useSettingsLabel) {
 
 function renderChecklist() {
     const items = [
-        "Optional: Connect ChatGPT or Grok for Timestamps and model-powered Summaries.",
+        "Optional: Connect ChatGPT, Grok, or Gemini for Timestamps and model-powered Summaries.",
         "Choose the models used for Timestamps and Summary.",
         "Enable the Safari extension.",
         "Open a YouTube video with captions or a transcript.",
@@ -58,6 +63,9 @@ function providerIsConnected(providerID, state) {
     }
     if (providerID === "xaiOAuth") {
         return Boolean(state.grok?.connected);
+    }
+    if (providerID === "googleGemini") {
+        return Boolean(state.gemini?.connected);
     }
     return false;
 }
@@ -91,7 +99,7 @@ window.renderAppState = function renderAppState(state) {
     const selectedProviderConnected = providerIsConnected(selectedProviderID, state);
 
     renderOptions(providerSelect, providerOptions, selectedProviderID);
-    renderOptions(modelSelect, state.modelOptions || [], settings.modelID || "gpt-5.6-terra");
+    renderOptions(modelSelect, state.modelOptions || [], settings.modelID || "gpt-6-luna");
     renderOptions(chapterPreferenceSelect, state.chapterPreferenceOptions || [], settings.chapterPreference || "preferNative");
     renderOptions(
         summarySelect,
@@ -144,6 +152,23 @@ window.renderAppState = function renderAppState(state) {
         completeGrokLoginButton.disabled = false;
         cancelGrokLoginButton.disabled = false;
     }
+
+    const geminiConnected = Boolean(state.gemini?.connected);
+    const geminiConnecting = Boolean(state.gemini?.connecting);
+    geminiStatus.textContent = geminiConnecting
+        ? "Checking Gemini API access..."
+        : (state.gemini?.error || (geminiConnected ? "Gemini is connected." : "Gemini is not connected."));
+    geminiStatus.dataset.state = geminiConnecting ? "configured" : (geminiConnected ? "connected" : "missing");
+    geminiConnectButton.textContent = geminiConnecting ? "Checking..." : "Connect Gemini";
+    geminiConnectButton.hidden = geminiConnected;
+    geminiConnectButton.disabled = geminiConnecting || geminiConnected;
+    geminiKey.disabled = geminiConnecting || geminiConnected;
+    if (geminiConnected) {
+        geminiKey.value = "";
+    }
+    geminiKey.placeholder = geminiConnected ? "API key saved in Keychain" : "Paste your Google AI Studio API key";
+    geminiDisconnectButton.hidden = !geminiConnected;
+    geminiDisconnectButton.disabled = geminiConnecting;
 
     if (state.codexLogin) {
         codexPairing.hidden = false;
@@ -217,5 +242,27 @@ cancelGrokLoginButton.addEventListener("click", () => {
 copyCodexCodeButton.addEventListener("click", () => {
     post("copyCodexCode");
 });
+
+function connectGemini() {
+    if (geminiConnectButton.disabled) {
+        return;
+    }
+    const apiKey = geminiKey.value;
+    geminiKey.value = "";
+    geminiConnectButton.disabled = true;
+    geminiKey.disabled = true;
+    geminiDisconnectButton.disabled = true;
+    post("connectGemini", { apiKey });
+}
+
+geminiConnectButton.addEventListener("click", connectGemini);
+geminiKey.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+        event.preventDefault();
+        connectGemini();
+    }
+});
+geminiDisconnectButton.addEventListener("click", () => post("disconnectGemini"));
+geminiAPIKeysButton.addEventListener("click", () => post("openGeminiAPIKeys"));
 
 post("ready");

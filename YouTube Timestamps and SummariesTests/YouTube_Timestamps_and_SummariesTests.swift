@@ -12,7 +12,14 @@ import Testing
 struct YouTube_Timestamps_and_SummariesTests {
 
     @Test func generationDefaultsAndIndependentSummarySelectionBehaveCorrectly() {
-        #expect(GenerationSettings.defaultModelID == "gpt-5.6-terra")
+        #expect(GenerationSettings.providerUserAgent.hasPrefix("TimestampsSummariesForYT/"))
+        #expect(GenerationSettings.providerUserAgent != "TimestampsSummariesForYT/1.0")
+        #expect(GenerationSettings.defaultModelID == "gpt-6-luna")
+        #expect(GenerationSettings.defaultGrokModelID == "grok-4.7")
+        #expect(
+            GenerationSettings.defaultModelID(for: GenerationSettings.grokProviderID)
+                == "grok-4.7"
+        )
 
         let defaults = GenerationSettings(
             providerID: "",
@@ -56,11 +63,15 @@ struct YouTube_Timestamps_and_SummariesTests {
         )
         #expect(
             GenerationSettings.orderedSummaryModelOptions(
-                providerModels: [["id": "gpt-5.6-terra", "label": "GPT-5.6 Terra"]],
+                providerModels: [
+                    ["id": "gpt-6-luna", "label": "GPT-6 Luna"],
+                    ["id": "gpt-6.1-sol", "label": "GPT-6.1 Sol"],
+                ],
                 appleModels: GenerationSettings.appleIntelligenceSummaryModelOptions
             ).compactMap { $0["id"] } == [
-                "gpt-5.6-terra",
                 GenerationSettings.appleIntelligenceModelID,
+                "gpt-6.1-sol",
+                "gpt-6-luna",
             ]
         )
         #expect(
@@ -325,26 +336,29 @@ struct YouTube_Timestamps_and_SummariesTests {
     @Test func providerAndModelNormalizationHandlesAliasesAndFutureModels() {
         #expect(GenerationSettings.normalizedProviderID("grokBuild") == GenerationSettings.grokProviderID)
         #expect(GenerationSettings.normalizedProviderID("unknown") == GenerationSettings.chatGPTProviderID)
+        // Every retired OpenAI ID (including GPT-6 Astra) falls back to GPT-6 Luna.
+        for retiredID in [
+            "gpt-6-astra", "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+            "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini",
+            "gpt-4-turbo", "gpt-3.5-turbo", "o3", "o4-mini", "unknown-model", "",
+        ] {
+            #expect(GenerationSettings.normalizedModelID(
+                retiredID,
+                providerID: GenerationSettings.chatGPTProviderID
+            ) == GenerationSettings.chatGPTLunaModelID)
+        }
         #expect(GenerationSettings.normalizedModelID(
-            "gpt-5.6",
+            " GPT-6.1-Sol ",
             providerID: GenerationSettings.chatGPTProviderID
         ) == GenerationSettings.chatGPTSolModelID)
-        #expect(GenerationSettings.normalizedModelID(
-            "gpt-5.4",
-            providerID: GenerationSettings.chatGPTProviderID
-        ) == GenerationSettings.chatGPTTerraModelID)
-        #expect(GenerationSettings.normalizedModelID(
-            "gpt-5.4-mini",
-            providerID: GenerationSettings.chatGPTProviderID
-        ) == GenerationSettings.chatGPTLunaModelID)
-        let migratedSettings = GenerationSettings(
+        let retiredSettings = GenerationSettings(
             providerID: GenerationSettings.chatGPTProviderID,
-            modelID: "gpt-5.4",
+            modelID: "gpt-5.5",
             summaryEngine: GenerationSettings.defaultSummaryEngine,
-            summaryModelID: "gpt-5.4-mini"
+            summaryModelID: "gpt-6-astra"
         )
-        #expect(migratedSettings.modelID == GenerationSettings.chatGPTTerraModelID)
-        #expect(migratedSettings.summaryModelID == GenerationSettings.chatGPTLunaModelID)
+        #expect(retiredSettings.modelID == GenerationSettings.chatGPTLunaModelID)
+        #expect(retiredSettings.summaryModelID == GenerationSettings.chatGPTLunaModelID)
         #expect(GenerationSettings.isUsableModelID(
             "gpt-6.0-future",
             providerID: GenerationSettings.chatGPTProviderID
@@ -380,12 +394,25 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(GenerationSettings.supportedModelIDs(
             for: GenerationSettings.chatGPTProviderID
         ).contains(GenerationSettings.chatGPTSolModelID))
-        #expect(!GenerationSettings.supportedModelIDs(
+        #expect(GenerationSettings.modelOptions(
             for: GenerationSettings.chatGPTProviderID
-        ).contains("gpt-5.4"))
-        #expect(!GenerationSettings.supportedModelIDs(
+        ) == [
+            ["id": "gpt-6.1-sol", "label": "GPT-6.1 Sol"],
+            ["id": "gpt-6-luna", "label": "GPT-6 Luna"],
+        ])
+        let supportedChatGPTIDs = GenerationSettings.supportedModelIDs(
             for: GenerationSettings.chatGPTProviderID
-        ).contains("gpt-5.4-mini"))
+        )
+        #expect(supportedChatGPTIDs == ["gpt-6.1-sol", "gpt-6-luna"])
+        #expect(!supportedChatGPTIDs.contains("gpt-6-astra"))
+        let independentSettings = GenerationSettings(
+            providerID: GenerationSettings.chatGPTProviderID,
+            modelID: GenerationSettings.chatGPTSolModelID,
+            summaryEngine: GenerationSettings.defaultSummaryEngine,
+            summaryModelID: GenerationSettings.chatGPTLunaModelID
+        )
+        #expect(independentSettings.modelID == "gpt-6.1-sol")
+        #expect(independentSettings.summaryModelID == "gpt-6-luna")
         #expect(GenerationSettings.supportedModelIDs(
             for: GenerationSettings.grokProviderID
         ).contains(GenerationSettings.defaultGrokModelID))
@@ -393,12 +420,14 @@ struct YouTube_Timestamps_and_SummariesTests {
             for: GenerationSettings.grokProviderID
         ).contains {
             $0["id"] == GenerationSettings.defaultGrokModelID
-                && $0["label"] == "Grok 4.5"
+                && $0["label"] == "Grok 4.7"
         })
         #expect(
             GenerationSettings.modelOptions(
                 for: GenerationSettings.grokProviderID
             ).compactMap { $0["id"] } == [
+                "grok-4.7",
+                "grok-4.6",
                 "grok-4.5",
                 "grok-4.3",
             ]
@@ -409,27 +438,29 @@ struct YouTube_Timestamps_and_SummariesTests {
         let grokOptions = GenerationSettings.sortedModelOptions([
             ["id": "grok-4.3", "label": "Grok 4.3"],
             ["id": "grok-4.5", "label": "Grok 4.5"],
+            ["id": "grok-4.6", "label": "Grok 4.6"],
+            ["id": "grok-4.7", "label": "Grok 4.7"],
             ["id": "grok-4.4", "label": "Grok 4.4"],
         ])
         #expect(grokOptions.compactMap { $0["id"] } == [
+            "grok-4.7",
+            "grok-4.6",
             "grok-4.5",
             "grok-4.4",
             "grok-4.3",
         ])
 
         let chatGPTOptions = GenerationSettings.sortedModelOptions([
-            ["id": "gpt-5.6-sol", "label": "GPT-5.6 Sol"],
-            ["id": "gpt-5.6-terra", "label": "GPT-5.6 Terra"],
-            ["id": "gpt-5.5", "label": "GPT-5.5 Thinking"],
+            ["id": "gpt-6-luna", "label": "GPT-6 Luna"],
+            ["id": "gpt-6.1-sol", "label": "GPT-6.1 Sol"],
         ])
         #expect(chatGPTOptions.compactMap { $0["id"] } == [
-            "gpt-5.6-sol",
-            "gpt-5.6-terra",
-            "gpt-5.5",
+            "gpt-6.1-sol",
+            "gpt-6-luna",
         ])
     }
 
-    @Test func grok45AlwaysUsesLowReasoning() {
+    @Test func grok45Through47AlwaysUseLowReasoning() {
         #expect(GenerationSettings.isGrok45ModelID("grok-4.5"))
         #expect(GenerationSettings.isGrok45ModelID("grok-4.5-latest"))
         #expect(GenerationSettings.isGrok45ModelID("grok-4.5-preview"))
@@ -438,11 +469,11 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.5-preview") == "low")
         #expect(
             GenerationSettings.grokProviderModelID(for: "grok-4.5-latest")
-                == GenerationSettings.defaultGrokModelID
+                == GenerationSettings.grok45ModelID
         )
         #expect(
             GenerationSettings.grokProviderModelID(for: "grok-4.5-preview")
-                == GenerationSettings.defaultGrokModelID
+                == GenerationSettings.grok45ModelID
         )
         #expect(
             GenerationSettings.grokReasoningRequestValue(for: "grok-4.5")
@@ -459,10 +490,55 @@ struct YouTube_Timestamps_and_SummariesTests {
         #expect(!GenerationSettings.isGrok45ModelID("grok-4.3"))
         #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.3") == nil)
         #expect(GenerationSettings.grokReasoningRequestValue(for: "grok-4.3") == nil)
+        #expect(GenerationSettings.grokProviderModelID(for: "grok-4.6-latest") == "grok-4.6")
+        #expect(!GenerationSettings.isGrok45ModelID("grok-4.6"))
+        #expect(GenerationSettings.isGrok46ModelID("grok-4.6"))
+        #expect(GenerationSettings.isGrok46ModelID("grok-4.6-latest"))
+        #expect(GenerationSettings.isGrok46ModelID("grok-4.6-preview"))
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.6") == "low")
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.6-latest") == "low")
+        #expect(
+            GenerationSettings.grokReasoningRequestValue(for: "grok-4.6-latest")
+                == ["effort": "low"]
+        )
+        #expect(GenerationSettings.grokProviderModelID(for: "grok-4.7-latest") == "grok-4.7")
+        #expect(!GenerationSettings.isGrok45ModelID("grok-4.7"))
+        #expect(!GenerationSettings.isGrok46ModelID("grok-4.7"))
+        #expect(GenerationSettings.isGrok47ModelID("grok-4.7"))
+        #expect(GenerationSettings.isGrok47ModelID("grok-4.7-latest"))
+        #expect(GenerationSettings.isGrok47ModelID("grok-4.7-preview"))
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.7") == "low")
+        #expect(GenerationSettings.grokReasoningEffort(for: "grok-4.7-latest") == "low")
+        #expect(
+            GenerationSettings.grokReasoningRequestValue(for: "grok-4.7-latest")
+                == ["effort": "low"]
+        )
         #expect(!GenerationSettings.isGrok45ModelID("grok-5.0-future"))
+        #expect(!GenerationSettings.isGrok46ModelID("grok-5.0-future"))
+        #expect(!GenerationSettings.isGrok47ModelID("grok-5.0-future"))
         #expect(GenerationSettings.grokReasoningEffort(for: "grok-5.0-future") == nil)
         #expect(
             GenerationSettings.grokReasoningRequestValue(for: "grok-5.0-future") == nil
+        )
+    }
+
+    @Test func chatGPTLunaAndSolAlwaysUseLowReasoning() {
+        // Never send `none` (Sol rejects it) or sampling parameters.
+        #expect(
+            GenerationSettings.chatGPTReasoningRequestValue(
+                for: GenerationSettings.chatGPTLunaModelID
+            ) == ["effort": "low"]
+        )
+        #expect(
+            GenerationSettings.chatGPTReasoningRequestValue(
+                for: GenerationSettings.chatGPTSolModelID
+            ) == ["effort": "low"]
+        )
+        // Retired IDs normalize to Luna and therefore also use low reasoning.
+        #expect(
+            GenerationSettings.chatGPTReasoningRequestValue(
+                for: "gpt-6-astra"
+            ) == ["effort": "low"]
         )
     }
 
@@ -489,9 +565,17 @@ struct YouTube_Timestamps_and_SummariesTests {
                 GenerationSettings.isUsableModelID($0, providerID: providerID)
             })
             if providerID == GenerationSettings.chatGPTProviderID {
+                #expect(Set(ids) == [
+                    GenerationSettings.chatGPTSolModelID,
+                    GenerationSettings.chatGPTLunaModelID,
+                ])
                 let excludedIDs = Set(provider["excludedModelIDs"] as? [String] ?? [])
-                #expect(excludedIDs.contains("gpt-5.4"))
-                #expect(excludedIDs.contains("gpt-5.4-mini"))
+                for retiredID in [
+                    "gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+                    "gpt-5.6", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
+                ] {
+                    #expect(excludedIDs.contains(retiredID))
+                }
             }
         }
     }

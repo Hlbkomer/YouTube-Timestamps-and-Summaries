@@ -64,6 +64,9 @@ const DEBUG_LINE_LIMIT = 80;
 const NATIVE_DISCOVERY_GRACE_MS = chapterState.NATIVE_CHAPTER_DISCOVERY_GRACE_MS;
 const NATIVE_PANEL_DISCOVERY_GRACE_MS = 5 * 1000;
 const MIN_GENERATION_TIMEOUT_MS = 6 * 60 * 1000;
+const STATUS_REQUEST_TIMEOUT_MS = 20000;
+const STATUS_REQUEST_MAX_ATTEMPTS = 3;
+const STATUS_REQUEST_RETRY_DELAY_MS = 1000;
 const PENDING_GENERATION_START_GRACE_MS = 30000;
 const VIDEO_SESSION_CACHE_LIMIT = 8;
 const TRANSCRIPT_TRACK_WAIT_ATTEMPTS = 16;
@@ -127,11 +130,16 @@ let state = {
     selectedProviderConnected: false,
     providerError: "",
     statusError: "",
+    // No definitive provider status has arrived yet (first check after page
+    // load, or Safari is still waking the background page). Until then the
+    // panel shows a neutral checking state instead of "not available".
+    statusKnown: false,
+    statusChecking: false,
     timestampsAvailable: false,
     summaryAvailable: false,
     settings: {
         providerID: "openaiCodex",
-        modelID: "gpt-5.6-terra",
+        modelID: "gpt-6-luna",
         summaryEngine: "selectedModel",
         chapterPreference: "preferNative",
     },
@@ -244,6 +252,7 @@ const handlePanelControlClick = globalThis.YouTubeTimestampsPageControls.createP
     copySidebarResult: () => { void copyActiveResult(); },
     switchChapterSource: (source) => { void switchVideoChapterSource(source); },
     openApp: () => { void openCompanionApp(); },
+    retryStatus: () => { refreshStatusInBackground(); },
     jumpToTime: (seconds) => jumpToTime(seconds),
 });
 
@@ -2919,6 +2928,25 @@ function renderProviderConnectionState() {
     `;
 }
 
+function renderStatusPendingState() {
+    if (state.statusChecking || !state.statusError) {
+        return `
+            <div class="surface state-surface">
+                <div class="state-copy">Checking provider status...</div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="surface state-surface">
+            <div class="state-copy">Couldn’t check provider status.</div>
+            <button class="soft-button" data-retry-status>Try Again</button>
+            <div class="error-copy">${escapeHTML(state.statusError)}</div>
+            <div class="caption">Safari may have paused the extension. Try again or reload the page.</div>
+        </div>
+    `;
+}
+
 function renderSummaryUnavailableState() {
     if (state.appleIntelligenceAvailable) {
         return renderConnectionState(`Connect ${providerLabel()} in the companion app to generate summaries with the selected model.`);
@@ -3141,6 +3169,15 @@ function resultScrollSurface(root) {
 }
 
 function renderActiveContent() {
+    const statusGatesActiveTab = (state.activeTab === "timestamps" && !canGenerateTimestamps() && !state.timestampsText)
+        || (state.activeTab === "summary" && (
+            !canGenerateSummary()
+            || (state.settings.summaryEngine === "appleIntelligence" && !state.appleIntelligenceAvailable)
+        ));
+    if (statusGatesActiveTab && !state.statusKnown) {
+        return renderStatusPendingState();
+    }
+
     if (state.activeTab === "timestamps" && !canGenerateTimestamps() && !state.timestampsText) {
         return renderProviderConnectionState();
     }
@@ -3686,22 +3723,38 @@ function render() {
 
 async function performStatusRefresh() {
     const previousChapterPreference = normalizedChapterPreference(state.settings.chapterPreference);
-    const response = await sendMessageWithTimeout({ type: "ai:getStatus" }, 20000).catch((error) => {
-        console.debug("[Apple Intelligence content:status] Status refresh failed", error);
-        return {
-            ok: false,
-            error: error?.message || "The extension could not refresh provider status.",
-        };
+    state.statusChecking = true;
+    if (!state.statusKnown) {
+        state.statusError = "";
+        render();
+    }
+
+    const { response, transientFailure } = await contentState.requestStatusWithRetry({
+        request: () => sendMessageWithTimeout({ type: "ai:getStatus" }, STATUS_REQUEST_TIMEOUT_MS),
+        sleep,
+        maxAttempts: STATUS_REQUEST_MAX_ATTEMPTS,
+        retryDelayMs: STATUS_REQUEST_RETRY_DELAY_MS,
+        onRetry: (error, attempt) => {
+            console.debug(
+                `[Apple Intelligence content:status] Status request ${attempt} got no answer; retrying`,
+                error
+            );
+        },
     });
+    state.statusChecking = false;
 
     const statusResult = contentState.reduceStatusState(state, response);
     if (!statusResult.applied) {
-        state.statusError = statusResult.error;
+        console.debug("[Apple Intelligence content:status] Status refresh failed", statusResult.error);
+        state.statusError = transientFailure
+            ? `Couldn’t reach the extension to check provider status. ${statusResult.error}`
+            : statusResult.error;
         render();
         return false;
     }
 
     Object.assign(state, statusResult.value);
+    state.statusKnown = true;
     state.settings.chapterPreference = normalizedChapterPreference(state.settings.chapterPreference);
     const nextChapterPreference = state.settings.chapterPreference;
     const chapterPreferenceChanged = nextChapterPreference !== previousChapterPreference;
@@ -3964,6 +4017,10 @@ async function pollGenerationJob(kind, videoKey, generationID, jobID, generation
         },
         onWait: (elapsedSeconds) => {
             logDebug(kind, `waiting: ${elapsedSeconds}s`);
+            render();
+        },
+        onTransientError: (error, attempt) => {
+            logDebug(kind, `status poll ${attempt} got no answer (${error?.message || String(error)}); retrying`);
             render();
         },
         timeoutError: kind === "timestamps"
@@ -4359,6 +4416,20 @@ async function reconcilePanel() {
 
     const mount = getPanelMount();
     if (!mount) {
+        if (
+            panelHost?.dataset.ytsPlacement === "native"
+            && (
+                !nativePanel.getMount()
+                || !nativePanelContentAvailable(nextVideoKey)
+            )
+        ) {
+            // The targetless parent shell can be reused as Description while a
+            // just-finished live video is still settling. nativePanel.syncTabs
+            // has already restored any panel the extension auto-opened; remove
+            // the now-orphaned native host even if an early caption-track hint
+            // is still present.
+            removePanel();
+        }
         if (!transcriptOrchestrator.hasAvailableTranscript(nextVideoKey)) {
             removeStandalonePanels();
         }

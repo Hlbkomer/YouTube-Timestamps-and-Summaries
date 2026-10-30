@@ -29,7 +29,9 @@
         if (!selectedProviderConnected) {
             providerError = settings.providerID === "xaiOAuth"
                 ? String(response.grok?.error || "")
-                : String(response.codex?.error || "");
+                : settings.providerID === "googleGemini"
+                    ? String(response.gemini?.error || "")
+                    : String(response.codex?.error || "");
         }
 
         return {
@@ -46,6 +48,48 @@
                 statusError: "",
                 settings,
             },
+        };
+    }
+
+    // Safari can suspend the extension background page under tab pressure, so
+    // a status request may time out or resolve without an answer while the page
+    // wakes. Those failures say nothing about the provider itself; retry a few
+    // times with a short backoff before reporting them. A real answer (ok true
+    // or an explicit ok false) is returned immediately.
+    async function requestStatusWithRetry({
+        request,
+        sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        maxAttempts = 3,
+        retryDelayMs = 1000,
+        onRetry = () => {},
+    }) {
+        const attempts = Math.max(1, Number(maxAttempts) || 1);
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= attempts; attempt += 1) {
+            try {
+                const response = await request(attempt);
+                if (response !== null && typeof response !== "undefined") {
+                    return { response, attempts: attempt, transientFailure: false };
+                }
+                lastError = new Error("The extension background page did not answer.");
+            } catch (error) {
+                lastError = error;
+            }
+
+            if (attempt < attempts) {
+                onRetry(lastError, attempt);
+                await sleep(retryDelayMs * attempt);
+            }
+        }
+
+        return {
+            response: {
+                ok: false,
+                error: String(lastError?.message || "The extension could not refresh provider status."),
+            },
+            attempts,
+            transientFailure: true,
         };
     }
 
@@ -172,6 +216,7 @@
         createSerialRefreshCoordinator,
         createVideoRetention,
         reduceStatusState,
+        requestStatusWithRetry,
     };
 
     globalScope.YouTubeTimestampsContentState = contentState;

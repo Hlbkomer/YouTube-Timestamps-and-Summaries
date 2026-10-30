@@ -88,7 +88,7 @@ actor RemoteModelCatalogService {
         request.httpMethod = "GET"
         request.timeoutInterval = 8
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("TimestampsSummariesForYT/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue(GenerationSettings.providerUserAgent, forHTTPHeaderField: "User-Agent")
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)

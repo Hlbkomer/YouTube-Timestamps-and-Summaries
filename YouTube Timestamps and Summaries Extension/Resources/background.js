@@ -5,7 +5,7 @@ const MIN_NATIVE_TIMEOUT_MS = 6 * 60 * 1000;
 const MAX_NATIVE_TIMEOUT_MS = 20 * 60 * 1000;
 const JOB_RETENTION_MS = 30 * 60 * 1000;
 const JOB_MESSAGE_LIMIT = 80;
-const DEFAULT_SELECTED_MODEL = "gpt-5.6-terra";
+const DEFAULT_SELECTED_MODEL = "gpt-6-luna";
 const jobs = new Map();
 let nextJobID = 0;
 
@@ -233,6 +233,11 @@ async function generationSettingsPayload() {
 }
 
 function selectedProviderAction(providerID, kind) {
+    if (providerID === "googleGemini") {
+        return kind === "timestamps"
+            ? "generateGeminiTimestamps"
+            : "generateGeminiSummary";
+    }
     if (providerID === "xaiOAuth") {
         return kind === "timestamps"
             ? "generateGrokTimestamps"
@@ -333,6 +338,7 @@ function startGenerateJob(kind, transcript = "", timeoutMs = MIN_NATIVE_TIMEOUT_
         if (response?.ok) {
             job.status = "completed";
             job.text = response.text || "";
+            job.engineLabel = response.engineLabel || job.engineLabel;
             if (response.debug?.betaModel) {
                 appendJobMessage(job, `engine: ${response.debug.betaModel}`);
             }

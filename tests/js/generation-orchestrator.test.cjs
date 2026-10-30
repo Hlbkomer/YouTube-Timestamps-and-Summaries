@@ -130,3 +130,45 @@ test("background polling discards a response after video state becomes stale", a
         isCurrent: () => false,
     }), { stale: true });
 });
+
+test("background polling survives a timed-out status poll and still returns the completed job", async () => {
+    let clock = 0;
+    const steps = [
+        () => { throw new Error("Timed out after 20 seconds."); },
+        () => ({ ok: true, status: "running", debug: {} }),
+        () => ({ ok: true, status: "completed", text: "sol result", debug: {} }),
+    ];
+    const transient = [];
+    const poller = createJobPoller({
+        request: async () => steps.shift()(),
+        now: () => clock,
+        sleep: async (milliseconds) => { clock += milliseconds; },
+        pollIntervalMs: 1000,
+    });
+
+    const response = await poller.poll({
+        jobID: "job-sol",
+        timeoutMs: 450000,
+        onTransientError: (error, attempt) => transient.push([error.message, attempt]),
+    });
+
+    assert.equal(response.ok, true);
+    assert.equal(response.text, "sol result");
+    assert.deepEqual(transient, [["Timed out after 20 seconds.", 1]]);
+});
+
+test("background polling gives up after repeated unanswered status polls", async () => {
+    let clock = 0;
+    const poller = createJobPoller({
+        request: async () => { throw new Error("Timed out after 20 seconds."); },
+        now: () => clock,
+        sleep: async (milliseconds) => { clock += milliseconds; },
+        maxConsecutiveTransientFailures: 2,
+    });
+
+    const response = await poller.poll({ jobID: "job-dead", timeoutMs: 450000 });
+
+    assert.equal(response.ok, false);
+    assert.equal(response.error, "Timed out after 20 seconds.");
+    assert.equal(response.debug.layer, "content");
+});

@@ -15,6 +15,8 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
     private let codexService = CodexGenerationService()
     private let codexAuthService = CodexAuthService()
     private let grokGenerationService = GrokGenerationService()
+    private let geminiAPIClient = GeminiAPIClient()
+    private let geminiGenerationService = GeminiGenerationService()
     private let companionAppURL = URL(string: "youtube-timestamps-summaries://open")!
     private let logger = Logger(subsystem: "Matuko.YouTube-Timestamps-and-Summaries", category: "NativeBridge")
 
@@ -143,6 +145,23 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 videoContext: providerVideoContext(from: payload)
             )
 
+        case "generateGeminiTimestamps":
+            return await geminiGenerationService.generateTimestamps(
+                transcript: payload["transcript"] as? String ?? "",
+                model: payload["model"] as? String ?? GenerationSettings.defaultGeminiModelID,
+                languageCode: payload["languageCode"] as? String ?? "",
+                languageLabel: payload["languageLabel"] as? String ?? ""
+            )
+
+        case "generateGeminiSummary":
+            return await geminiGenerationService.generateSummary(
+                transcript: payload["transcript"] as? String ?? "",
+                model: payload["model"] as? String ?? GenerationSettings.defaultGeminiModelID,
+                languageCode: payload["languageCode"] as? String ?? "",
+                languageLabel: payload["languageLabel"] as? String ?? "",
+                videoContext: providerVideoContext(from: payload)
+            )
+
         default:
             return [
                 "ok": false,
@@ -241,9 +260,15 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         let appleConfigured = (appleStatus["isConfigured"] as? Bool) == true
         let codexConnected = (codexStatus["connected"] as? Bool) == true
         let grokConnected = (grokStatus["connected"] as? Bool) == true
-        let selectedProviderConnected = settings.providerID == GenerationSettings.grokProviderID
-            ? grokConnected
-            : codexConnected
+        let geminiStatus: [String: Any] = settings.providerID == GenerationSettings.geminiProviderID
+            ? geminiAPIClient.statusPayload()
+            : ["connected": false, "error": ""]
+        let selectedProviderConnected: Bool
+        switch settings.providerID {
+        case GenerationSettings.grokProviderID: selectedProviderConnected = grokConnected
+        case GenerationSettings.geminiProviderID: selectedProviderConnected = (geminiStatus["connected"] as? Bool) == true
+        default: selectedProviderConnected = codexConnected
+        }
         let effectiveSummaryModelID: String
         if !selectedProviderConnected, appleConfigured {
             effectiveSummaryModelID = GenerationSettings.appleIntelligenceModelID
@@ -268,9 +293,7 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         settingsPayload["modelLabel"] = modelLabel
         settingsPayload["summaryModelLabel"] = summaryModelLabel
         settingsPayload["summaryEngineLabel"] = summaryModelLabel
-        settingsPayload["providerLabel"] = settings.providerID == GenerationSettings.grokProviderID
-            ? "Grok (SuperGrok)"
-            : "ChatGPT / Codex"
+        settingsPayload["providerLabel"] = GenerationSettings.providerLabel(for: settings.providerID)
         settingsPayload["providerConnected"] = selectedProviderConnected
 
         return [
@@ -283,6 +306,7 @@ final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             "appleIntelligence": appleStatus,
             "codex": codexStatus,
             "grok": grokStatus,
+            "gemini": geminiStatus,
             "settings": settingsPayload,
         ]
     }

@@ -153,9 +153,15 @@ test("native panel mounting rejects Description surfaces with tab-list-like mark
         targetID: "engagement-panel-structured-description",
         labels: ["Kapitoly", "Prepis"],
     });
+    const initializingDescription = panel({
+        title: "In this video",
+        targetID: "engagement-panel-structured-description",
+        labels: ["Chapters", "Transcript"],
+    });
 
     assert.equal(controllerFor([targetlessDescription], {}).getMount(), null);
     assert.equal(controllerFor([targetedDescription], {}).getMount(), null);
+    assert.equal(controllerFor([initializingDescription], {}).getMount(), null);
 });
 
 test("an empty native shell cannot be opened without usable analysis evidence", () => {
@@ -193,6 +199,10 @@ test("transcript discovery never expands a generic Description panel", () => {
     assert.match(
         contentSource,
         /const nativeMountAvailable = Boolean\(nativePanel\.getMount\(\)\)\s*&& nativePanelContentAvailable\(videoKey\)/,
+    );
+    assert.match(
+        contentSource,
+        /panelHost\?\.dataset\.ytsPlacement === "native"[\s\S]{0,250}!nativePanel\.getMount\(\)[\s\S]{0,120}!nativePanelContentAvailable\(nextVideoKey\)/,
     );
 });
 
@@ -307,6 +317,50 @@ test("the page Show transcript command reuses the integrated native Transcript t
     assert.equal(state.nativeYouTubeTab, "");
     assert.equal(transcriptButton.clickCount, 1);
     assert.deepEqual(calls, ["preventDefault", "stopPropagation", "stopImmediatePropagation"]);
+});
+
+test("an auto-opened native shell is hidden if YouTube reuses it as Description", () => {
+    const parentPanel = panel({
+        title: "In this video",
+        labels: ["Transcript"],
+    });
+    const state = {
+        nativeExtensionTab: "timestamps",
+        nativeYouTubeTab: "",
+        nativePanelDismissed: true,
+        userSelectedTab: true,
+    };
+    const controller = controllerFor([parentPanel], state);
+    const trigger = {
+        textContent: "Show transcript",
+        getAttribute: () => null,
+    };
+    const event = {
+        target: {
+            closest(selector) {
+                if (selector === "ytd-video-description-transcript-section-renderer") {
+                    return {};
+                }
+                if (selector === "button, [role='button']") {
+                    return trigger;
+                }
+                return null;
+            },
+        },
+        preventDefault() {},
+        stopPropagation() {},
+        stopImmediatePropagation() {},
+    };
+
+    assert.equal(controller.handlePageTranscriptOpenClick(event), true);
+    assert.equal(parentPanel.getAttribute("visibility"), "ENGAGEMENT_PANEL_VISIBILITY_EXPANDED");
+
+    parentPanel.setAttribute("target-id", "engagement-panel-structured-description");
+    controller.syncTabs();
+
+    assert.equal(controller.getMount(), null);
+    assert.equal(parentPanel.hidden, true);
+    assert.equal(parentPanel.getAttribute("visibility"), "ENGAGEMENT_PANEL_VISIBILITY_HIDDEN");
 });
 
 function closeSurface(title, targetID = "") {
@@ -642,6 +696,51 @@ test("SPA tab injection is not blocked by transcript or generation startup", () 
         contentSource,
         /new MutationObserver\(\(records\) => \{[\s\S]{0,500}nativePanel\.syncTabs\(\);[\s\S]{0,180}scheduleNativePanelRefresh\(\);/,
     );
+});
+
+test("Timeline stays hidden across native tab replacements and restores on cleanup", () => {
+    const hiddenAttribute = "data-yts-native-owned-tab-hidden";
+    function nativeTab(label, display = "") {
+        const attributes = new Map();
+        const container = {
+            style: { display, removeProperty(name) { this[name] = ""; } },
+            getAttribute: (name) => attributes.get(name) ?? null,
+            hasAttribute: (name) => attributes.has(name),
+            setAttribute: (name, value) => attributes.set(name, value),
+            removeAttribute: (name) => attributes.delete(name),
+        };
+        return { ...button(label), container, closest: () => container };
+    }
+    let tabs = [nativeTab("Transcript"), nativeTab("Timeline", "inline-flex")];
+    const allContainers = tabs.map((tab) => tab.container);
+    const row = {
+        querySelectorAll: () => tabs,
+    };
+    const document = {
+        querySelectorAll: (selector) => selector === `[${hiddenAttribute}]`
+            ? allContainers.filter((container) => container.hasAttribute(hiddenAttribute))
+            : [],
+    };
+    const controller = controllerFor([], {}, { document });
+    const originalTimeline = tabs[1];
+
+    for (const replacementLabel of [null, "Zeitachse", "Časová os"]) {
+        if (replacementLabel) {
+            tabs = [tabs[0], nativeTab(replacementLabel)];
+            allContainers.push(tabs[1].container);
+        }
+        controller.syncNativeOwnedTabVisibility({ tabList: row });
+        controller.syncNativeOwnedTabVisibility({ tabList: row });
+        assert.equal(tabs[1].container.style.display, "none");
+        assert.equal(tabs[1].container.hasAttribute(hiddenAttribute), true);
+        assert.equal(tabs[0].container.style.display, "");
+        assert.equal(tabs[0].container.hasAttribute(hiddenAttribute), false);
+    }
+
+    controller.cleanupTabs();
+    assert.equal(originalTimeline.container.style.display, "inline-flex");
+    assert.equal(tabs[1].container.style.display, "");
+    assert.equal(allContainers.some((container) => container.hasAttribute(hiddenAttribute)), false);
 });
 
 for (const { label, kind } of [

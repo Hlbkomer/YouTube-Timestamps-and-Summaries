@@ -48,15 +48,15 @@ This fallback was successfully tested: the pasted callback completed sign-in and
 
 ## Model Policy
 
-xAI describes `grok-4.5` as its current frontier model for coding, agentic tasks, and knowledge work. This app exposes it as one `Grok 4.5` choice, keeps `grok-4.3` available, and refreshes the connected account's text-input/text-output Grok model list from `https://api.x.ai/v1/language-models` when possible.
+xAI describes `grok-4.7` as its flagship model for code, agentic tasks, and knowledge work. This app uses it with explicit low reasoning as the default, retains `grok-4.6`, `grok-4.5`, and `grok-4.3`, and refreshes the connected account's text-input/text-output Grok model list from `https://api.x.ai/v1/language-models` when possible.
 
-Grok 4.5 explicitly sends `reasoning: { "effort": "low" }`. This is a request invariant rather than a picker convention: exact `grok-4.5` and provider aliases such as `grok-4.5-latest` are canonicalized to the same built-in model before request serialization. Grok 4.3 and other model families retain xAI's default until separately measured. Request diagnostics record the picker model, provider model, reasoning effort, time to first output, input/output/total tokens, cached input tokens, reasoning tokens, and service tier whenever xAI returns those fields.
+Grok 4.7, Grok 4.6, and Grok 4.5 explicitly send `reasoning: { "effort": "low" }`. This is a request invariant rather than a picker convention: exact IDs and provider aliases such as `grok-4.7-latest`, `grok-4.6-latest`, and `grok-4.5-latest` are canonicalized to their built-in models before request serialization. Grok 4.3 and other model families retain xAI's default until separately measured. Request diagnostics record the picker model, provider model, reasoning effort, time to first output, input/output/total tokens, cached input tokens, reasoning tokens, and service tier whenever xAI returns those fields.
 
-A repository-wide request-path audit confirmed that Chapters and selected-provider Summary both route through the same `GrokGenerationService.requestText` builder and that no second xAI generation endpoint exists. The builder derives the reasoning object from the actual provider model immediately before JSON serialization; callers cannot pass or omit an effort independently. It also refuses to send a Grok 4.5 request unless the derived object is exactly `{"effort":"low"}`, so a mapping regression fails locally instead of silently falling through to xAI's potentially higher default. Every attempt re-enters that boundary.
+A repository-wide request-path audit confirmed that Chapters and selected-provider Summary both route through the same `GrokGenerationService.requestText` builder and that no second xAI generation endpoint exists. The builder derives the reasoning object from the actual provider model immediately before JSON serialization; callers cannot pass or omit an effort independently. It also refuses to send a curated Grok 4.7, Grok 4.6, or Grok 4.5 request unless the derived object is exactly `{"effort":"low"}`, so a mapping regression fails locally instead of silently falling through to xAI's high default. Every attempt re-enters that boundary.
 
-The signed Swift test covers exact, latest, and version-family classification plus the final reasoning-object value. A source-contract test verifies the single endpoint and final serializer guard. Native debug payloads expose the applied effort on success and failure.
+The signed Swift test covers exact, latest, and version-family classification for Grok 4.7, Grok 4.6, and Grok 4.5 plus the final reasoning-object value. A source-contract test verifies the single endpoint and final serializer guard. Native debug payloads expose the applied effort on success and failure.
 
-The runtime catalog is filtered to provider-shaped `grok-*` language models with text output. Provider entries for `grok-4.5` and `grok-4.5-latest` are represented by the curated Grok 4.5 choice rather than duplicated. Grok 4.20, Grok Build, Imagine, and voice models are not valid timestamp/summary choices. Former saved 4.20 or `grok-build-0.1` settings automatically normalize to Grok 4.5 when the app or extension loads settings.
+The runtime catalog is filtered to provider-shaped `grok-*` language models with text output. Provider aliases for curated Grok 4.7, Grok 4.6, and Grok 4.5 choices are canonicalized rather than duplicated. Grok 4.20, Grok Build, Imagine, and voice models are not valid timestamp/summary choices. Former saved 4.20 or `grok-build-0.1` settings automatically normalize to Grok 4.7 when the app or extension loads settings.
 
 For xAI's current model catalog and pricing, consult the official [models page](https://docs.x.ai/developers/models) and [pricing page](https://docs.x.ai/developers/pricing).
 
@@ -66,17 +66,47 @@ The extension does not currently assign a Responses API `prompt_cache_key`. The 
 
 Prompt caching helps when consecutive requests share a long, byte-identical starting prefix. It has limited value in the current product flow because the transcript is unique per video, Chapters and Summary use different prompts, and a successful result is already cached locally so the same video/model request normally does not reach xAI twice. A useful implementation would first separate stable instructions from transcript-only input, choose stable keys scoped by model and task kind, and then verify a meaningful nonzero `cached_tokens` count in the new diagnostics. Adding a key without those measurements could create complexity without reducing the first generation's latency, because a cache can only accelerate a later matching request.
 
-### Observed latency and default decision — 2026-07-20
+### Grok 4.5 latency decision — 2026-07-20
 
-Before the explicit effort setting, one representative video took about 36 seconds with Grok 4.5 and 9 seconds with Grok 4.3. After Grok 4.5 was changed from xAI's implicit high reasoning to explicit low reasoning, an early hands-on comparison took about 14 seconds with Grok 4.5 and 7 seconds with Grok 4.3. Broader follow-up testing then found that Grok 4.5 was, in most cases, only about 20% slower than Grok 4.3 while continuing to produce better perceived chapter quality. That speed/quality balance is acceptable, so Grok 4.5 remains the default.
+Before the explicit effort setting, one representative video took about 36 seconds with Grok 4.5 and 9 seconds with Grok 4.3. After Grok 4.5 was changed from xAI's implicit high reasoning to explicit low reasoning, an early hands-on comparison took about 14 seconds with Grok 4.5 and 7 seconds with Grok 4.3. Broader follow-up testing then found that Grok 4.5 was, in most cases, only about 20% slower than Grok 4.3 while continuing to produce better perceived chapter quality. That speed/quality balance supported Grok 4.5 as the default until Grok 4.6 became the new default on August 12, 2026.
 
 These are practical observations, not a controlled benchmark: provider load, transcript length, language, and video structure can change timings. The app therefore keeps elapsed time in the result caption and retains internal first-output/token diagnostics, but does not add a benchmark screen, persistent test recorder, adaptive reasoning policy, priority tier, or prompt-cache key. Grok 4.3 remains available for people who prefer the fastest option. Revisit this decision only if future testing shows a material quality regression or the typical latency gap grows substantially beyond the observed roughly 20%.
 
-## xAI Catalog Check — 2026-07-09
+### Grok 4.6 default and reasoning decision — 2026-08-12
+
+Grok 4.6 replaced Grok 4.5 as the built-in default after xAI published the `grok-4.6` model. xAI documents that omitted reasoning effort defaults to high, while low is intended for latency-sensitive use. Initial hands-on generation through this extension found the implicit high setting unacceptably slow, so Grok 4.6 sends explicit low reasoning for both Chapters and Summary. Grok 4.6 remained the default until Grok 4.7 became available. See xAI's [Grok 4.6 model page](https://docs.x.ai/developers/models/grok-4.6) and [reasoning controls](https://docs.x.ai/developers/model-capabilities/text/reasoning).
+
+### Grok 4.7 default and reasoning decision — 2026-09-24
+
+Grok 4.7 replaces Grok 4.6 as the built-in default. xAI documents `low`, `medium`, `high`, and `xhigh` for Grok 4.7, with `high` as the provider default and no option to disable reasoning. Because this extension is latency-sensitive and Grok 4.6's implicit high effort was already too slow in hands-on use, Grok 4.7 starts with explicit low reasoning rather than repeating that experiment. Existing valid selections remain unchanged, so upgrades do not silently replace a person's selected Grok 4.6, 4.5, or 4.3 model. See xAI's [Grok 4.7 model page](https://docs.x.ai/developers/models/grok-4.7), [announcement](https://x.ai/news/grok-4-7), and [reasoning controls](https://docs.x.ai/developers/model-capabilities/text/reasoning).
+
+### Grok 4.7 live validation — 2026-09-24
+
+The opt-in signed-Debug smoke test used the existing xAI OAuth session from the app's Keychain and passed the production Chapters and Summary paths. Both responses reported `grok-4.7`, and both request diagnostics reported `reasoningEffort: low`. The synthetic transcript checks also confirmed chronological grounded chapters and a summary covering the supplied subject.
+
+| Path | Total | First output | Input tokens | Output tokens | Reasoning tokens |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Chapters | 13,721 ms | 13,069 ms | 1,535 | 941 | 866 |
+| Summary | 3,346 ms | 1,388 ms | 1,434 | 216 | 56 |
+
+Run the same guarded check with:
+
+```sh
+TEST_RUNNER_YTS_GROK_MODEL_SMOKE=1 xcodebuild test \
+  -project 'YouTube Timestamps and Summaries.xcodeproj' \
+  -scheme 'YouTube Timestamps and Summaries' \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -only-testing:'YouTube Timestamps and SummariesTests'
+```
+
+The `TEST_RUNNER_` prefix is required so Xcode forwards the flag to the signed test host. Credentials remain in Keychain; metrics and generated text are stored only as Xcode result attachments.
+
+## xAI Catalog Check — 2026-09-24
 
 xAI's catalog can change, so its official pages above are the source of truth. At the time of this check, the official models page presented these primary offerings:
 
-- text/chat: `grok-4.5` and `grok-4.3`
+- text/chat: `grok-4.7` is the current flagship; the app retains `grok-4.6`, `grok-4.5`, and `grok-4.3`
 - code-specific pricing still lists `grok-build-0.1`
 - image and video: `grok-imagine-image-quality`, `grok-imagine-image`, `grok-imagine-video-1.5`, and `grok-imagine-video`
 - voice: realtime agent, realtime text input, text-to-speech, and speech-to-text (REST and streaming)
