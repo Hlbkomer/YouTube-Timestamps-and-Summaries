@@ -2,11 +2,22 @@
 
 Original candidate review: 2026-08-21. Model-support follow-ups: 2026-09-19 and 2026-09-24.
 
-Status: **GitHub version 1.2/build 8 approved for publication on October 30, 2026, using the verified notarized ZIP below. Both public websites are included in this publication. App Store work is explicitly excluded and remains local/unsubmitted.**
+Status: **Published GitHub v1.2/build 8 on October 30, 2026. The verified notarized download and both public websites are live. App Store publication is explicitly excluded; its installer and metadata drafts remain local and unsubmitted.**
 
 This document records the version 1.2 code, documentation, visual, signing, and packaging gates. Public GitHub copy is in [github-release-1.2.md](github-release-1.2.md). The reusable procedure remains in [RELEASING.md](../RELEASING.md).
 
-## Verified Publication Candidate — October 30, 2026
+## Published — October 30, 2026
+
+- Release: [v1.2](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.2), with the notarized ZIP and `SHA256SUMS` uploaded.
+- Release tag/source commit: `4d21ed852433ae75a1f0fa297aa11f3cb3c80e58`. All 73 app build-input hashes matched the verified package at commit time.
+- [Public latest download](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip) was downloaded and verified: 5,609,828 bytes, SHA-256 `c80623a12b288d74d48e8c25193d7eb181ee8e92a9c54207e4faf0fb9a669dbc`.
+- [Project website](https://hlbkomer.github.io/YouTube-Timestamps-and-Summaries/) deployed successfully from the release source; the publication-record follow-up changes documentation only.
+- [Root website](https://hlbkomer.github.io/) deployed successfully from `dae8d08fdd56e8e773c82e893d08bab65184cf4e` in `Hlbkomer/hlbkomer.github.io`.
+- Both sites were fetched at their public URLs. Verified `Better YouTube Chapters`, Gemini copy, exact current image bytes, and support/privacy/terms pages. The root site's Google verification file and unrelated existing assets were preserved.
+- JavaScript checks passed again before publication: 112. The earlier 44 signed Debug cases / 48 native runs and notarization/Gatekeeper verification apply to the unchanged app package.
+- App Store Connect, its public listing, upload and submission were untouched. The local `APP_STORE_CONNECT_COPY.md`, `APP_STORE_PREP.md`, and `docs/app-store-whats-new-1.2.txt` changes were excluded from the publication commit, as was the unrelated benchmark-output edit.
+
+## Historical Verified Candidate — October 30, 2026
 
 This section supersedes the older readiness/status findings below.
 
