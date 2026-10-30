@@ -16,24 +16,21 @@ home: true
         <a class="yts-button" href="https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.2">What’s new</a>
       </div>
     </div>
-    <div class="yts-window yts-hero-art">
-      <img src="readme-assets/companion-app.png" alt="App settings with chapter and summary model choices, and ChatGPT, Gemini and Grok connections">
-    </div>
+    <figure class="yts-hero-art">
+      <img class="yts-showcase" src="readme-assets/youtube-sidebar.png" alt="A YouTube video with clickable chapters in the sidebar">
+      <figcaption>Interface preview with example content.</figcaption>
+    </figure>
   </section>
 
-  <section class="yts-section">
-    <h2>Chapters and summaries</h2>
-    <p class="yts-section-lede">Use YouTube’s chapters or generate chapters from the transcript. The current chapter is highlighted as the video plays.</p>
-    <div class="yts-gallery">
-      <figure>
-        <img class="yts-showcase" src="readme-assets/youtube-sidebar.png" alt="Clickable chapters in YouTube’s video panel">
-        <figcaption>Chapters. Interface preview with example content.</figcaption>
-      </figure>
-      <figure>
-        <img class="yts-showcase" src="readme-assets/youtube-summary.png" alt="A video summary beside YouTube’s Transcript tab">
-        <figcaption>Summary. Interface preview with example content.</figcaption>
-      </figure>
+  <section class="yts-section yts-summary-section">
+    <div>
+      <h2>Video summaries</h2>
+      <p class="yts-section-lede">Read a summary beside the video, then switch to Transcript for the original wording.</p>
     </div>
+    <figure class="yts-summary-preview">
+      <img class="yts-showcase" src="readme-assets/summary-detail.jpg" alt="The Summary tab with the video’s main ideas and the Transcript tab beside it" loading="lazy">
+      <figcaption>Summary preview with example content.</figcaption>
+    </figure>
   </section>
 
   <section class="yts-section">

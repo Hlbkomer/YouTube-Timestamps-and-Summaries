@@ -318,6 +318,13 @@
         body.summary-view .chapter-list { display: none; }
         body.summary-view .summary { display: block; }
 
+        /* Isolated panel capture: ?view=summary&focus=panel, 500 by 772 px. */
+        html.panel-preview, .panel-preview body { width: 500px; height: 772px; min-height: 772px; overflow: hidden; background: #fff; }
+        .panel-preview body { display: block; }
+        .panel-preview .topbar, .panel-preview .watch { display: none; }
+        .panel-preview .layout { display: block; width: 500px; height: 772px; padding: 0; background: #fff; }
+        .panel-preview .native-panel { width: 500px; height: 772px; box-shadow: none; }
+
         .release-badge {
             position: absolute;
             left: 24px;
@@ -398,6 +405,9 @@
 
     <script>
         const params = new URLSearchParams(location.search);
+        if (params.get("focus") === "panel") {
+            document.documentElement.classList.add("panel-preview");
+        }
         if (params.get("view") === "summary") {
             document.body.classList.add("summary-view");
             document.querySelector(".chapter-caption").hidden = true;

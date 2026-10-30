@@ -5,7 +5,8 @@ a:hover { text-decoration-thickness: 2px; }
 a:focus-visible { outline: 3px solid #155da2; outline-offset: 4px; }
 .site-shell { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
 .site-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.4rem 0; border-bottom: 1px solid #e8ecf1; }
-.site-brand { color: #172033; font-size: .95rem; font-weight: 700; text-decoration: none; }
+.site-brand { display: inline-flex; align-items: center; gap: .75rem; color: #172033; font-size: .95rem; font-weight: 700; text-decoration: none; }
+.site-brand img { display: block; width: 40px; height: 40px; flex: 0 0 auto; }
 .site-nav, .site-footer { display: flex; flex-wrap: wrap; gap: .7rem 1.4rem; font-size: .9rem; }
 .site-nav a { color: #536077; text-decoration: none; }
 .site-nav a:hover, .site-nav a[aria-current="page"] { color: #155da2; text-decoration: underline; }
@@ -27,8 +28,8 @@ a:focus-visible { outline: 3px solid #155da2; outline-offset: 4px; }
 .yts-home img { display: block; width: 100%; margin: 0; border: 0; }
 .yts-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
-  gap: clamp(2rem, 6vw, 5rem);
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.4fr);
+  gap: clamp(2rem, 4vw, 3rem);
   align-items: center;
   padding: clamp(2.5rem, 7vw, 6rem) 0;
 }
@@ -43,7 +44,7 @@ a:focus-visible { outline: 3px solid #155da2; outline-offset: 4px; }
 .yts-hero h1 {
   margin: 0;
   color: #121a2b;
-  font-size: clamp(2.5rem, 6vw, 5.25rem);
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
   line-height: .98;
   letter-spacing: -.055em;
 }
@@ -68,25 +69,19 @@ a:focus-visible { outline: 3px solid #155da2; outline-offset: 4px; }
   text-decoration: none !important;
 }
 .yts-button-primary { border-color: #155da2; background: #155da2; color: #fff !important; }
-.yts-window {
-  overflow: hidden;
-  border: 1px solid #dce2e9;
-  border-radius: 22px;
-  background: #f5f7f9;
-  box-shadow: 0 28px 65px rgba(23, 32, 51, .16);
-}
+.yts-home figure { margin: 0; min-width: 0; }
+.yts-home figcaption { margin-top: .65rem; color: #69758a; font-size: .85rem; }
 .yts-section { padding: clamp(2.8rem, 7vw, 6rem) 0; border-top: 1px solid #e8ecf1; }
 .yts-section h2 { margin: 0; color: #121a2b; font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.05; letter-spacing: -.04em; }
 .yts-section-lede { max-width: 48rem; margin: 1rem 0 2rem; color: #5d687c; font-size: 1.1rem; line-height: 1.65; }
 .yts-showcase { overflow: hidden; border: 1px solid #dce2e9; border-radius: 20px; box-shadow: 0 24px 58px rgba(23, 32, 51, .12); }
-.yts-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-.yts-gallery figure { margin: 0; }
-.yts-gallery figcaption { margin-top: .65rem; color: #69758a; font-size: .9rem; }
+.yts-summary-section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); align-items: center; gap: clamp(2rem, 6vw, 5rem); max-width: 1000px; margin: 0 auto; }
+.yts-summary-preview { width: 100%; max-width: 420px; }
 .yts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 .yts-card { padding: 1.35rem; border: 1px solid #e1e6ec; border-radius: 16px; background: #fff; }
 .yts-card h3 { margin: 0 0 .55rem; color: #172033; font-size: 1.08rem; }
 .yts-card p { margin: 0; color: #667287; line-height: 1.55; }
 @media (max-width: 780px) {
-  .yts-hero, .yts-gallery, .yts-grid { grid-template-columns: 1fr; }
-  .yts-hero-art { order: -1; max-width: 34rem; }
+  .yts-hero, .yts-summary-section, .yts-grid { grid-template-columns: 1fr; }
+  .yts-summary-preview { justify-self: center; }
 }
