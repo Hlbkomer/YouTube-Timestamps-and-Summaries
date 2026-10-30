@@ -2,7 +2,7 @@
 
 Review date: 2026-07-20
 
-Status: **Published on GitHub on 2026-07-20** — [release 1.1](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.1)
+Status: **Published on GitHub on 2026-07-20**: [release 1.1](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.1)
 
 This document is the completed release record for version 1.1. It complements the detailed implementation history in [CHANGELOG.md](../CHANGELOG.md), the system design in [ARCHITECTURE.md](../ARCHITECTURE.md), and the reusable release procedure in [RELEASING.md](../RELEASING.md).
 

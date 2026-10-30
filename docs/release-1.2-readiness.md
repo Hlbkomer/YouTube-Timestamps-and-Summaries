@@ -6,7 +6,7 @@ Status: **Published GitHub v1.2/build 8 on October 30, 2026. The verified notari
 
 This document records the version 1.2 code, documentation, visual, signing, and packaging gates. Public GitHub copy is in [github-release-1.2.md](github-release-1.2.md). The reusable procedure remains in [RELEASING.md](../RELEASING.md).
 
-## Published — October 30, 2026
+## Published: October 30, 2026
 
 - Release: [v1.2](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.2), with the notarized ZIP and `SHA256SUMS` uploaded.
 - Release tag/source commit: `4d21ed852433ae75a1f0fa297aa11f3cb3c80e58`. All 73 app build-input hashes matched the verified package at commit time.
@@ -17,7 +17,7 @@ This document records the version 1.2 code, documentation, visual, signing, and 
 - JavaScript checks passed again before publication: 112. The earlier 44 signed Debug cases / 48 native runs and notarization/Gatekeeper verification apply to the unchanged app package.
 - App Store Connect, its public listing, upload and submission were untouched. The local `APP_STORE_CONNECT_COPY.md`, `APP_STORE_PREP.md`, and `docs/app-store-whats-new-1.2.txt` changes were excluded from the publication commit, as was the unrelated benchmark-output edit.
 
-## Historical Verified Candidate — October 30, 2026
+## Historical Verified Candidate: October 30, 2026
 
 This section supersedes the older readiness/status findings below.
 
@@ -38,14 +38,14 @@ This section supersedes the older readiness/status findings below.
 
 Publication authorization: the user requested everything except App Store. Publish the app/site/release source, matching `v1.2` tag, verified notarized ZIP and checksum, then deploy both GitHub Pages sites. App Store metadata drafts, installer and submission are excluded. Do not reuse the older August archive listed below. Deployment and download verification are recorded after publication.
 
-## Historical Preparation Follow-up — October 30
+## Historical Preparation Follow-up: October 30
 
 - Website headline changed to `Better YouTube Chapters` in the source and offline preview.
 - Apple’s public Mac App Store listing reports 1.0.4, released May 18, 2026. Prepared the cumulative 1.2 App Store changelog in `docs/app-store-whats-new-1.2.txt` and the corresponding App Store Connect copy section. The subsequent preparation pass refreshed the App Store description, review notes, and privacy draft for Gemini; see `APP_STORE_PREP.md` for the locally exported App Store installer and remaining Connect actions.
 - The project-site draft and GitHub ZIP are prepared locally. No public site, public download, or App Store listing/build has been updated. The separate legacy root-site bundle is now regenerated from the project homepage, privacy/terms sources, and current images using `scripts/prepare-root-site.py`. It is packaged as `build/release-1.2-20261030/artifacts/root-site-1.2.zip` for `Hlbkomer/hlbkomer.github.io`; neither site has been deployed.
 - No compiled app inputs changed; the already notarized GitHub ZIP checksum remains valid.
 
-## Historical Status Audit — October 18, 2026
+## Historical Status Audit: October 18, 2026
 
 - GitHub's live release API reports `v1.1` as latest, published July 20, 2026. There is no published or draft `v1.2` release in the returned release list.
 - GitHub Pages is built from `main:/docs`. Its latest build API reports commit `405538e3c7a34fa3bb512651380e7112d58dac11`, created July 20, 2026 at 15:45 UTC. The public site still presents version 1.1 and the earlier text-focused page. The redesigned local `docs/index.md` has not been deployed.

@@ -1,4 +1,4 @@
-# GPT-6 Astra Support — 2026-09-19
+# GPT-6 Astra Support: 2026-09-19
 
 > **Superseded:** GPT-6 Astra support was later removed. The current ChatGPT/Codex picker offers only **GPT-6.1 Sol** and **GPT-6 Luna** (default); GPT-6 Astra and the GPT-5.x choices are no longer listed. This document is retained as a historical record of the 2026-09-19 validation only, and its Astra instructions no longer describe the app. See [model-catalog.md](model-catalog.md) for the current lineup.
 

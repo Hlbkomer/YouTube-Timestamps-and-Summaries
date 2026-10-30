@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## v1.2 — 2026-10-30
+## v1.2: 2026-10-30
 
 - Show the actual Gemini model version returned by Google in new Chapters and Summary result notes, while retaining the Flash latest alias in Settings. Keep the selected model label as a fallback when Google omits a version.
 

@@ -1,157 +1,27 @@
 # Timestamps & Summaries for YT
 
-Safari extension and macOS companion app that adds chapters and summaries directly to YouTube's native `In this video` panel.
+A Safari extension for YouTube chapters and summaries.
 
-Use creator chapters, automatic Key moments, or transcript-generated chapters in one compact view. Summaries can stay on the Mac with Apple Intelligence or use a selected ChatGPT/Codex, Grok, or Gemini model. ChatGPT and Grok use subscription sign-in; Gemini uses your own Google AI Studio API key. No developer backend is required.
+Use YouTube’s chapters or generate them from the transcript. Click a chapter to jump to that point in the video. Read the summary beside YouTube’s Transcript tab.
 
-Generated chapters are validated against real transcript cue times before they become clickable. When neither YouTube's native panel nor a usable transcript exists, the extension leaves the page untouched.
+[Download version 1.2](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip) · [Release notes](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.2) · [Website](https://hlbkomer.github.io/YouTube-Timestamps-and-Summaries/)
 
-## Download
-
-Download the signed and notarized macOS app:
-
-[Download Timestamps & Summaries for YT](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/latest/download/Timestamps-and-Summaries-for-YT.zip)
-
-Current release: **1.2** (October 30, 2026). See the [1.2 release notes](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/releases/tag/v1.2).
-
-After unzipping, drag the app onto the included `Applications` shortcut, then open it and enable the Safari extension.
-
-## Preview
-
-### Chapters inside YouTube
-
-![Chapters integrated into YouTube's native panel](docs/readme-assets/youtube-sidebar.png)
-
-### Summary inside YouTube
-
-![A structured video summary in YouTube's native panel](docs/readme-assets/youtube-summary.png)
-
-### Companion app
-
-![Companion app with current generation settings and provider connections](docs/readme-assets/companion-app.png)
-
-## Features
-
-- YouTube-native `In this video` integration with a unified compact `Chapters` view and `Summary`, plus a standalone fallback when a transcript is available
-- transcript-based generation for better timestamp accuracy
-- native YouTube chapters and automatic Key moments are imported and shown in the same compact Chapters list as generated chapters
-- companion-app defaults to prefer YouTube chapters or always generate, plus an inline Chapters-footer action to switch the current video when both sources are available
-- all compact chapter lists can highlight the currently playing chapter
-- configurable provider/model for timestamp generation and optional model summaries
-- optional ChatGPT/Codex or Grok sign-in, or a Gemini API key stored in macOS Keychain
-- summaries can use Apple Intelligence without a provider, or the selected provider model when available
-- GPT-6 Luna and Grok 4.7 with explicit low reasoning are the fast defaults for new settings
-- result captions show the model/path used and the generation time, while extension tab labels stay stable
-- no developer backend; API keys are needed only for Gemini
-
-## Chapter Sources And YouTube Navigation
-
-The companion app controls the default chapter policy: prefer chapters already available on YouTube, or always generate chapters from the transcript. YouTube creator chapters and automatic `Key moments` are imported into the same compact Chapters list as generated results. The small footer identifies the active source and, when another source is available, offers `Generate chapters from transcript`, `View generated chapters`, or `View YouTube chapters` on a second line without opening a separate menu.
-
-Native chapters satisfy only the Chapters result. Summary remains independent and starts automatically whenever its configured engine and a transcript are available. While a newly selected video is still resolving a lazy YouTube Chapters/Key moments source, the panel shows `Checking for YouTube chapters...` instead of briefly rendering an empty result. If a page has neither YouTube's native `In this video` shell nor a usable transcript, the extension leaves that page untouched; a transcript-confirmed standalone sidebar remains available when only the native shell is missing.
-
-The Safari toolbar popup now contains only a Settings shortcut. The former `Current video chapters` picker was removed because the watch-page content script already owns native-chapter discovery, cached generated results, the displayed source, and per-video overrides. Keeping the switch beside the result avoids duplicating that state across the page, background process, and popup.
-
-YouTube navigation is handled as a transition rather than an immediate teardown. During watch-to-watch navigation, the outgoing panel chrome remains stable until YouTube commits the destination; the prior video's rows are then cleared before destination data is rendered. Generation work is bound to both its video and a monotonic request identity, so an older request cannot alter the destination video's result or remove the `Chapters...` busy label while its chapters are still generating. When leaving for the homepage or another non-video page, the integration is removed only after that navigation commits, avoiding a brief tab disappearance before the page changes. From feeds and the homepage, a small route guard converts watch/live transitions into real navigations so Safari reliably injects the video-page scripts. Shorts and other non-video pages never load the full integration.
-
-## Project Structure
-
-- macOS companion app target
-- Safari Web Extension target and native bridge
-
-## Extension Routing Notes
-
-The Safari extension intentionally keeps the YouTube content script scoped to supported YouTube video pages only:
-
-- `content.js` should run on YouTube watch/live pages, where the native-panel integration is mounted or a transcript-confirmed standalone fallback may be mounted.
-- `content.js` keeps the outgoing panel stable during a navigation transition, gates observer/URL fallbacks until YouTube finishes, then resets or removes the integration for the committed destination.
-- `route-guard.js` can run on broader YouTube pages, but only to turn watch/live single-page navigations into full navigations so Safari injects `content.js`; finish-event and URL-change fallbacks recover when YouTube bypasses the initial click interceptor.
-- Do not broaden `content.js` to all YouTube pages. Running the full integration script on Shorts, feeds, subscriptions, or the homepage can disturb YouTube's own layout.
-
-The `tests/js/manifest-routing.test.cjs` test protects this split.
+![Chapters in YouTube’s video panel, with example content](docs/readme-assets/youtube-sidebar.png)
 
 ## Setup
 
-1. Use a Mac with macOS 26.4 or later.
-2. In Xcode, set your Apple development team for both the app target and the extension target.
-3. Run the macOS app.
-4. Choose the generation model and summary engine in the app.
-5. Optional: sign in with ChatGPT or Grok, or connect a Google AI Studio API key in the Gemini panel, for timestamps and model-powered summaries. A provider becomes selectable in Generation Setup after it is connected.
-6. Click `Open Safari Extension Settings` and enable the Safari extension.
-7. Open a supported YouTube watch page. Generated results require captions or a transcript; imported YouTube chapters do not.
+Requires Safari on macOS 26.4 or later.
 
-## Releasing
+1. Unzip the download and move the app to Applications.
+2. Open the app and enable the extension in Safari Settings. Allow access to YouTube.
+3. Choose your chapter and summary models in the app.
 
-For Developer ID signing, notarization, and release packaging, see [RELEASING.md](RELEASING.md). The version 1.2 audit, validation, and candidate record is in [docs/release-1.2-readiness.md](docs/release-1.2-readiness.md).
+ChatGPT and Grok use subscription sign-in. Gemini uses your own Google AI Studio API key, with API usage billed to your Google project. Apple Intelligence can generate local summaries on a compatible Mac.
 
-## Optional Grok Login
+Generated chapters and summaries need captions or a transcript and may contain mistakes. YouTube’s existing chapters work without connecting a provider.
 
-Choose **Sign in with Grok** in the companion app to use a SuperGrok subscription. The app opens the xAI browser sign-in flow and uses the resulting OAuth session directly from the sandboxed app and Safari extension. No command-line client, Login Item, background helper, or developer backend is involved.
+## Help and development
 
-The Grok model pickers list **Grok 4.7** as the default with explicit low reasoning, retain **Grok 4.6** and **Grok 4.5** with the same low reasoning, and keep **Grok 4.3** with its provider-default reasoning. The app refreshes the connected account's text-capable Grok model catalog from xAI when possible. The hardened loopback listener has completed the normal Safari/xAI authorization flow on the Mac that previously reproduced the callback failure. If Safari still cannot open the temporary `127.0.0.1` callback page, copy the complete callback URL from Safari (or the one-time authorization code shown by xAI), paste it into the companion app's Grok sign-in panel, and choose **Complete Sign-In**. The manual path remains a recovery option; see [docs/grok-integration.md](docs/grok-integration.md).
+[Setup and support](https://hlbkomer.github.io/YouTube-Timestamps-and-Summaries/support.html) · [Report a problem](https://github.com/Hlbkomer/YouTube-Timestamps-and-Summaries/issues) · [Privacy](https://hlbkomer.github.io/YouTube-Timestamps-and-Summaries/privacy.html)
 
-Gemini defaults to **Gemini Flash (latest)** (`gemini-flash-latest`), with **Gemini 3.5 Flash-Lite** and **Gemini 4 Argon** also available for Chapters and Summary. All three use explicit low thinking. In the companion app, open **Google AI Studio**, create a current Gemini API key for your project, paste it into **Gemini API key**, and choose **Connect Gemini**. Then select **Gemini** in Generation Setup. The app validates model access before saving the key in the shared macOS Keychain. API usage is billed to your Google project; eligible Google AI Pro developer credits can offset it after activation. It does not reuse Gemini app, Gemini CLI, or Antigravity subscription credentials. See [docs/gemini-integration.md](docs/gemini-integration.md).
-
-ChatGPT/Codex defaults to **GPT-6 Luna** (fast, economical) and also offers the flagship **GPT-6.1 Sol**. Chapters and Summary can use different models. Both models use explicit low reasoning for fast generation, and the app sends no temperature or other sampling parameters. New `gpt-*` picker options can arrive from the repository's remote catalog without a binary update. Existing supported model selections are preserved on upgrade; retired choices (including GPT-6 Astra and the GPT-5.x family) fall back to GPT-6 Luna. The catalog maintenance and provider model policy are documented in [docs/model-catalog.md](docs/model-catalog.md).
-
-## Apple Intelligence Summary By macOS Version
-
-The visible `Summary` tab keeps one consistent workflow while choosing the local Apple Intelligence implementation for the installed macOS version:
-
-- macOS 26 uses the established character-based summary path.
-- On macOS 27, the Summary model picker contains one **Apple Intelligence** choice backed by the detailed adaptive-grounded pipeline. Choices are grouped alphabetically by provider (Apple Intelligence first), with newer models first within the selected cloud provider.
-
-This applies only when Apple Intelligence is selected for summaries. ChatGPT, Grok, and Gemini summaries continue to use the selected provider on every macOS version. Private Cloud Compute is not active while its managed Apple entitlement is pending. See [docs/macos27-summary.md](docs/macos27-summary.md) for the technical and testing notes.
-
-For release notes, see [CHANGELOG.md](CHANGELOG.md).
-
-For the transcript-analysis design, see [ARCHITECTURE.md](ARCHITECTURE.md). For the native YouTube panel implementation notes, see [docs/native-panel-integration.md](docs/native-panel-integration.md).
-
-## Limitations
-
-- Requires macOS 26.4 or later.
-- Timestamp generation requires a ready selected provider.
-- Grok generation requires a Grok account with the appropriate subscription and an active OAuth sign-in in the companion app.
-- Apple Intelligence summaries require Apple Intelligence to be available on the Mac.
-- Videos without an available transcript cannot be summarized or timestamped.
-- Active livestreams may not expose a stable transcript until the broadcast finishes.
-- Generated timestamps and summaries can be incomplete or inaccurate.
-
-## Troubleshooting
-
-### Apple Intelligence is not available
-
-- Confirm the Mac supports Apple Intelligence.
-- Enable Apple Intelligence in macOS Settings.
-- Wait for the on-device model to finish downloading if macOS says it is not ready yet.
-
-### The Safari panel does not appear on YouTube
-
-- Open the companion app and make sure the Safari extension is enabled.
-- In Safari, verify the extension has access to YouTube.
-- Refresh the YouTube watch page after enabling the extension.
-
-### Timestamps or summary could not be generated
-
-- Try the request again after refreshing the page.
-- Confirm the video has captions or an available transcript.
-- For timestamps, confirm the selected provider is ready in the companion app.
-- For summaries without a selected provider, confirm Apple Intelligence is available on the Mac.
-- If the video is still live, wait until the stream finishes and YouTube exposes the transcript.
-
-## Security Notes
-
-- No developer-operated backend is required. ChatGPT and Grok use sign-in; Gemini requires your own API key.
-- ChatGPT sign-in tokens are stored in the local macOS data-protection Keychain under a shared access group so the app and extension can use the user's own signed-in account without legacy login-Keychain authorization prompts.
-- Grok OAuth tokens are stored in the same shared Keychain access group. The app does not use a command-line client or a separate helper.
-- Transcript text is sent to the selected provider for timestamp generation and, if selected, summary generation.
-- The companion app can fetch a small model catalog JSON file from this repository on GitHub to keep ChatGPT/Codex picker options current; this request does not include transcripts or sign-in tokens.
-- When Apple Intelligence is selected for summaries, transcript text is processed locally by the app extension on the user's Mac.
-- The WebExtension requests host access only for YouTube pages.
-
-## GitHub Checklist
-
-Before publishing:
-
-- do not commit local build artifacts, logs, or screenshots that reveal private browsing context
-- confirm no credentials or API keys are added before publishing
+For contributors: [development guide](docs/development.md), [architecture](ARCHITECTURE.md), [changelog](CHANGELOG.md) and [release procedure](RELEASING.md).

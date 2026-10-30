@@ -96,7 +96,7 @@ TEST_RUNNER_YTS_GEMINI_SMOKE=1 xcodebuild test \
 The `TEST_RUNNER_` prefix forwards the opt-in flag to the signed host. Normal test runs do not make real Gemini calls. Final Safari verification should confirm Chapters/Summary attribution, seeking on a generated chapter, cached results, key removal, and Apple Intelligence Summary selection with Gemini as the chapter provider. Use the normal signed Debug host per `AGENTS.md` and `RELEASING.md`.
 
 
-## Alternative models assessed — October 18, 2026
+## Alternative models assessed: October 18, 2026
 
 This assessment initially kept Flash latest as the only selectable model. After the user requested both alternatives, Flash-Lite and Argon were added with explicit low thinking; Flash latest remains the default. No settings migrations were added.
 
@@ -114,7 +114,7 @@ Standard API prices per million tokens, excluding caching/tools, checked on Octo
 
 Flash introductory pricing ends December 31, 2026, then becomes $1.50/$7.50. Argon introductory pricing ends November 30, 2026, then becomes $4/$20. Alias pricing follows the resolved model. [Google pricing](https://ai.google.dev/gemini-api/docs/pricing)
 
-## Timeline and provider-label verification — October 18, 2026
+## Timeline and provider-label verification: October 18, 2026
 
 The displayed provider name is now `Gemini`, retaining the `googleGemini` internal identifier. The integrated sidebar hides Timeline while preserving Transcript. Automated checks passed: 110 JavaScript tests, including repeated/localized Timeline replacement and cleanup restoration, and 42 signed Debug native tests. No live provider calls were made for these presentation changes.
 
@@ -122,16 +122,16 @@ The displayed provider name is now `Gemini`, retaining the `googleGemini` intern
 The low-thinking configuration for Lite is supported even though Google defaults Lite to minimal. Argon defaults to medium; our explicit low setting favors responsiveness for transcript summaries and chapters. [Thinking levels](https://ai.google.dev/gemini-api/docs/generate-content/thinking), [Argon guidance](https://ai.google.dev/gemini-api/docs/latest-model).
 
 
-## Three-model verification — October 18, 2026
+## Three-model verification: October 18, 2026
 
 The signed Debug build passed 110 JavaScript tests and 42 native test cases (46 runs including parameterized Flash/Lite/Argon request and production-service checks). Offline coverage verifies each model endpoint, explicit LOW thinking, Argon's larger output ceiling, shared production prompts, timestamp grounding, returned model diagnostics, and credential preservation after quota errors. The built app's Summary menu was inspected and shows Apple Intelligence, Gemini 4 Argon, Gemini Flash (latest), then Gemini 3.5 Flash-Lite. Flash latest remained selected for Chapters and Summary. No live generation was performed for Lite or Argon; the user will compare those outputs.
 
 
-## Flash-Lite thinking adjustment — October 18, 2026
+## Flash-Lite thinking adjustment: October 18, 2026
 
 Flash-Lite briefly used medium thinking at the user's request. After testing, the user requested low again: the current configuration is explicit LOW for all three Gemini models, for both Chapters and Summary. The native request and diagnostic `reasoningEffort` share the `GenerationSettings.geminiThinkingLevel` constant so recorded effort matches the API payload. The temporary per-model branch was removed. No settings migration or additional UI preference was introduced.
 
 
-## Chapter-format regression — October 18, 2026
+## Chapter-format regression: October 18, 2026
 
 A report of repeated `Gemini did not return usable timestamps` on video `ri4yr-2qBc8` exposed the strict formatting boundary. A synthetic regression reproduces rejection of bracketed/bulleted Markdown and equivalent clock spellings, and verifies Gemini-only normalization while preserving exact source-cue grounding and Grok behavior. The original failed model response was unavailable, and the public transcript export could not retrieve this freshly uploaded video, so this does not establish which formatting appeared in that specific response. A retry on the updated Debug build remains the real-video confirmation. No live Gemini calls were made for this investigation.

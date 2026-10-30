@@ -66,21 +66,21 @@ The extension does not currently assign a Responses API `prompt_cache_key`. The 
 
 Prompt caching helps when consecutive requests share a long, byte-identical starting prefix. It has limited value in the current product flow because the transcript is unique per video, Chapters and Summary use different prompts, and a successful result is already cached locally so the same video/model request normally does not reach xAI twice. A useful implementation would first separate stable instructions from transcript-only input, choose stable keys scoped by model and task kind, and then verify a meaningful nonzero `cached_tokens` count in the new diagnostics. Adding a key without those measurements could create complexity without reducing the first generation's latency, because a cache can only accelerate a later matching request.
 
-### Grok 4.5 latency decision — 2026-07-20
+### Grok 4.5 latency decision: 2026-07-20
 
 Before the explicit effort setting, one representative video took about 36 seconds with Grok 4.5 and 9 seconds with Grok 4.3. After Grok 4.5 was changed from xAI's implicit high reasoning to explicit low reasoning, an early hands-on comparison took about 14 seconds with Grok 4.5 and 7 seconds with Grok 4.3. Broader follow-up testing then found that Grok 4.5 was, in most cases, only about 20% slower than Grok 4.3 while continuing to produce better perceived chapter quality. That speed/quality balance supported Grok 4.5 as the default until Grok 4.6 became the new default on August 12, 2026.
 
 These are practical observations, not a controlled benchmark: provider load, transcript length, language, and video structure can change timings. The app therefore keeps elapsed time in the result caption and retains internal first-output/token diagnostics, but does not add a benchmark screen, persistent test recorder, adaptive reasoning policy, priority tier, or prompt-cache key. Grok 4.3 remains available for people who prefer the fastest option. Revisit this decision only if future testing shows a material quality regression or the typical latency gap grows substantially beyond the observed roughly 20%.
 
-### Grok 4.6 default and reasoning decision — 2026-08-12
+### Grok 4.6 default and reasoning decision: 2026-08-12
 
 Grok 4.6 replaced Grok 4.5 as the built-in default after xAI published the `grok-4.6` model. xAI documents that omitted reasoning effort defaults to high, while low is intended for latency-sensitive use. Initial hands-on generation through this extension found the implicit high setting unacceptably slow, so Grok 4.6 sends explicit low reasoning for both Chapters and Summary. Grok 4.6 remained the default until Grok 4.7 became available. See xAI's [Grok 4.6 model page](https://docs.x.ai/developers/models/grok-4.6) and [reasoning controls](https://docs.x.ai/developers/model-capabilities/text/reasoning).
 
-### Grok 4.7 default and reasoning decision — 2026-09-24
+### Grok 4.7 default and reasoning decision: 2026-09-24
 
 Grok 4.7 replaces Grok 4.6 as the built-in default. xAI documents `low`, `medium`, `high`, and `xhigh` for Grok 4.7, with `high` as the provider default and no option to disable reasoning. Because this extension is latency-sensitive and Grok 4.6's implicit high effort was already too slow in hands-on use, Grok 4.7 starts with explicit low reasoning rather than repeating that experiment. Existing valid selections remain unchanged, so upgrades do not silently replace a person's selected Grok 4.6, 4.5, or 4.3 model. See xAI's [Grok 4.7 model page](https://docs.x.ai/developers/models/grok-4.7), [announcement](https://x.ai/news/grok-4-7), and [reasoning controls](https://docs.x.ai/developers/model-capabilities/text/reasoning).
 
-### Grok 4.7 live validation — 2026-09-24
+### Grok 4.7 live validation: 2026-09-24
 
 The opt-in signed-Debug smoke test used the existing xAI OAuth session from the app's Keychain and passed the production Chapters and Summary paths. Both responses reported `grok-4.7`, and both request diagnostics reported `reasoningEffort: low`. The synthetic transcript checks also confirmed chronological grounded chapters and a summary covering the supplied subject.
 
@@ -102,7 +102,7 @@ TEST_RUNNER_YTS_GROK_MODEL_SMOKE=1 xcodebuild test \
 
 The `TEST_RUNNER_` prefix is required so Xcode forwards the flag to the signed test host. Credentials remain in Keychain; metrics and generated text are stored only as Xcode result attachments.
 
-## xAI Catalog Check — 2026-09-24
+## xAI Catalog Check: 2026-09-24
 
 xAI's catalog can change, so its official pages above are the source of truth. At the time of this check, the official models page presented these primary offerings:
 

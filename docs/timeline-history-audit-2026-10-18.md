@@ -1,4 +1,4 @@
-# Timeline history audit — October 18, 2026
+# Timeline history audit: October 18, 2026
 
 ## Subsequent product decision
 
@@ -26,11 +26,11 @@ The assistant reported implementing this in commit `7374596` (**Stabilize native
 
 Subsequent reports describe broken Timeline switching: a blank body, disappearing tabs, competing sidebars, and reopening after Close. The fixes were:
 
-- `a9f1ae8` — **Keep native panel stable on Timeline**, July 6.
-- `a200310` — **Smooth Timeline native tab switching**, July 7.
-- `dcd5a10` — **Restore native panels before Timeline handoff**, July 7.
-- `91ba995` — **Polish native timeline handoff**, July 7.
-- `800d670` — **Respect native timeline surface**, July 7.
+- `a9f1ae8` - **Keep native panel stable on Timeline**, July 6.
+- `a200310` - **Smooth Timeline native tab switching**, July 7.
+- `dcd5a10` - **Restore native panels before Timeline handoff**, July 7.
+- `91ba995` - **Polish native timeline handoff**, July 7.
+- `800d670` - **Respect native timeline surface**, July 7.
 
 In particular, `91ba995` hides the extension's own content host when a YouTube-owned tab takes over, retaining its shadow DOM. `800d670` restores native elements and avoids forcing the original parent panel open while Timeline is selected. These changes preserve Timeline's native UI.
 

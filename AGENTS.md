@@ -1,5 +1,11 @@
 # Workspace Instructions
 
+## Writing style
+
+- Do not use em dashes in authored UI text, website copy, README or documentation. Use periods, commas, colons or parentheses as appropriate.
+- Keep public pages and the README short and factual. Put implementation details in linked developer documentation.
+- Preserve punctuation handling in parsers and external/provider-response fixtures.
+
 ## Development build policy
 
 - Use the signed **Debug** configuration for routine implementation, automated checks, and Safari testing.
@@ -11,7 +17,7 @@
 
 The detailed rationale and release procedure are in `RELEASING.md` under “Development Safari Testing.”
 
-## Model settings policy — non-negotiable
+## Model settings policy: non-negotiable
 
 - Do not add per-model or per-version settings migrations, retired-ID remapping, or migration-specific branches/tests.
 - Change the provider's default when needed. Unsupported saved settings must use the existing generic validation and default fallback, without special handling for the previous model.

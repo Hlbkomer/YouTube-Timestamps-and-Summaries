@@ -1,4 +1,4 @@
-# Code Review Hardening — July 24, 2026
+# Code Review Hardening: July 24, 2026
 
 This document tracks the implementation work that followed the July 24 code
 review, with particular attention to changes that can affect complexity, speed,
